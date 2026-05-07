@@ -8,6 +8,7 @@ import { generateVehicleComparisonPdf } from "@/lib/api/pdf-comparison-report";
 import { getSiteSettings } from "@/lib/site-settings/service";
 import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
+import { applyMileageValuationOverride } from "@/lib/api/market-value";
 
 export const runtime = "nodejs";
 
@@ -18,15 +19,16 @@ function parseLocale(input: string | null): Locale {
 function parseMileage(input: string | null): number | null {
   if (!input) return null;
   const value = Number(input);
-  if (!Number.isFinite(value) || value < 0 || value > 1_500_000) return null;
+  if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value);
 }
 
 function withMileageContext(localized: Record<string, unknown>, userMileage: number | null) {
   if (userMileage === null) return localized;
-  const enriched = ((localized.enriched ?? {}) as Record<string, unknown>);
+  const adjusted = applyMileageValuationOverride(localized, userMileage);
+  const enriched = ((adjusted.enriched ?? {}) as Record<string, unknown>);
   return {
-    ...localized,
+    ...adjusted,
     enriched: {
       ...enriched,
       userMileageInput: userMileage,

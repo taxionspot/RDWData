@@ -34,7 +34,7 @@ type CompareResponse = {
 function toMileage(value: string | null): number | null {
   if (!value || value.trim().length === 0) return null;
   const num = Number(value);
-  if (!Number.isFinite(num) || num < 0 || num > 1_500_000) return null;
+  if (!Number.isFinite(num) || num < 0) return null;
   return Math.round(num);
 }
 
@@ -259,7 +259,7 @@ export function VehicleComparisonScreen({ plate }: Props) {
               className={styles.input}
               inputMode="numeric"
               value={compareMileageInput}
-              onChange={(e) => setCompareMileageInput(e.target.value.replace(/[^\d]/g, "").slice(0, 7))}
+              onChange={(e) => setCompareMileageInput(e.target.value.replace(/[^\d]/g, ""))}
               placeholder={locale === "nl" ? "Kilometerstand (optioneel)" : "Mileage (optional)"}
             />
             <button className={styles.btn} type="button" onClick={onCompare}>

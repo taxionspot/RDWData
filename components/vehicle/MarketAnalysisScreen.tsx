@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   Pencil,
+  RefreshCw,
   TrendingUp
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -14,6 +15,7 @@ import styles from "./MarketAnalysisScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { PremiumLock } from "../ui/PremiumLock";
 import { useI18n } from "@/lib/i18n/context";
+import { computeMarketValueV3 } from "@/lib/rdw/heuristics";
 
 
 type Props = {
@@ -47,18 +49,21 @@ export function MarketAnalysisScreen({ plate }: Props) {
     const raw = searchParams.get("mileage");
     if (!raw || raw.trim().length === 0) return null;
     const value = Number(raw);
-    if (!Number.isFinite(value) || value < 0 || value > 1_500_000) return null;
+    if (!Number.isFinite(value) || value < 0) return null;
     return Math.round(value);
   }, [searchParams]);
   const [mileageInput, setMileageInput] = useState(() => (mileageFromQuery != null ? String(mileageFromQuery) : ""));
   const mileageValue = useMemo(() => {
     if (mileageInput.trim().length === 0) return null;
     const value = Number(mileageInput);
-    if (!Number.isFinite(value) || value < 0 || value > 1_500_000) return null;
+    if (!Number.isFinite(value) || value < 0) return null;
     return Math.round(value);
   }, [mileageInput]);
   const { normalized, isValid, data, isLoading, isError } = useVehicleLookup(plate, mileageValue);
   const [sellerPrice, setSellerPrice] = useState<string>("");
+  const [appliedMileage, setAppliedMileage] = useState<number | null>(mileageValue);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const initializedMileage = useRef(false);
 
   useEffect(() => {
     setMileageInput(mileageFromQuery != null ? String(mileageFromQuery) : "");
@@ -80,10 +85,42 @@ export function MarketAnalysisScreen({ plate }: Props) {
     }
   }, [mileageValue, pathname, router, searchParams]);
 
-  const marketValue = data?.enriched?.estimatedValueNow ?? data?.vehicle.cataloguePrice ?? null;
-  const marketValueMin = data?.enriched?.estimatedValueMin ?? null;
-  const marketValueMax = data?.enriched?.estimatedValueMax ?? null;
-  const marketConfidence = data?.enriched?.marketValueConfidence ?? null;
+  useEffect(() => {
+    if (!data?.vehicle) return;
+    if (!initializedMileage.current) {
+      initializedMileage.current = true;
+      setAppliedMileage(mileageValue);
+      return;
+    }
+    setIsRecalculating(true);
+    const timeout = setTimeout(() => {
+      setAppliedMileage(mileageValue);
+      setIsRecalculating(false);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [mileageValue, data?.vehicle]);
+
+  const valuation = useMemo(() => {
+    if (!data?.vehicle) return null;
+    const first = data.vehicle.firstRegistrationWorld ? new Date(data.vehicle.firstRegistrationWorld) : null;
+    const ageYears =
+      first && !Number.isNaN(first.getTime())
+        ? Math.max((Date.now() - first.getTime()) / (1000 * 60 * 60 * 24 * 365.25), 0)
+        : null;
+    return computeMarketValueV3({
+      catalogPrice: data.vehicle.cataloguePrice,
+      ageYears,
+      brand: data.vehicle.brand,
+      fuelType: data.vehicle.fuelType,
+      bodyType: data.vehicle.bodyType,
+      mileage: appliedMileage
+    });
+  }, [data?.vehicle, appliedMileage]);
+
+  const marketValue = valuation?.value ?? data?.enriched?.estimatedValueNow ?? data?.vehicle.cataloguePrice ?? null;
+  const marketValueMin = valuation?.min ?? data?.enriched?.estimatedValueMin ?? null;
+  const marketValueMax = valuation?.max ?? data?.enriched?.estimatedValueMax ?? null;
+  const marketConfidence = valuation?.confidence ?? data?.enriched?.marketValueConfidence ?? null;
 
   useEffect(() => {
     if (!sellerPrice && marketValue) {
@@ -168,15 +205,15 @@ export function MarketAnalysisScreen({ plate }: Props) {
   const v = data.vehicle;
   const enriched = data.enriched;
   const estimateRows = [
-    { label: locale === "nl" ? "Geschatte waarde" : "Estimated value", value: formatCurrency(enriched.estimatedValueNow) },
+    { label: locale === "nl" ? "Geschatte waarde" : "Estimated value", value: formatCurrency(marketValue) },
     {
       label: locale === "nl" ? "Waardebandbreedte" : "Value range",
       value:
-        enriched.estimatedValueMin && enriched.estimatedValueMax
-          ? `${formatCurrency(enriched.estimatedValueMin)} - ${formatCurrency(enriched.estimatedValueMax)}`
+        marketValueMin && marketValueMax
+          ? `${formatCurrency(marketValueMin)} - ${formatCurrency(marketValueMax)}`
           : "-"
     },
-    { label: locale === "nl" ? "Marktbetrouwbaarheid" : "Market confidence", value: enriched.marketValueConfidence ?? "UNKNOWN" },
+    { label: locale === "nl" ? "Marktbetrouwbaarheid" : "Market confidence", value: marketConfidence ?? "UNKNOWN" },
     { label: locale === "nl" ? "Marktsignaal" : "Market signal", value: enriched.mileageVerdict ?? "UNKNOWN" },
     { label: locale === "nl" ? "APK slagingskans" : "APK pass chance", value: `${enriched.apkPassChance}%` },
     {
@@ -208,10 +245,21 @@ export function MarketAnalysisScreen({ plate }: Props) {
             <div className={styles.panel}>
               <div className={styles.valueHero}>
                 <div className={styles.valueLabel}>{locale === "nl" ? "Geschatte marktwaarde" : "Estimated Market Value"}</div>
-                <div className={styles.valueAmount}>{formatCurrency(marketValue)}</div>
+                <div className={styles.valueAmount}>
+                  {isRecalculating ? <RefreshCw size={30} className={styles.inlineSpinner} /> : formatCurrency(marketValue)}
+                </div>
                 <div className={styles.valueContext}>
-                  <TrendingUp size={16} />
-                  {marketValue ? (locale === "nl" ? "Hoge vraag in de markt" : "High demand in current market") : locale === "nl" ? "Wacht op marktsignaal" : "Awaiting market signal"}
+                  {isRecalculating ? (
+                    <>
+                      <RefreshCw size={16} className={styles.inlineSpinner} />
+                      {locale === "nl" ? "Marktwaarde herberekenen..." : "Recalculating market value..."}
+                    </>
+                  ) : (
+                    <>
+                      <TrendingUp size={16} />
+                      {marketValue ? (locale === "nl" ? "Hoge vraag in de markt" : "High demand in current market") : locale === "nl" ? "Wacht op marktsignaal" : "Awaiting market signal"}
+                    </>
+                  )}
                 </div>
                 <div className={styles.valueRange}>
                   {marketValueMin != null && marketValueMax != null
@@ -263,7 +311,7 @@ export function MarketAnalysisScreen({ plate }: Props) {
                   className={styles.textInput}
                   inputMode="numeric"
                   value={mileageInput}
-                  onChange={(event) => setMileageInput(event.target.value.replace(/[^\d]/g, "").slice(0, 7))}
+                  onChange={(event) => setMileageInput(event.target.value.replace(/[^\d]/g, ""))}
                   placeholder={locale === "nl" ? "Bijv. 142000" : "E.g. 142000"}
                 />
                 <div className={styles.inputHint}>

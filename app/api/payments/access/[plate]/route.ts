@@ -26,3 +26,33 @@ export async function GET(_: Request, { params }: Params) {
   }
 }
 
+export async function POST(request: Request, { params }: Params) {
+  try {
+    const plate = normalizePlate(params.plate ?? "");
+    if (!plate) {
+      return NextResponse.json({ ok: false, error: "Invalid plate." }, { status: 400 });
+    }
+
+    const body = (await request.json().catch(() => ({}))) as { email?: string };
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const orderId = `demo-${plate}-${Date.now()}`;
+
+    await connectMongo();
+    await PlatePaymentModel.create({
+      plate,
+      orderId,
+      captureId: orderId,
+      ...(email ? { email } : {}),
+      amount: "0.00",
+      currency: "EUR",
+      status: "COMPLETED",
+      provider: "paypal",
+      createdAt: new Date()
+    });
+
+    return NextResponse.json({ ok: true, paid: true, plate });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to grant demo access.";
+    return NextResponse.json({ ok: false, paid: false, error: message }, { status: 500 });
+  }
+}

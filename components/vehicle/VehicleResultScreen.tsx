@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   BadgeCheck,
   Bookmark,
-  Camera,
   Clock3,
   Coins,
   Download,
@@ -587,11 +586,6 @@ export function VehicleResultScreen({ plate }: Props) {
                     priority
                     unoptimized
                   />
-                  <div className={styles.imageOverlayTag}>
-                    <Camera size={14} />
-                    IMAGIN.studio
-                  </div>
-                  
                   <div className={styles.angleSwitcher}>
                     {["01", "09", "28"].map((angle) => (
                       <button

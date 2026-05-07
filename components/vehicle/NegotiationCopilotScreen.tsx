@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, BadgeEuro, HandCoins, ShieldAlert, Wrench } from "lucide-react";
+import { AlertCircle, BadgeEuro, HandCoins, RefreshCw, ShieldAlert, Wrench } from "lucide-react";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { PremiumLock } from "../ui/PremiumLock";
@@ -242,9 +242,12 @@ export function NegotiationCopilotScreen({ plate }: Props) {
               <div className={styles.aiScriptTitle}>{locale === "nl" ? "Claude onderhandelingsscript" : "Claude negotiation script"}</div>
               <div className={styles.aiScriptText}>
                 {aiLoading
-                  ? locale === "nl"
-                    ? "Claude script wordt gegenereerd..."
-                    : "Generating Claude script..."
+                  ? (
+                    <span className={styles.inlineLoading}>
+                      <RefreshCw size={14} className={styles.inlineSpinner} />
+                      {locale === "nl" ? "Claude script wordt gegenereerd..." : "Generating Claude script..."}
+                    </span>
+                  )
                   : aiAdvice?.script ??
                     (locale === "nl"
                       ? "AI-script tijdelijk niet beschikbaar."

@@ -86,7 +86,8 @@ function riskColor(level: AiInsights["riskLevel"]) {
 
 function splitText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
   if (!text) return [""];
-  const words = text.split(/\s+/);
+  const safe = text.replace(/[\u2013\u2014]/g, "-");
+  const words = safe.split(/\s+/);
   const lines: string[] = [];
   let line = "";
 
@@ -114,7 +115,7 @@ function splitText(text: string, font: PDFFont, size: number, maxWidth: number):
     line = current;
   }
   if (line) lines.push(line);
-  return lines.length ? lines : [text];
+  return lines.length ? lines : [safe];
 }
 
 function formatRecordFields(record: Row): string {
@@ -680,19 +681,6 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   layout.keyValue("raw.body", `${body.length} ${locale === "nl" ? "records" : "records"}`);
   layout.keyValue("raw.typeApprovals", `${typeApprovals.length} ${locale === "nl" ? "records" : "records"}`);
 
-  layout.section(locale === "nl" ? "RDW brondata details (leesbaar)" : "RDW Source Data Details (Readable)");
-  layout.table(
-    [locale === "nl" ? "Dataset" : "Dataset", locale === "nl" ? "Record" : "Record", locale === "nl" ? "Velden" : "Fields"],
-    [
-      ...rawMain.map((row, idx) => ["raw.main", String(idx + 1), formatRecordFields(row)]),
-      ...fuel.map((row, idx) => ["raw.fuel", String(idx + 1), formatRecordFields(row)]),
-      ...rawApk.map((row, idx) => ["raw.apk", String(idx + 1), formatRecordFields(row)]),
-      ...rawDefects.map((row, idx) => ["raw.defects", String(idx + 1), formatRecordFields(row)]),
-      ...rawRecalls.map((row, idx) => ["raw.recalls", String(idx + 1), formatRecordFields(row)]),
-      ...body.map((row, idx) => ["raw.body", String(idx + 1), formatRecordFields(row)]),
-      ...typeApprovals.map((row, idx) => ["raw.typeApprovals", String(idx + 1), formatRecordFields(row)])
-    ]
-  );
 }
 
 async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; contentType: string } | null> {

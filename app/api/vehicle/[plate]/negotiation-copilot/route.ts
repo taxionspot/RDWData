@@ -14,7 +14,7 @@ function parseLocale(input: string | null): Locale {
 
 function parseMileage(input: unknown): number | null {
   const value = Number(input);
-  if (!Number.isFinite(value) || value < 0 || value > 1_500_000) return null;
+  if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value);
 }
 

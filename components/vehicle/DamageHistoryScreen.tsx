@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -15,6 +16,7 @@ import styles from "./DamageHistoryScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { PremiumLock } from "../ui/PremiumLock";
 import { useI18n } from "@/lib/i18n/context";
+import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 
 
 type Props = {
@@ -35,47 +37,85 @@ function SeverityChip({ tone, label }: { tone: "warning" | "low"; label: string 
   );
 }
 
+function formatDateLabel(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "-";
+  if (/^\d{8}$/.test(raw)) {
+    const y = Number(raw.slice(0, 4));
+    const m = Number(raw.slice(4, 6)) - 1;
+    const d = Number(raw.slice(6, 8));
+    const date = new Date(y, m, d);
+    if (!Number.isNaN(date.getTime())) return date.toLocaleDateString("nl-NL");
+  }
+  const date = new Date(raw);
+  if (!Number.isNaN(date.getTime())) return date.toLocaleDateString("nl-NL");
+  return raw;
+}
+
 export function DamageHistoryScreen({ plate }: Props) {
   const { locale } = useI18n();
   const isNl = locale === "nl";
   const backHref = buildPlateHref(plate);
+  const { normalized, isValid, data, isLoading, isError } = useVehicleLookup(plate ?? "");
+
+  const inspections = useMemo(() => (data?.inspections ?? []) as Array<Record<string, unknown>>, [data]);
+  const defects = useMemo(() => (data?.defects ?? []) as Array<Record<string, unknown>>, [data]);
+  const recalls = useMemo(() => (data?.recalls ?? []) as Array<Record<string, unknown>>, [data]);
+  const defectDescriptions = useMemo(
+    () => ((data?.defectDescriptions ?? {}) as Record<string, string>),
+    [data]
+  );
+
+  const damageEvents = useMemo(() => {
+    const source = defects.length > 0 ? defects : inspections;
+    return source
+      .map((row, index) => {
+        const code = String(row.gebrek_identificatie ?? row.gebrek_identificatienummer ?? "").trim();
+        const title = defectDescriptions[code] || code || (isNl ? "Schade-event" : "Damage event");
+        const dateRaw =
+          row.meld_datum_door_keuringsinstantie_dt ??
+          row.meld_datum_door_keuringsinstantie ??
+          row.datum ??
+          row.date ??
+          "";
+        const dateLabel = formatDateLabel(dateRaw);
+        return {
+          id: `${code || "event"}-${index}`,
+          code: code || "-",
+          title,
+          date: dateLabel,
+          recognition: String(row.soort_erkenning_omschrijving ?? row.soort_erkenning_keuringsinstantie ?? "-"),
+          count: Number(row.aantal_gebreken_geconstateerd ?? 1)
+        };
+      })
+      .sort((a, b) => {
+        const ad = new Date(a.date).getTime();
+        const bd = new Date(b.date).getTime();
+        if (Number.isNaN(ad) || Number.isNaN(bd)) return 0;
+        return bd - ad;
+      });
+  }, [defects, inspections, defectDescriptions, isNl]);
 
   const markers = [
-    { id: "front", label: isNl ? "Voorbumper" : "Front bumper", active: false },
-    { id: "rear", label: isNl ? "Achterdeur" : "Rear door", active: true },
-    { id: "left", label: isNl ? "Linkerpaneel" : "Left panel", active: false }
+    { id: "front", label: isNl ? "Schade-event 1" : "Damage event 1", active: damageEvents.length > 0 },
+    { id: "rear", label: isNl ? "Schade-event 2" : "Damage event 2", active: damageEvents.length > 1 },
+    { id: "left", label: isNl ? "Schade-event 3" : "Damage event 3", active: damageEvents.length > 2 }
   ];
 
   const legendItems = [
-    { id: "minor", label: isNl ? "Kleine reparatie" : "Minor repair", count: "2" },
-    { id: "panel", label: isNl ? "Paneelvervanging" : "Panel replacement", count: "1" },
-    { id: "paint", label: isNl ? "Spuitwerk" : "Paint work", count: "1" }
+    { id: "minor", label: isNl ? "Inspectierecords" : "Inspection records", count: String(inspections.length) },
+    { id: "panel", label: isNl ? "Defectrecords" : "Defect records", count: String(defects.length) },
+    { id: "paint", label: isNl ? "Recalls" : "Recalls", count: String(recalls.length) }
   ];
 
-  const detailCards = [
-    {
-      kicker: isNl ? "Event 01" : "Event 01",
-      title: isNl ? "Achterdeur vervangen" : "Rear door replacement",
-      severity: isNl ? "Middel" : "Moderate",
-      severityTone: "warning",
-      date: "Mar 2023",
-      cost: "EUR 1,200",
-      location: "Rotterdam",
-      status: isNl ? "Afgerond" : "Resolved",
-      tags: [isNl ? "Achterpaneel" : "Rear panel", isNl ? "Verzekeringsclaim" : "Insurance claim"]
-    },
-    {
-      kicker: isNl ? "Event 02" : "Event 02",
-      title: isNl ? "Voorbumper gerepareerd" : "Front bumper repair",
-      severity: isNl ? "Laag" : "Low",
-      severityTone: "low",
-      date: "Sep 2022",
-      cost: "EUR 350",
-      location: "Utrecht",
-      status: isNl ? "Afgerond" : "Resolved",
-      tags: [isNl ? "Cosmetisch" : "Cosmetic", isNl ? "Geen structurele impact" : "No structural impact"]
-    }
-  ];
+  const latestEvent = damageEvents[0];
+
+  if (!isValid || isError) {
+    return <div className={styles.page}><div className={styles.shell}>{isNl ? "Voertuig niet gevonden." : "Vehicle not found."}</div></div>;
+  }
+  if (isLoading || !data) {
+    return <div className={styles.page}><div className={styles.shell}>{isNl ? "Schadehistorie laden..." : "Loading damage history..."}</div></div>;
+  }
 
   return (
     <div className={styles.page}>
@@ -125,33 +165,33 @@ export function DamageHistoryScreen({ plate }: Props) {
                     : "Use the car body diagram to inspect reported zones. Each marker represents a clickable event such as front bumper, rear door, or left panel damage."}
                 </div>
               </div>
-              <div className={styles.heroStats}>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>{isNl ? "Gedetecteerde markers" : "Detected markers"}</div>
-                  <div className={styles.statValue}>{isNl ? "3 panelen" : "3 panels"}</div>
-                </div>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>{isNl ? "Grote ongevallen" : "Major accidents"}</div>
-                  <div className={styles.statValue}>{isNl ? "Geen gevonden" : "None found"}</div>
-                </div>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>{isNl ? "Laatste event" : "Latest event"}</div>
-                  <div className={styles.statValue}>Mar 2023</div>
+                <div className={styles.heroStats}>
+                  <div className={styles.statCard}>
+                    <div className={styles.statLabel}>{isNl ? "Schade-events" : "Damage events"}</div>
+                    <div className={styles.statValue}>{damageEvents.length}</div>
+                  </div>
+                  <div className={styles.statCard}>
+                    <div className={styles.statLabel}>{isNl ? "Defectrecords" : "Defect records"}</div>
+                    <div className={styles.statValue}>{defects.length}</div>
+                  </div>
+                  <div className={styles.statCard}>
+                    <div className={styles.statLabel}>{isNl ? "Laatste event" : "Latest event"}</div>
+                    <div className={styles.statValue}>{latestEvent?.date ?? "-"}</div>
+                  </div>
                 </div>
               </div>
-            </div>
 
             <div className={`${styles.heroSide} ${styles.surface}`}>
               <div className={styles.summaryTitle}>{isNl ? "Schadesamenvatting" : "Damage summary"}</div>
               <div className={styles.summaryCard}>
                 <div className={`${styles.statusPill} ${styles.statusSuccess}`}>
-                  <BadgeCheck size={12} /> {isNl ? "Geen ongevalshistorie gevonden" : "No accident history found"}
+                  <BadgeCheck size={12} /> {isNl ? "Gebaseerd op RDW/APK-data" : "Based on RDW/APK data"}
                 </div>
-                <div className={styles.summaryValue}>{isNl ? "Laag risico" : "Low risk"}</div>
+                <div className={styles.summaryValue}>{damageEvents.length === 0 ? (isNl ? "Geen events" : "No events") : (isNl ? "Events gevonden" : "Events found")}</div>
                 <div className={styles.summaryCopy}>
                   {isNl
-                    ? "Geen patroon van zware ongevallen in het zichtbare rapport. Gemelde schade lijkt beperkt en lokaal."
-                    : "No major accident pattern appears in the visible report. Minor bodywork markers are limited and read as localized repairs rather than structural damage."}
+                    ? "Deze samenvatting komt direct uit de beschikbare inspectie-, defect- en recallrecords."
+                    : "This summary is mapped directly from available inspection, defect, and recall records."}
                 </div>
                 <div className={styles.summaryBar}>
                   <div className={styles.summaryFill} />
@@ -159,12 +199,14 @@ export function DamageHistoryScreen({ plate }: Props) {
               </div>
               <div className={styles.summaryCard}>
                 <div className={`${styles.statusPill} ${styles.statusWarning}`}>
-                  <AlertCircle size={12} /> {isNl ? "Achterdeurreparatie" : "Rear door repair"}
+                  <AlertCircle size={12} /> {isNl ? "Laatste gemelde event" : "Latest reported event"}
                 </div>
                 <div className={styles.summaryCopy}>
-                  {isNl
-                    ? "Geschatte reparatiekosten zijn gemiddeld en het event lijkt geïsoleerd. Open de kaarten hieronder voor details."
-                    : "Estimated repair cost is moderate and the event appears isolated. Open the cards below to compare date, severity, and repair scope across all visible markers."}
+                  {latestEvent
+                    ? `${latestEvent.date} · ${latestEvent.title}`
+                    : isNl
+                    ? "Geen events beschikbaar in de dataset."
+                    : "No events available in the dataset."}
                 </div>
               </div>
             </div>
@@ -249,14 +291,14 @@ export function DamageHistoryScreen({ plate }: Props) {
                 </div>
               </div>
 
-              {detailCards.map((card) => (
-                <div className={styles.detailCard} key={card.title}>
+              {damageEvents.map((card, index) => (
+                <div className={styles.detailCard} key={card.id}>
                   <div className={styles.detailHead}>
                     <div className={styles.detailTitleWrap}>
-                      <div className={styles.detailKicker}>{card.kicker}</div>
+                      <div className={styles.detailKicker}>{isNl ? "Event" : "Event"} {index + 1}</div>
                       <div className={styles.detailTitle}>{card.title}</div>
                     </div>
-                    <SeverityChip tone={card.severityTone as "warning" | "low"} label={card.severity} />
+                    <SeverityChip tone={card.count > 1 ? "warning" : "low"} label={card.count > 1 ? (isNl ? "Middel" : "Moderate") : (isNl ? "Laag" : "Low")} />
                   </div>
                   <div className={styles.detailGrid}>
                     <div className={styles.infoBox}>
@@ -264,37 +306,37 @@ export function DamageHistoryScreen({ plate }: Props) {
                       <div className={styles.infoValue}>{card.date}</div>
                     </div>
                     <div className={styles.infoBox}>
-                      <div className={styles.infoLabel}>{isNl ? "Schatting" : "Estimate"}</div>
-                      <div className={styles.infoValue}>{card.cost}</div>
+                      <div className={styles.infoLabel}>{isNl ? "Defectcode" : "Defect code"}</div>
+                      <div className={styles.infoValue}>{card.code}</div>
                     </div>
                     <div className={styles.infoBox}>
-                      <div className={styles.infoLabel}>{isNl ? "Locatie" : "Location"}</div>
-                      <div className={styles.infoValue}>{card.location}</div>
+                      <div className={styles.infoLabel}>{isNl ? "Erkenning" : "Recognition"}</div>
+                      <div className={styles.infoValue}>{card.recognition}</div>
                     </div>
                     <div className={styles.infoBox}>
-                      <div className={styles.infoLabel}>{isNl ? "Status" : "Status"}</div>
-                      <div className={styles.infoValue}>{card.status}</div>
+                      <div className={styles.infoLabel}>{isNl ? "Aantal gebreken" : "Defect count"}</div>
+                      <div className={styles.infoValue}>{card.count}</div>
                     </div>
                   </div>
                   <div className={styles.detailCopy}>
                     {isNl
-                      ? "Reparatie lijkt lokaal beperkt. Geen grote structurele impact gemeld. Controleer indien nodig facturen."
-                      : "Repair scope appears localized. No major structural impact reported. Validate against service invoices if needed."}
+                      ? "Inhoud komt direct uit RDW/APK records. Controleer details met documentatie van verkoper."
+                      : "Content is mapped directly from RDW/APK records. Validate details with seller documentation."}
                   </div>
                   <div className={styles.detailFooter}>
                     <div className={styles.tagRow}>
-                      {card.tags.map((tag) => (
-                        <span key={tag} className={styles.miniTag}>
-                          {tag}
-                        </span>
-                      ))}
+                      <span className={styles.miniTag}>{card.code}</span>
+                      <span className={styles.miniTag}>{card.recognition}</span>
                     </div>
-                    <button className={styles.linkBtn} type="button">
-                      {isNl ? "Documenten bekijken" : "View documents"}
-                    </button>
+                    <span className={styles.linkBtn}>{isNl ? "RDW record" : "RDW record"}</span>
                   </div>
                 </div>
               ))}
+              {damageEvents.length === 0 ? (
+                <div className={styles.detailCard}>
+                  <div className={styles.detailTitle}>{isNl ? "Geen schade-events in dataset" : "No damage events in dataset"}</div>
+                </div>
+              ) : null}
             </div>
           </div>
         </PremiumLock>

@@ -113,7 +113,16 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
               <button
                 type="button"
                 className={styles.skipButton}
-                onClick={() => {
+                onClick={async () => {
+                  try {
+                    await fetch(`/api/payments/access/${encodeURIComponent(plate)}`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ email: email.trim().toLowerCase() || undefined })
+                    });
+                  } catch {
+                    // Keep demo UX non-blocking even if backend grant fails.
+                  }
                   grantPaidAccessForPlate(plate);
                   onUnlocked?.({ email: email.trim().toLowerCase() || undefined });
                   onClose();

@@ -176,18 +176,10 @@ export function OwnershipTimelineScreen({ plate }: Props) {
         <div className={`${styles.timelineContainer} ${styles.glassPanel}`}>
           <div className={styles.timelineHeader}>
             <h2 className={styles.timelineTitle}>{locale === "nl" ? "Eigendomstijdlijn" : "Ownership Timeline"}</h2>
-            <p className={styles.timelineSubtitle}>
-              {locale === "nl"
-                ? "Bekijk overdrachtsperiodes van dit voertuig. RDW levert alleen eigenaarsaantal en registratiedatums; perioden zijn daarom geschat."
-                : "Review the transfer periods associated with this vehicle. RDW only provides owner count and registration dates, so periods are estimated from available data."}
-            </p>
           </div>
 
           <div className={styles.timeline}>
-            {entries.length === 0 ? (
-              <div className={styles.emptyNote}>{locale === "nl" ? "Eigendomdetails niet beschikbaar vanuit RDW." : "Ownership detail data not available from RDW."}</div>
-            ) : (
-              entries.map((entry) => (
+            {entries.map((entry) => (
                 <div key={entry.id} className={styles.timelineItem}>
                   <div className={`${styles.timelineNode} ${entry.tone === "warning" ? styles.nodeWarning : ""}`} />
                   <div className={`${styles.ownerCard} ${entry.tone === "warning" ? styles.cardWarning : ""}`}>
@@ -213,8 +205,7 @@ export function OwnershipTimelineScreen({ plate }: Props) {
                     ) : null}
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </div>
         </PremiumLock>

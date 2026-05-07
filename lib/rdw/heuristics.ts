@@ -41,7 +41,7 @@ export type EnrichedData = {
 
 type MileagePoint = { date: Date; t: number; km: number };
 
-type MarketValueResult = {
+export type MarketValueResult = {
   value: number | null;
   min: number | null;
   max: number | null;
@@ -447,16 +447,15 @@ function fuelOffset({ fuelType, bodyType, ageYears }: { fuelType: string | null;
   return 0.0;
 }
 
-function computeMarketValue(params: {
+export function computeMarketValueV3(params: {
   catalogPrice: number | null;
   ageYears: number | null;
   brand: string | null;
   fuelType: string | null;
   bodyType: string | null;
   mileage: number | null;
-  brandKnown: boolean;
 }): MarketValueResult {
-  const { catalogPrice, ageYears, brand, fuelType, bodyType, mileage, brandKnown } = params;
+  const { catalogPrice, ageYears, brand, fuelType, bodyType, mileage } = params;
   if (!catalogPrice || ageYears == null || ageYears < 0) {
     return { value: null, min: null, max: null, se: null, confidence: null };
   }
@@ -495,6 +494,7 @@ function computeMarketValue(params: {
   if (!hasMileage) se += 0.10;
   if (t > 15) se += 0.06;
   if (hasMileage && Math.abs(r) > 1.0) se += 0.04;
+  const brandKnown = getBrandOffset(brand).known;
   if (!brandKnown) se += 0.03;
 
   minimum = roundTo(Math.exp(lnP - 1.28 * se), 50);
@@ -561,16 +561,13 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
 
   const registrationDate = v.firstRegistrationWorld ? parseDate(v.firstRegistrationWorld) : null;
   const mileageEst = estimateMileage(profile, registrationDate);
-  const brandInfo = getBrandOffset(v.brand);
-
-  const marketValue = computeMarketValue({
+  const marketValue = computeMarketValueV3({
     catalogPrice: v.cataloguePrice,
     ageYears,
     brand: v.brand,
     fuelType: v.fuelType,
     bodyType: v.bodyType,
-    mileage: mileageEst.latestMileage ?? mileageEst.estimatedMileageNow,
-    brandKnown: brandInfo.known
+    mileage: mileageEst.latestMileage ?? mileageEst.estimatedMileageNow
   });
 
   let estimatedValueNextYear: number | null = null;
@@ -580,14 +577,13 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
       ? mileageEst.estimatedMileageNow + mileageEst.mileageSlopeKmPerYear
       : mileageEst.estimatedMileageNow ?? mileageEst.latestMileage;
 
-    const nextValue = computeMarketValue({
+    const nextValue = computeMarketValueV3({
       catalogPrice: v.cataloguePrice,
       ageYears: nextAge,
       brand: v.brand,
       fuelType: v.fuelType,
       bodyType: v.bodyType,
-      mileage: projectedMileage ?? null,
-      brandKnown: brandInfo.known
+      mileage: projectedMileage ?? null
     });
     estimatedValueNextYear = nextValue.value;
   }

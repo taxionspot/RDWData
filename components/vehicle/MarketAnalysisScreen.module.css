@@ -500,6 +500,16 @@
   color: var(--muted-foreground);
 }
 
+.inlineSpinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 1024px) {
   .mainGrid {
     grid-template-columns: minmax(0, 1fr);

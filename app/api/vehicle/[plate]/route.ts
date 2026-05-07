@@ -10,6 +10,7 @@ import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
 import { generateVehicleReportHtml } from "@/lib/api/report-template";
 import { generateVehicleReportPdf } from "@/lib/api/pdf-report";
+import { applyMileageValuationOverride } from "@/lib/api/market-value";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
@@ -27,7 +28,7 @@ function isValidEmail(input: string): boolean {
 function parseUserMileage(input: string | null): number | null {
   if (!input) return null;
   const value = Number(input);
-  if (!Number.isFinite(value) || value < 0 || value > 1_500_000) return null;
+  if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value);
 }
 
@@ -46,7 +47,8 @@ async function hasPaidReportAccess(plate: string): Promise<boolean> {
 
 async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: number | null) {
   const profile = await getVehicleProfile(plate);
-  const localized = localizeVehicleProfile(profile, locale) as Record<string, unknown>;
+  let localized = localizeVehicleProfile(profile, locale) as Record<string, unknown>;
+  localized = applyMileageValuationOverride(localized, userMileage);
   if (userMileage !== null) {
     const enriched = ((localized.enriched ?? {}) as Record<string, unknown>);
     localized.enriched = {

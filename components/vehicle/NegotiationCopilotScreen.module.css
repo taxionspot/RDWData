@@ -112,6 +112,22 @@
   font-size: 14px;
 }
 
+.inlineLoading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inlineSpinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .aiHints {
   margin-top: 8px;
   display: grid;
@@ -248,4 +264,3 @@
     font-size: 12px;
   }
 }
-
