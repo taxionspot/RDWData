@@ -56,7 +56,7 @@ export function DamageHistoryScreen({ plate }: Props) {
   const { locale } = useI18n();
   const isNl = locale === "nl";
   const backHref = buildPlateHref(plate);
-  const { normalized, isValid, data, isLoading, isError } = useVehicleLookup(plate ?? "");
+  const { isValid, data, isLoading, isError } = useVehicleLookup(plate ?? "");
 
   const inspections = useMemo(() => (data?.inspections ?? []) as Array<Record<string, unknown>>, [data]);
   const defects = useMemo(() => (data?.defects ?? []) as Array<Record<string, unknown>>, [data]);

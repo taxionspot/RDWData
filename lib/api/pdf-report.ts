@@ -118,12 +118,6 @@ function splitText(text: string, font: PDFFont, size: number, maxWidth: number):
   return lines.length ? lines : [safe];
 }
 
-function formatRecordFields(record: Row): string {
-  const entries = Object.entries(record);
-  if (entries.length === 0) return "-";
-  return entries.map(([key, value]) => `${key}: ${s(value)}`).join(" | ");
-}
-
 function drawHeader(page: PDFPage, bold: PDFFont, regular: PDFFont, args: ReportArgs) {
   page.drawRectangle({
     x: 0,
