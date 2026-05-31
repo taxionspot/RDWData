@@ -1,14 +1,28 @@
 import { notFound } from "next/navigation";
 import { connectMongo } from "@/lib/db/mongodb";
 import { CmsPageModel } from "@/models/CmsPage";
-import { ensureLegalPages } from "@/lib/cms/legal-pages";
+import { ensureLegalPages, getLegalTemplateBySlug } from "@/lib/cms/legal-pages";
 
 type Params = { params: { slug: string } };
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+async function loadCmsPage(slug: string): Promise<{ title: string; content: string } | null> {
+  try {
+    await connectMongo();
+    await ensureLegalPages();
+    const page = await CmsPageModel.findOne({ slug, published: true }).lean<{ title: string; content: string } | null>();
+    if (page) return { title: page.title, content: page.content };
+  } catch (error) {
+    console.warn(`CMS lookup failed for "${slug}"; trying static fallback.`, error);
+  }
+  const template = getLegalTemplateBySlug(slug);
+  return template ? { title: template.title, content: template.content } : null;
+}
+
 export default async function CmsPage({ params }: Params) {
-  await connectMongo();
-  await ensureLegalPages();
-  const page = await CmsPageModel.findOne({ slug: params.slug.toLowerCase(), published: true }).lean();
+  const page = await loadCmsPage(params.slug.toLowerCase());
   if (!page) notFound();
 
   return (

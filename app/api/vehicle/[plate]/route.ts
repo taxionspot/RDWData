@@ -15,6 +15,10 @@ import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
 
+export const runtime = "nodejs";
+// Headroom for RDW fan-out + Claude AI + PDF generation on serverless.
+export const maxDuration = 60;
+
 type Params = { params: { plate: string } };
 
 function parseLocale(input: string | null): Locale {

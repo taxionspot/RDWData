@@ -6,6 +6,10 @@ import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
 import { buildFallbackNegotiationCopilotAdvice, generateNegotiationCopilotAdvice, generateVehicleAiReport } from "@/lib/api/claude";
 
+export const runtime = "nodejs";
+// Headroom for RDW lookup + Claude negotiation analysis on serverless.
+export const maxDuration = 60;
+
 type Params = { params: { plate: string } };
 
 function parseLocale(input: string | null): Locale {
