@@ -12,3 +12,4 @@ coverage
 
 .npm-cache
 .test-dist
+tsconfig.tsbuildinfo
