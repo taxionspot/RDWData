@@ -122,6 +122,7 @@ export default function LandingPage() {
               height={675}
               alt="Platform dashboard"
               priority
+              unoptimized
               className="w-full h-auto"
             />
           </div>
