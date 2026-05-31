@@ -11,6 +11,8 @@ import { PlatePaymentModel } from "@/models/PlatePayment";
 import { applyMileageValuationOverride } from "@/lib/api/market-value";
 
 export const runtime = "nodejs";
+// Headroom for two RDW lookups + Claude comparison + PDF on serverless.
+export const maxDuration = 60;
 
 function parseLocale(input: string | null): Locale {
   return input === "en" ? "en" : "nl";

@@ -1,15 +1,26 @@
 import { notFound } from "next/navigation";
 import { connectMongo } from "@/lib/db/mongodb";
 import { CmsPageModel } from "@/models/CmsPage";
-import { ensureLegalPages } from "@/lib/cms/legal-pages";
+import { ensureLegalPages, getLegalTemplateBySlug } from "@/lib/cms/legal-pages";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+async function loadLegalPage(slug: string): Promise<{ title: string; content: string } | null> {
+  try {
+    await connectMongo();
+    await ensureLegalPages();
+    const page = await CmsPageModel.findOne({ slug, published: true }).lean<{ title: string; content: string } | null>();
+    if (page) return { title: page.title, content: page.content };
+  } catch (error) {
+    console.warn(`Falling back to static legal template for "${slug}".`, error);
+  }
+  const template = getLegalTemplateBySlug(slug);
+  return template ? { title: template.title, content: template.content } : null;
+}
 
 export default async function TermsAndConditionsPage() {
-  await connectMongo();
-  await ensureLegalPages();
-
-  const page = await CmsPageModel.findOne({ slug: "terms-and-conditions", published: true }).lean();
+  const page = await loadLegalPage("terms-and-conditions");
   if (!page) notFound();
 
   return (

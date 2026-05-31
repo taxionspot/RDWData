@@ -6,6 +6,8 @@ import { DATASETS } from "@/lib/rdw/endpoints";
 import { parseDatasetOrThrow, parsePlateOrThrow } from "@/lib/api/plate";
 import { errorResponse } from "@/lib/api/errors";
 
+export const runtime = "nodejs";
+
 type Params = { params: { dataset: string; plate: string } };
 
 export async function GET(_: Request, { params }: Params) {

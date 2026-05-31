@@ -39,6 +39,27 @@ const ICON_MAP: Record<string, LucideIcon> = {
   ShieldCheck
 };
 
+/**
+ * Coerce a configurable link entry to a display string. Site settings come from
+ * the database and admins may have saved links as plain strings, objects with a
+ * label, or other shapes — never assume it is already a string.
+ */
+function toLinkLabel(item: unknown): string {
+  if (typeof item === "string") return item;
+  if (item && typeof item === "object") {
+    const maybe = item as { label?: unknown; title?: unknown; name?: unknown };
+    const candidate = maybe.label ?? maybe.title ?? maybe.name;
+    if (typeof candidate === "string") return candidate;
+  }
+  if (item === null || item === undefined) return "";
+  return String(item);
+}
+
+function toLinkLabels(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(toLinkLabel).filter((label) => label.trim().length > 0);
+}
+
 function resolveLegalHref(label: string): string | null {
   const normalized = label.trim().toLowerCase();
   if (normalized === "privacy policy" || normalized === "privacybeleid") {
@@ -122,6 +143,7 @@ export default function LandingPage() {
               height={675}
               alt="Platform dashboard"
               priority
+              unoptimized
               className="w-full h-auto"
             />
           </div>
@@ -193,7 +215,7 @@ export default function LandingPage() {
           <div>
             <div className={styles["footer-title"]}>{settings.landing.footer.productTitle}</div>
             <div className={styles["footer-links"]}>
-              {settings.landing.footer.productLinks.map((item) => (
+              {toLinkLabels(settings.landing.footer.productLinks).map((item) => (
                 <div key={item} className={styles["footer-link"]}>
                   {item}
                 </div>
@@ -203,7 +225,7 @@ export default function LandingPage() {
           <div>
             <div className={styles["footer-title"]}>{settings.landing.footer.companyTitle}</div>
             <div className={styles["footer-links"]}>
-              {settings.landing.footer.companyLinks.map((item) => (
+              {toLinkLabels(settings.landing.footer.companyLinks).map((item) => (
                 <div key={item} className={styles["footer-link"]}>
                   {item}
                 </div>
@@ -213,7 +235,7 @@ export default function LandingPage() {
           <div>
             <div className={styles["footer-title"]}>{settings.landing.footer.legalTitle}</div>
             <div className={styles["footer-links"]}>
-              {settings.landing.footer.legalLinks.map((item) => (
+              {toLinkLabels(settings.landing.footer.legalLinks).map((item) => (
                 (() => {
                   const href = resolveLegalHref(item);
                   if (href) {
