@@ -9,8 +9,7 @@ import {
   Download,
   Share2,
   Shield,
-  Sparkles,
-  Wrench
+  Sparkles
 } from "lucide-react";
 import styles from "./DamageHistoryScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
@@ -96,12 +95,6 @@ export function DamageHistoryScreen({ plate }: Props) {
       });
   }, [defects, inspections, defectDescriptions, isNl]);
 
-  const markers = [
-    { id: "front", label: isNl ? "Schade-event 1" : "Damage event 1", active: damageEvents.length > 0 },
-    { id: "rear", label: isNl ? "Schade-event 2" : "Damage event 2", active: damageEvents.length > 1 },
-    { id: "left", label: isNl ? "Schade-event 3" : "Damage event 3", active: damageEvents.length > 2 }
-  ];
-
   const legendItems = [
     { id: "minor", label: isNl ? "Inspectierecords" : "Inspection records", count: String(inspections.length) },
     { id: "panel", label: isNl ? "Defectrecords" : "Defect records", count: String(defects.length) },
@@ -130,7 +123,7 @@ export function DamageHistoryScreen({ plate }: Props) {
               </Link>
               <div className={styles.brandCopy}>
                 <div className={styles.brandTitle}>{isNl ? "Schadehistorie" : "Damage history"}</div>
-                <div className={styles.brandSubtitle}>{isNl ? "Carrosserie-events en reparatiemarkeringen" : "Vehicle body events and repair markers"}</div>
+                <div className={styles.brandSubtitle}>{isNl ? "Gemelde defecten uit RDW- en APK-historie" : "Reported defects from RDW and APK history"}</div>
               </div>
             </div>
             <div className={styles.topActions}>
@@ -151,18 +144,18 @@ export function DamageHistoryScreen({ plate }: Props) {
           <div className={styles.hero}>
             <div className={`${styles.heroMain} ${styles.surface}`}>
               <div className={styles.eyebrow}>
-                <Sparkles size={14} /> {isNl ? "Interactieve carrosseriekaart" : "Interactive body map"}
+                <Sparkles size={14} /> {isNl ? "Defecthistorie" : "Defect history"}
               </div>
               <div className={styles.headlineBlock}>
                 <div className={styles.headline}>
                   {isNl
-                    ? "Bekijk schadepunten, reparatieschattingen en signalen van een schone historie in een overzicht."
-                    : "Review visual damage markers, repair estimates, and clean-history signals in one focused workspace."}
+                    ? "De gemelde defecten en keuringssignalen uit de RDW- en APK-historie in één overzicht."
+                    : "The reported defects and inspection signals from the RDW and APK history in one overview."}
                 </div>
                 <div className={styles.subhead}>
                   {isNl
-                    ? "Gebruik het carrosseriediagram om gemelde zones te inspecteren. Elke marker staat voor een event zoals voorbumper-, achterdeur- of linkerpaneelschade."
-                    : "Use the car body diagram to inspect reported zones. Each marker represents a clickable event such as front bumper, rear door, or left panel damage."}
+                    ? "RDW levert defectcodes uit de APK-keuringen — geen schadelocaties. Hieronder staan de daadwerkelijk gemelde defecten met datum en omschrijving."
+                    : "RDW provides defect codes from APK inspections — not body locations. Below are the actual reported defects with their date and description."}
                 </div>
               </div>
                 <div className={styles.heroStats}>
@@ -216,45 +209,14 @@ export function DamageHistoryScreen({ plate }: Props) {
             <div className={`${styles.diagramPanel} ${styles.surface}`}>
               <div className={styles.panelHead}>
                 <div className={styles.panelTitleGroup}>
-                  <div className={styles.panelTitle}>{isNl ? "Carrosseriediagram" : "Vehicle body diagram"}</div>
+                  <div className={styles.panelTitle}>{isNl ? "Defectoverzicht" : "Defect overview"}</div>
                   <div className={styles.panelCopy}>
-                    {isNl
-                      ? "Klikbare markers tonen waar schade is gemeld en welk paneel is gerepareerd of gecontroleerd."
-                      : "Clickable markers help scan where damage was reported and which panel was repaired or reviewed."}
+                    {isNl ? "Aantallen uit de RDW- en APK-historie." : "Counts from the RDW and APK history."}
                   </div>
-                </div>
-                <div className={styles.viewSwitch}>
-                  <button className={`${styles.switchItem} ${styles.switchActive}`} type="button">
-                    {isNl ? "Diagram" : "Diagram view"}
-                  </button>
-                  <button className={styles.switchItem} type="button">
-                    {isNl ? "Historielijst" : "History list"}
-                  </button>
                 </div>
               </div>
 
               <div className={styles.diagramStage}>
-                <div className={styles.carZone}>
-                  <div className={styles.carLabel}>{isNl ? "Bovenaanzicht · carrosseriezones" : "Top view · body zones"}</div>
-                  <div className={styles.carDiagram}>
-                    <div className={styles.carBase} />
-                    <div className={styles.carCabin} />
-                    <div className={`${styles.wheel} ${styles.wheelLeft}`} />
-                    <div className={`${styles.wheel} ${styles.wheelRight}`} />
-
-                    {markers.map((marker) => (
-                      <button
-                        key={marker.id}
-                        className={`${styles.damageMarker} ${styles[marker.id]} ${marker.active ? styles.markerActive : ""}`}
-                        type="button"
-                        aria-label={marker.label}
-                      >
-                        <Wrench size={16} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className={styles.legendCard}>
                   <div className={styles.legendTitle}>{isNl ? "Legenda" : "Legend"}</div>
                   <div className={styles.legendList}>
@@ -281,11 +243,19 @@ export function DamageHistoryScreen({ plate }: Props) {
                     <BadgeCheck size={18} />
                   </div>
                   <div>
-                    <div className={styles.cleanTitle}>{isNl ? "Schone structurele rapportage" : "Clean structural report"}</div>
+                    <div className={styles.cleanTitle}>
+                      {defects.length === 0
+                        ? isNl ? "Geen gebreken gevonden" : "No defects found"
+                        : isNl ? `${defects.length} defectrecords` : `${defects.length} defect records`}
+                    </div>
                     <div className={styles.cleanCopy}>
-                      {isNl
-                        ? "Geen structurele schade of chassisafwijkingen gedetecteerd in de beschikbare data."
-                        : "No structural damage or chassis misalignment detected in the available dataset."}
+                      {defects.length === 0
+                        ? isNl
+                          ? "In de beschikbare RDW- en APK-historie zijn geen gebreken gemeld."
+                          : "No defects are reported in the available RDW and APK history."
+                        : isNl
+                        ? "Gebaseerd op de gemelde gebreken in de RDW- en APK-historie; zie de details hieronder."
+                        : "Based on the defects reported in the RDW and APK history; see the details below."}
                     </div>
                   </div>
                 </div>
