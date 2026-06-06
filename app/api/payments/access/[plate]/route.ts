@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
+import { hasPaidPlateAccess, isDemoBypassEnabled } from "@/lib/payments/server-access";
 
 export const runtime = "nodejs";
 
@@ -16,18 +17,32 @@ export async function GET(_: Request, { params }: Params) {
     if (!plate) {
       return NextResponse.json({ paid: false }, { status: 400 });
     }
-
-    await connectMongo();
-    const exists = await PlatePaymentModel.exists({ plate, status: "COMPLETED", provider: "paypal" });
-    return NextResponse.json({ paid: Boolean(exists) });
+    const paid = await hasPaidPlateAccess(plate);
+    return NextResponse.json({ paid });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to check access.";
     return NextResponse.json({ paid: false, error: message }, { status: 500 });
   }
 }
 
+/**
+ * Demo-only access grant.
+ *
+ * Previously this endpoint unconditionally created a COMPLETED "paypal" payment
+ * for ANY plate with no authentication — making every paid report free. It is
+ * now hard-gated behind the server-side demo bypass and writes a clearly
+ * labelled "demo" record (which never counts as a real entitlement once the
+ * bypass is turned off).
+ */
 export async function POST(request: Request, { params }: Params) {
   try {
+    if (!isDemoBypassEnabled()) {
+      return NextResponse.json(
+        { ok: false, error: "Demo access is disabled.", code: "DEMO_DISABLED" },
+        { status: 403 }
+      );
+    }
+
     const plate = normalizePlate(params.plate ?? "");
     if (!plate) {
       return NextResponse.json({ ok: false, error: "Invalid plate." }, { status: 400 });
@@ -46,7 +61,7 @@ export async function POST(request: Request, { params }: Params) {
       amount: "0.00",
       currency: "EUR",
       status: "COMPLETED",
-      provider: "paypal",
+      provider: "demo",
       createdAt: new Date()
     });
 

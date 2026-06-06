@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { capturePaypalOrder } from "@/lib/payments/paypal";
 import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
+import { getExpectedReportPrice, isCapturedAmountSufficient } from "@/lib/payments/server-access";
+import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 
 export const runtime = "nodejs";
 
@@ -57,9 +60,11 @@ export async function POST(request: Request) {
       status?: string;
       id?: string;
       purchase_units?: Array<{
+        custom_id?: string;
         payments?: {
           captures?: Array<{
             id?: string;
+            custom_id?: string;
             amount?: { value?: string; currency_code?: string };
             status?: string;
           }>;
@@ -73,10 +78,36 @@ export async function POST(request: Request) {
 
     if (captureStatus !== "COMPLETED") {
       return NextResponse.json(
-        { error: `PayPal capture not completed: ${captureStatus}` },
+        { error: `PayPal capture not completed: ${captureStatus}`, code: "CAPTURE_NOT_COMPLETED" },
         { status: 402 }
       );
     }
+
+    // 1) The order must be bound to the plate it was created for. The order's
+    //    custom_id is "plate:<PLATE>" (see create-order). This prevents paying
+    //    once and then unlocking a different plate by passing another value.
+    const customId = unit?.custom_id ?? firstCapture?.custom_id ?? "";
+    if (customId !== `plate:${plate}`) {
+      return NextResponse.json(
+        { error: "Payment does not match the requested plate.", code: "PLATE_MISMATCH" },
+        { status: 400 }
+      );
+    }
+
+    // 2) The captured amount must at least cover the server-side price. This
+    //    blocks the create-order amount-tampering path (e.g. capturing €0.01).
+    const expected = await getExpectedReportPrice();
+    const capturedAmount = firstCapture?.amount?.value;
+    const capturedCurrency = firstCapture?.amount?.currency_code;
+    if (!isCapturedAmountSufficient({ amount: capturedAmount, currency: capturedCurrency }, expected)) {
+      return NextResponse.json(
+        { error: "Captured amount does not match the report price.", code: "AMOUNT_MISMATCH" },
+        { status: 402 }
+      );
+    }
+
+    // Bind the purchase to a logged-in buyer when we have a session (best-effort).
+    const session = verifyUserSession(cookies().get(USER_SESSION_COOKIE)?.value);
 
     await connectMongo();
     await PlatePaymentModel.updateOne(
@@ -86,13 +117,15 @@ export async function POST(request: Request) {
           plate,
           orderId,
           ...(email ? { email } : {}),
+          ...(session ? { userId: session.sub } : {}),
           captureId: firstCapture?.id ?? capture.id ?? orderId,
-          amount: firstCapture?.amount?.value ?? "9.95",
-          currency: firstCapture?.amount?.currency_code ?? "EUR",
+          amount: capturedAmount,
+          currency: capturedCurrency ?? expected.currency,
           status: "COMPLETED",
-          provider: "paypal",
-          createdAt: new Date()
-        }
+          provider: "paypal"
+        },
+        // Preserve the original capture timestamp across idempotent retries.
+        $setOnInsert: { createdAt: new Date() }
       },
       { upsert: true }
     );

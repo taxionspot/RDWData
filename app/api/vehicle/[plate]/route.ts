@@ -5,9 +5,8 @@ import { errorResponse } from "@/lib/api/errors";
 import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
 import { buildFallbackVehicleAiReport, generateVehicleAiReport } from "@/lib/api/claude";
-import { getSiteSettings } from "@/lib/site-settings/service";
 import { connectMongo } from "@/lib/db/mongodb";
-import { PlatePaymentModel } from "@/models/PlatePayment";
+import { hasPaidPlateAccess } from "@/lib/payments/server-access";
 import { generateVehicleReportHtml } from "@/lib/api/report-template";
 import { generateVehicleReportPdf } from "@/lib/api/pdf-report";
 import { applyMileageValuationOverride } from "@/lib/api/market-value";
@@ -30,19 +29,6 @@ function parseUserMileage(input: string | null): number | null {
   const value = Number(input);
   if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value);
-}
-
-async function hasPaidReportAccess(plate: string): Promise<boolean> {
-  const demoBypassEnabled =
-    process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
-  if (demoBypassEnabled) return true;
-
-  const settings = await getSiteSettings();
-  const paymentRequired = settings.paymentEnabled && settings.lockSections.reportDownload;
-  if (!paymentRequired) return true;
-  await connectMongo();
-  const hasPaid = await PlatePaymentModel.exists({ plate, status: "COMPLETED", provider: "paypal" });
-  return Boolean(hasPaid);
 }
 
 async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: number | null) {
@@ -167,7 +153,7 @@ export async function GET(request: Request, { params }: Params) {
     const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
 
     if (downloadReport) {
-      const hasAccess = await hasPaidReportAccess(plate);
+      const hasAccess = await hasPaidPlateAccess(plate);
       if (!hasAccess) {
         return NextResponse.json({ error: "Payment required for report download.", code: "PAYMENT_REQUIRED" }, { status: 402 });
       }
@@ -208,7 +194,7 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Invalid email address.", code: "INVALID_EMAIL" }, { status: 400 });
     }
 
-    const hasAccess = await hasPaidReportAccess(plate);
+    const hasAccess = await hasPaidPlateAccess(plate);
     if (!hasAccess) {
       return NextResponse.json({ error: "Payment required for report email.", code: "PAYMENT_REQUIRED" }, { status: 402 });
     }

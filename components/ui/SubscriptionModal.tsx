@@ -39,7 +39,10 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
   const [isMounted, setIsMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
-  const canSkipPaymentForDemo = true;
+  // Only show the demo skip button when explicitly enabled. The server-side
+  // grant endpoint is independently gated by PAYMENT_DEMO_BYPASS, so this flag
+  // controls visibility only — it cannot hand out free reports on its own.
+  const canSkipPaymentForDemo = process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
 
   useEffect(() => {
     setIsMounted(true);

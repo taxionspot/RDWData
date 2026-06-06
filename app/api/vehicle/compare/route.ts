@@ -5,9 +5,7 @@ import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
 import { generateVehicleComparisonAi } from "@/lib/api/claude-comparison";
 import { generateVehicleComparisonPdf } from "@/lib/api/pdf-comparison-report";
-import { getSiteSettings } from "@/lib/site-settings/service";
-import { connectMongo } from "@/lib/db/mongodb";
-import { PlatePaymentModel } from "@/models/PlatePayment";
+import { hasPaidAccessForAnyPlate } from "@/lib/payments/server-access";
 import { applyMileageValuationOverride } from "@/lib/api/market-value";
 
 export const runtime = "nodejs";
@@ -36,20 +34,6 @@ function withMileageContext(localized: Record<string, unknown>, userMileage: num
         Number.isFinite(Number(enriched.estimatedMileageNow)) ? Math.round(userMileage - Number(enriched.estimatedMileageNow)) : null
     }
   };
-}
-
-async function hasPaidReportAccess(plateA: string, plateB: string): Promise<boolean> {
-  const demoBypassEnabled =
-    process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
-  if (demoBypassEnabled) return true;
-
-  const settings = await getSiteSettings();
-  const paymentRequired = settings.paymentEnabled && settings.lockSections.reportDownload;
-  if (!paymentRequired) return true;
-  await connectMongo();
-  const hasPaidA = await PlatePaymentModel.exists({ plate: plateA, status: "COMPLETED", provider: "paypal" });
-  const hasPaidB = await PlatePaymentModel.exists({ plate: plateB, status: "COMPLETED", provider: "paypal" });
-  return Boolean(hasPaidA || hasPaidB);
 }
 
 export async function GET(request: Request) {
@@ -87,7 +71,7 @@ export async function GET(request: Request) {
       : null;
 
     if (download) {
-      const access = await hasPaidReportAccess(basePlate, comparePlate);
+      const access = await hasPaidAccessForAnyPlate([basePlate, comparePlate]);
       if (!access) {
         return NextResponse.json({ error: "Payment required for report download.", code: "PAYMENT_REQUIRED" }, { status: 402 });
       }
