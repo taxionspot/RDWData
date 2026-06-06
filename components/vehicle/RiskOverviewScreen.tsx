@@ -212,11 +212,11 @@ export function RiskOverviewScreen({ plate }: Props) {
     {
       id: "ownership",
       title: locale === "nl" ? "Eigendom" : "Ownership",
-      status: v.owners.count ? `${v.owners.count} ${locale === "nl" ? "vorige eigenaren" : "previous owners"}` : (locale === "nl" ? "Onbekend" : "Unknown"),
+      status: v.owners.count ? `${v.owners.count} ${locale === "nl" ? "tenaamstellingen" : "registrations"}` : (locale === "nl" ? "Zie registratiedatums" : "See registration dates"),
       description:
         locale === "nl"
-          ? "RDW geeft alleen eigenaarsaantal en registratiedatums."
-          : "RDW reports only owner count and registration dates.",
+          ? "RDW-opendata toont registratiedatums (incl. huidige eigenaar sinds); het aantal houders is niet altijd beschikbaar."
+          : "RDW open data shows registration dates (incl. current owner since); keeper count isn't always available.",
       badge: v.owners.count && v.owners.count > 2 ? (locale === "nl" ? "Controleren" : "Review") : (locale === "nl" ? "Stabiel" : "Stable"),
       trend: v.owners.count ? (locale === "nl" ? "Overdrachtsdatums" : "Transfer dates") : (locale === "nl" ? "Geen data" : "No data"),
       icon: Users,

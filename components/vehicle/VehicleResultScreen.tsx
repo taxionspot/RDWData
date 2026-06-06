@@ -548,7 +548,7 @@ export function VehicleResultScreen({ plate }: Props) {
   const vehicleSubtitle = [
     v.engine?.displacement ? `${(v.engine.displacement / 1000).toFixed(1)}L` : null,
     v.fuelType,
-    v.engine?.powerKw ? `${Math.round(v.engine.powerKw * 1.36)} HP` : null
+    v.engine?.powerKw ? `${Math.round(v.engine.powerKw * 1.36)} pk` : null
   ]
     .filter(Boolean)
     .join(" | ");
@@ -567,8 +567,8 @@ export function VehicleResultScreen({ plate }: Props) {
       : "Needs review";
   const ownersLabel = v.owners.count
     ? locale === "nl"
-      ? `${v.owners.count} vorige eigenaar(s)`
-      : `${v.owners.count} previous`
+      ? `${v.owners.count} tenaamstellingen`
+      : `${v.owners.count} registrations`
     : locale === "nl"
     ? "Onbekend"
     : "Unknown";

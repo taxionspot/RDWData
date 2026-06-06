@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   FileCheck2,
   UserPlus,
@@ -17,6 +18,56 @@ import { useI18n } from "@/lib/i18n/context";
 type Props = {
   plate: string;
 };
+
+// Plain-language explanation of the mileage/NAP verdict, driven by the REAL
+// RDW verdict (and our APK-based verdict) — never a fixed optimistic message.
+function mileageVerdictCopy(
+  napVerdict: string | null,
+  mileageVerdict: string | null | undefined,
+  locale: "nl" | "en"
+): { label: string; explanation: string; ok: boolean } {
+  const nap = (napVerdict ?? "").toLowerCase();
+  const illogical = nap.includes("onlogisch") || mileageVerdict === "ONLOGISCH";
+  const doubtful = nap.includes("twijfel") || mileageVerdict === "TWIJFELACHTIG";
+  if (illogical) {
+    return {
+      label: locale === "nl" ? "Onlogisch" : "Illogical",
+      explanation:
+        locale === "nl"
+          ? "Let op: de geregistreerde kilometerstand lijkt teruggedraaid of onlogisch. Koop niet zonder onafhankelijke controle."
+          : "Warning: the recorded odometer appears rolled back or illogical. Do not buy without an independent inspection.",
+      ok: false
+    };
+  }
+  if (doubtful) {
+    return {
+      label: locale === "nl" ? "Twijfelachtig" : "Doubtful",
+      explanation:
+        locale === "nl"
+          ? "De kilometerhistorie vertoont onregelmatigheden. Vraag de verkoper om onderbouwing (facturen, onderhoudsboekje)."
+          : "The mileage history shows irregularities. Ask the seller for documentation (invoices, service book).",
+      ok: false
+    };
+  }
+  if (nap.includes("logisch")) {
+    return {
+      label: locale === "nl" ? "Logisch" : "Logical",
+      explanation:
+        locale === "nl"
+          ? "De geregistreerde kilometerstanden lopen logisch op; geen aanwijzing voor terugdraaien (RDW NAP-controle)."
+          : "Recorded odometer readings increase logically; no sign of a rollback (RDW NAP check).",
+      ok: true
+    };
+  }
+  return {
+    label: locale === "nl" ? "Geen oordeel" : "No verdict",
+    explanation:
+      locale === "nl"
+        ? "Er is (nog) geen NAP-oordeel beschikbaar voor dit voertuig. Beoordeel de kilometerstanden hieronder zelf."
+        : "No NAP verdict is available (yet) for this vehicle. Review the odometer readings below yourself.",
+    ok: true
+  };
+}
 
 type TimelineEvent = {
   id: string;
@@ -219,6 +270,8 @@ export function MileageTimelineScreen({ plate }: Props) {
 
   const yLabels = [chartMileageMax, chartMileageMax * 0.66, chartMileageMax * 0.33, 0];
 
+  const verdict = mileageVerdictCopy(data.vehicle.napVerdict, data.enriched?.mileageVerdict, locale);
+
   return (
     <div className={styles.pageContainer}>
       <div className={styles.contentContainer}>
@@ -228,15 +281,11 @@ export function MileageTimelineScreen({ plate }: Props) {
           <div className={`${styles.heroPanel} ${styles.glassPanel}`}>
             <div className={styles.heroCopy}>
               <div className={styles.eyebrow}>
-                <CheckCircle2 size={14} />
-                {locale === "nl" ? "Status" : "Status"}: {data.vehicle.napVerdict ?? (locale === "nl" ? "Consistent" : "Consistent")}
+                {verdict.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+                {locale === "nl" ? "Status" : "Status"}: {verdict.label}
               </div>
               <div className={styles.heroTitle}>{locale === "nl" ? "Kilometerhistorie" : "Mileage History"}</div>
-              <div className={styles.heroSubtitle}>
-                {locale === "nl"
-                  ? "Geregistreerde kilometerstand volgt een logisch patroon zonder duidelijke terugdraaiing."
-                  : "Recorded mileage follows a believable pattern with no obvious rollback or unusual reporting gaps. The progression is steady and correlates logically with ownership transfers and APK inspections."}
-              </div>
+              <div className={styles.heroSubtitle}>{verdict.explanation}</div>
               <div className={styles.heroMetrics}>
                 <HeroMetric label={locale === "nl" ? "Laatste meting" : "Latest Reading"} value={latestMileage ? `${formatNumber(latestMileage)} km` : "-"} />
                 <HeroMetric label={locale === "nl" ? "Gem. per jaar" : "Avg. Annual"} value={avgAnnual ? `~${formatNumber(avgAnnual)} km` : "-"} />

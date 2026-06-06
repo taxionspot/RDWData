@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import styles from "./TechnicalSpecsScreen.module.css";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
+import { classifyFuel } from "@/lib/rdw/heuristics";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { useI18n } from "@/lib/i18n/context";
 import { PremiumLock } from "../ui/PremiumLock";
@@ -41,7 +42,7 @@ function formatDisplacement(value: number | null) {
 
 function formatPower(value: number | null) {
   if (!value) return null;
-  return `${value} kW / ${Math.round(value * 1.36)} HP`;
+  return `${value} kW / ${Math.round(value * 1.36)} pk`;
 }
 
 function titleCase(value: string | null) {
@@ -176,6 +177,10 @@ export function TechnicalSpecsScreen({ plate }: Props) {
     const v = data?.vehicle;
     if (!v) return [];
 
+    // EVs report combined consumption in kWh/100km, combustion engines in L/100km.
+    const fuelKind = classifyFuel(v.fuelType);
+    const consumptionUnit = fuelKind.isElectric && !fuelKind.isPetrol && !fuelKind.isDiesel ? "kWh/100km" : "L/100km";
+
     const performanceSpecs = [
       { id: "power", label: locale === "nl" ? "Motorvermogen" : "Engine power", value: formatPower(v.engine?.powerKw), meta: locale === "nl" ? "Fabrieksopgave" : "Factory output", icon: Zap },
       { id: "displacement", label: locale === "nl" ? "Cilinderinhoud" : "Displacement", value: formatDisplacement(v.engine?.displacement), icon: Settings },
@@ -184,7 +189,7 @@ export function TechnicalSpecsScreen({ plate }: Props) {
 
     const efficiencySpecs = [
       { id: "fuel", label: locale === "nl" ? "Brandstof" : "Fuel type", value: titleCase(v.fuelType), icon: Gauge },
-      { id: "consumption", label: locale === "nl" ? "Verbruik" : "Fuel consumption", value: formatNumber(v.consumptionCombined, "L/100km"), icon: Gauge },
+      { id: "consumption", label: locale === "nl" ? "Verbruik" : "Fuel consumption", value: formatNumber(v.consumptionCombined, consumptionUnit), icon: Gauge },
       { id: "co2", label: locale === "nl" ? "CO2-uitstoot" : "CO2 emissions", value: formatNumber(v.co2, "g/km"), icon: Leaf },
       { id: "emission", label: locale === "nl" ? "Emissienorm" : "Emission standard", value: v.emissionStandard ?? null, icon: Leaf },
       { id: "energy", label: locale === "nl" ? "Energielabel" : "Energy label", value: v.energyLabel ?? null, icon: Leaf }
