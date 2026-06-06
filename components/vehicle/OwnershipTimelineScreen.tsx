@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useMemo } from "react";
-import { Briefcase, Store, User } from "lucide-react";
+import { Globe, Flag, Users, FileCheck2 } from "lucide-react";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 import styles from "./OwnershipTimelineScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
@@ -12,23 +12,14 @@ type Props = {
   plate: string;
 };
 
-type OwnershipEntry = {
+type TimelineEntry = {
   id: string;
   label: string;
-  type: string;
-  range: string;
-  duration: string;
-  warning?: string;
+  detail: string;
+  note?: string;
   tone: "default" | "warning";
-  icon: "business" | "private" | "lease";
+  icon: "world" | "nl" | "owners" | "apk";
 };
-
-function formatYear(dateValue: string | null) {
-  if (!dateValue) return null;
-  const parsed = new Date(dateValue);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.getFullYear();
-}
 
 function formatLongDate(dateValue: string | null, locale: "nl" | "en") {
   if (!dateValue) return locale === "nl" ? "Onbekend" : "Unknown";
@@ -37,82 +28,88 @@ function formatLongDate(dateValue: string | null, locale: "nl" | "en") {
   return new Intl.DateTimeFormat("nl-NL", { dateStyle: "medium" }).format(parsed);
 }
 
-function buildOwnershipTimeline(
-  firstYear: number | null,
-  ownersCount: number | null,
+// RDW exposes the NUMBER of keepers (aantal_houders) and the registration dates,
+// but NOT the date or type of each individual owner. So we build a timeline from
+// the real registration milestones we DO have, and state the owner count as a
+// fact -- no invented per-owner periods or lease/dealer/private labels.
+function buildRegistrationTimeline(
+  vehicle: {
+    firstRegistrationWorld: string | null;
+    firstRegistrationNL: string | null;
+    apkExpiryDate: string | null;
+    owners: { count: number | null };
+  },
+  isImported: boolean,
   locale: "nl" | "en"
-): OwnershipEntry[] {
-  if (!ownersCount || ownersCount < 1 || !firstYear) {
-    return [];
-  }
+): TimelineEntry[] {
+  const nl = locale === "nl";
+  const entries: TimelineEntry[] = [];
 
-  const currentYear = new Date().getFullYear();
-  const totalYears = Math.max(currentYear - firstYear, ownersCount);
-  const segment = Math.max(Math.floor(totalYears / ownersCount), 1);
-
-  const entries: OwnershipEntry[] = [];
-  let start = firstYear;
-
-  for (let i = ownersCount; i >= 1; i -= 1) {
-    const end = i === 1 ? (locale === "nl" ? "Heden" : "Present") : String(start + segment);
-    const range = `${start} - ${end}`;
-    const duration =
-      i === 1
-        ? locale === "nl"
-          ? "Huidige eigenaar"
-          : "Current owner"
-        : `${segment} ${locale === "nl" ? "jaar" : `year${segment > 1 ? "s" : ""}`}`;
-
-    const icon: OwnershipEntry["icon"] = i === ownersCount
-      ? "lease"
-      : i === 1
-      ? "business"
-      : "private";
-
+  if (vehicle.firstRegistrationWorld) {
     entries.push({
-      id: `owner-${i}`,
-      label: `${locale === "nl" ? "Eigenaar" : "Owner"} ${i}${i === 1 ? ` (${locale === "nl" ? "Huidig" : "Current"})` : ""}`,
-      type:
-        icon === "lease"
-          ? locale === "nl"
-            ? "Zakelijke lease"
-            : "Corporate Lease"
-          : icon === "business"
-          ? locale === "nl"
-            ? "Dealer / Bedrijf"
-            : "Dealer / Business"
-          : locale === "nl"
-          ? "Particulier"
-          : "Private Individual",
-      range,
-      duration,
-      warning: i === 1 && segment <= 1 ? (locale === "nl" ? "Controle aanbevolen: korte eigendomsduur." : "Review recommended: short ownership window.") : undefined,
-      tone: i === 1 && segment <= 1 ? "warning" : "default",
-      icon
+      id: "world",
+      label: nl ? "Eerste toelating (wereld)" : "First registration (world)",
+      detail: formatLongDate(vehicle.firstRegistrationWorld, locale),
+      icon: "world",
+      tone: "default"
     });
-
-    if (typeof end === "string" && end !== "Present" && end !== "Heden") {
-      start = Number(end);
-    }
   }
 
-  return entries.reverse();
+  if (vehicle.firstRegistrationNL && vehicle.firstRegistrationNL !== vehicle.firstRegistrationWorld) {
+    entries.push({
+      id: "nl",
+      label: isImported
+        ? nl ? "Import — eerste registratie in Nederland" : "Import — first registration in the Netherlands"
+        : nl ? "Eerste registratie in Nederland" : "First registration in the Netherlands",
+      detail: formatLongDate(vehicle.firstRegistrationNL, locale),
+      icon: "nl",
+      tone: isImported ? "warning" : "default"
+    });
+  }
+
+  const count = vehicle.owners.count;
+  entries.push({
+    id: "owners",
+    label: nl ? "Aantal eigenaren (tenaamstellingen)" : "Number of owners (registrations)",
+    detail: count != null ? `${count}` : nl ? "Onbekend" : "Unknown",
+    note: nl
+      ? "RDW geeft het aantal houders, niet de datum of het type per eigenaar."
+      : "RDW reports the number of keepers, not the date or type of each owner.",
+    icon: "owners",
+    tone: count != null && count > 4 ? "warning" : "default"
+  });
+
+  if (vehicle.apkExpiryDate) {
+    entries.push({
+      id: "apk",
+      label: nl ? "APK geldig tot" : "APK valid until",
+      detail: formatLongDate(vehicle.apkExpiryDate, locale),
+      icon: "apk",
+      tone: "default"
+    });
+  }
+
+  return entries;
 }
 
-function IconForType({ type }: { type: OwnershipEntry["icon"] }) {
-  if (type === "business") return <Store size={24} />;
-  if (type === "lease") return <Briefcase size={24} />;
-  return <User size={24} />;
+function IconForType({ type }: { type: TimelineEntry["icon"] }) {
+  if (type === "world") return <Globe size={24} />;
+  if (type === "nl") return <Flag size={24} />;
+  if (type === "apk") return <FileCheck2 size={24} />;
+  return <Users size={24} />;
 }
 
 export function OwnershipTimelineScreen({ plate }: Props) {
   const { locale } = useI18n();
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate);
 
-  const ownersCount = data?.vehicle.owners.count ?? null;
-  const firstYear = formatYear(data?.vehicle.firstRegistrationWorld ?? null);
-
-  const entries = useMemo(() => buildOwnershipTimeline(firstYear, ownersCount, locale), [firstYear, ownersCount, locale]);
+  const entries = useMemo(() => {
+    if (!data) return [];
+    const v = data.vehicle;
+    const imported =
+      !!v.firstRegistrationNL && !!v.firstRegistrationWorld && v.firstRegistrationNL !== v.firstRegistrationWorld;
+    return buildRegistrationTimeline(v, imported, locale);
+  }, [data, locale]);
 
   if (!isValid || isError) {
     return (
@@ -175,7 +172,7 @@ export function OwnershipTimelineScreen({ plate }: Props) {
 
         <div className={`${styles.timelineContainer} ${styles.glassPanel}`}>
           <div className={styles.timelineHeader}>
-            <h2 className={styles.timelineTitle}>{locale === "nl" ? "Eigendomstijdlijn" : "Ownership Timeline"}</h2>
+            <h2 className={styles.timelineTitle}>{locale === "nl" ? "Registratiehistorie" : "Registration history"}</h2>
           </div>
 
           <div className={styles.timeline}>
@@ -190,19 +187,13 @@ export function OwnershipTimelineScreen({ plate }: Props) {
                         </div>
                         <div className={styles.ownerInfo}>
                           <div className={styles.ownerName}>{entry.label}</div>
-                          <div className={styles.ownerType}>{entry.type}</div>
+                          {entry.note ? <div className={styles.ownerType}>{entry.note}</div> : null}
                         </div>
                       </div>
                       <div className={styles.ownerDates}>
-                        <div className={styles.dateRange}>{entry.range}</div>
-                        <div className={styles.durationBadge}>{entry.duration}</div>
+                        <div className={styles.dateRange}>{entry.detail}</div>
                       </div>
                     </div>
-                    {entry.warning ? (
-                      <div className={styles.warningAlert}>
-                        {entry.warning}
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               ))}
