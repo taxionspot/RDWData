@@ -62,7 +62,7 @@ function loadPaypalScript(clientId: string, currency: string): Promise<void> {
 export function PayPalCheckout({
   plate,
   email,
-  amount = "9.95",
+  amount = "6.95",
   currency = "EUR",
   onSuccess,
   onError

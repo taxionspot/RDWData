@@ -45,6 +45,7 @@ export type VehicleProfile = {
 
     // Ownership
     owners: { count: number | null };
+    currentOwnerSince: string | null; // datum_tenaamstelling — date the current keeper registered the vehicle
 
     // Import / export
     firstRegistrationNL: string | null;

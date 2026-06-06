@@ -38,6 +38,7 @@ function buildRegistrationTimeline(
     firstRegistrationNL: string | null;
     apkExpiryDate: string | null;
     owners: { count: number | null };
+    currentOwnerSince: string | null;
   },
   isImported: boolean,
   locale: "nl" | "en"
@@ -67,17 +68,27 @@ function buildRegistrationTimeline(
     });
   }
 
-  const count = vehicle.owners.count;
-  entries.push({
-    id: "owners",
-    label: nl ? "Aantal eigenaren (tenaamstellingen)" : "Number of owners (registrations)",
-    detail: count != null ? `${count}` : nl ? "Onbekend" : "Unknown",
-    note: nl
-      ? "RDW geeft het aantal houders, niet de datum of het type per eigenaar."
-      : "RDW reports the number of keepers, not the date or type of each owner.",
-    icon: "owners",
-    tone: count != null && count > 4 ? "warning" : "default"
-  });
+  if (vehicle.currentOwnerSince) {
+    entries.push({
+      id: "owner-since",
+      label: nl ? "Huidige eigenaar sinds" : "Current owner since",
+      detail: formatLongDate(vehicle.currentOwnerSince, locale),
+      icon: "owners",
+      tone: "default"
+    });
+  }
+
+  // RDW open data does not publish the keeper count, so only show it when a value
+  // is actually present -- never a misleading "Unknown" placeholder.
+  if (vehicle.owners.count != null) {
+    entries.push({
+      id: "owners",
+      label: nl ? "Aantal tenaamstellingen" : "Number of registrations",
+      detail: `${vehicle.owners.count}`,
+      icon: "owners",
+      tone: vehicle.owners.count > 4 ? "warning" : "default"
+    });
+  }
 
   if (vehicle.apkExpiryDate) {
     entries.push({

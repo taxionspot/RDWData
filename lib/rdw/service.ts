@@ -83,6 +83,7 @@ function withProfileDefaults(profile: Partial<VehicleProfile>): VehicleProfile {
       },
       apkExpiryDate: v.apkExpiryDate ?? null,
       owners: { count: v.owners?.count ?? null },
+      currentOwnerSince: v.currentOwnerSince ?? null,
       firstRegistrationNL: v.firstRegistrationNL ?? null,
       firstRegistrationWorld: v.firstRegistrationWorld ?? null,
       wok: Boolean(v.wok),

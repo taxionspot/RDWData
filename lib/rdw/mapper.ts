@@ -100,6 +100,7 @@ export function toVehicleProfile(input: {
 
       // Ownership
       owners: { count: num(m.aantal_houders) },
+      currentOwnerSince: dateStr(m.datum_tenaamstelling ?? m.datum_tenaamstelling_dt),
 
       // Import / export
       firstRegistrationNL: dateStr(m.datum_eerste_tenaamstelling_in_nederland_dt ?? m.datum_eerste_tenaamstelling_in_nederland),

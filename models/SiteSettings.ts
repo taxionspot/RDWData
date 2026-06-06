@@ -45,7 +45,7 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>(
     key: { type: String, required: true, unique: true, default: "global" },
     paymentEnabled: { type: Boolean, required: true, default: true },
     payment: {
-      amount: { type: String, required: true, default: "9.95" },
+      amount: { type: String, required: true, default: "6.95" },
       currency: { type: String, required: true, default: "EUR" }
     },
     lockSections: {

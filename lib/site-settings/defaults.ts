@@ -82,7 +82,7 @@ export type PublicSiteSettings = {
 export const defaultSiteSettings: PublicSiteSettings = {
   paymentEnabled: true,
   payment: {
-    amount: "9.95",
+    amount: "6.95",
     currency: "EUR"
   },
   lockSections: {

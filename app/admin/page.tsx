@@ -86,7 +86,7 @@ const NAV: NavItem[] = [
 // ─────────────────────── Defaults ───────────────────────
 const emptySettings: PublicSiteSettings = {
   paymentEnabled: true,
-  payment: { amount: "9.95", currency: "EUR" },
+  payment: { amount: "6.95", currency: "EUR" },
   lockSections: { riskOverview: true, mileageHistory: true, marketAnalysis: true, vehicleComparison: true, damageHistory: true, technicalSpecs: false, inspectionTimeline: false, ownershipHistory: false, reportDownload: true },
   ui: { showFeaturesLink: true, showSampleLink: true, showPricingLink: true, showLoginButton: true },
   content: { platformName: "Kentekenrapport", landingHeroTitleA: "", landingHeroTitleB: "", landingHeroSubtitle: "", landingCtaTitle: "", landingCtaSubtitle: "", landingCtaButton: "", landingHeroImageUrl: "", footerDescription: "" },
@@ -521,7 +521,7 @@ export default function AdminPage() {
               <Card>
                 <div className="grid gap-4 md:grid-cols-3">
                   <Toggle label="Enable payment locking" description="Users must pay to access premium sections" checked={settings.paymentEnabled} onChange={(v) => setSettings((p) => ({ ...p, paymentEnabled: v }))} />
-                  <Input label="Price per search" value={settings.payment.amount} onChange={(v) => setSettings((p) => ({ ...p, payment: { ...p.payment, amount: v } }))} placeholder="9.95" />
+                  <Input label="Price per search" value={settings.payment.amount} onChange={(v) => setSettings((p) => ({ ...p, payment: { ...p.payment, amount: v } }))} placeholder="6.95" />
                   <Input label="Currency" value={settings.payment.currency} onChange={(v) => setSettings((p) => ({ ...p, payment: { ...p.payment, currency: v.toUpperCase() } }))} placeholder="EUR" />
                 </div>
               </Card>
