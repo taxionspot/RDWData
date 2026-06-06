@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import styles from "./PremiumLock.module.css";
 import { Button } from "./Button";
-import { Lock } from "lucide-react";
+import { Lock, Check } from "lucide-react";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { useI18n } from "@/lib/i18n/context";
 import { hasPaidAccessForPlate, grantPaidAccessForPlate } from "@/lib/payments/access";
@@ -21,6 +21,10 @@ interface PremiumLockProps {
 export function PremiumLock({ children, isLocked = true, featureName, plate, sectionKey }: PremiumLockProps) {
   const { locale } = useI18n();
   const { settings } = useSiteSettings();
+  const priceLabel =
+    settings.payment.currency === "EUR"
+      ? `€${String(settings.payment.amount).replace(".", ",")}`
+      : `${settings.payment.currency} ${settings.payment.amount}`;
   const [showModal, setShowModal] = useState(false);
   const [isUnlockedForPlate, setIsUnlockedForPlate] = useState(false);
 
@@ -78,15 +82,24 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
             <h3 className={styles.title}>{locale === "nl" ? `Ontgrendel ${featureName}` : `Unlock ${featureName}`}</h3>
             <p className={styles.description}>
               {locale === "nl"
-                ? `Ontgrendel uitgebreide data, geverifieerd door officiele databronnen, voor ${featureName}.`
-                : `Unlock comprehensive data verified by official industry partners for this ${featureName}.`}
+                ? `Eén betaling ontgrendelt het volledige rapport en alle premium-tabbladen voor dit kenteken.`
+                : `One payment unlocks the full report and all premium tabs for this plate.`}
             </p>
           </div>
 
-
+          <div className={styles.featureList}>
+            {(locale === "nl"
+              ? ["Schadehistorie & reparaties", "Risico-overzicht", "Marktanalyse & waardebepaling", "Onderhandelhulp", "Volledig PDF-rapport"]
+              : ["Damage history & repairs", "Risk overview", "Market analysis & valuation", "Negotiation copilot", "Full PDF report"]
+            ).map((item) => (
+              <div key={item} className={styles.featureItem}>
+                <Check size={16} className={styles.checkIcon} /> {item}
+              </div>
+            ))}
+          </div>
 
           <Button variant="primary" className={styles.unlockButton} onClick={openModal}>
-            {locale === "nl" ? "Upgrade naar Premium" : "Upgrade to Premium Now"}
+            {locale === "nl" ? `Ontgrendelen — ${priceLabel}` : `Unlock — ${priceLabel}`}
           </Button>
 
         </div>

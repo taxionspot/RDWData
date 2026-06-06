@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, Check, ShieldCheck, Zap, Sparkles } from "lucide-react";
+import { X, Check, ShieldCheck, Zap, Lock } from "lucide-react";
 import styles from "./SubscriptionModal.module.css";
 import { useI18n } from "@/lib/i18n/context";
 import { PayPalCheckout } from "@/components/payments/PayPalCheckout";
@@ -72,7 +72,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
         <div className={styles.plans}>
           <div className={`${styles.planCard} ${styles.planActive}`}>
             <div className={styles.planHeader}>
-              <div className={styles.planName}>{locale === "nl" ? "Betalen met PayPal" : "Pay with PayPal"}</div>
+              <div className={styles.planName}>{locale === "nl" ? "Betalen met iDEAL of PayPal" : "Pay with iDEAL or PayPal"}</div>
               <div className={styles.planPrice}>
                 {settings.payment.currency} {settings.payment.amount}
                 <span>/{locale === "nl" ? "zoekopdracht" : "search"}</span>
@@ -151,7 +151,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
             <ShieldCheck size={16} /> {locale === "nl" ? "Geverifieerde RDW-data" : "Verified RDW Data"}
           </div>
           <div className={styles.trustItem}>
-            <Sparkles size={16} /> {locale === "nl" ? "Beste prijs garantie" : "Best Price Guaranteed"}
+            <Lock size={16} /> {locale === "nl" ? "Veilig betalen via iDEAL & PayPal" : "Secure payment via iDEAL & PayPal"}
           </div>
         </div>
       </div>

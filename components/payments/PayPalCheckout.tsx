@@ -44,7 +44,14 @@ function loadPaypalScript(clientId: string, currency: string): Promise<void> {
 
     const script = document.createElement("script");
     script.id = SCRIPT_ID;
-    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=${encodeURIComponent(currency)}`;
+    // enable-funding=ideal surfaces iDEAL (the dominant NL method) as an extra
+    // PayPal funding button for eligible (NL/EUR) buyers, using the same
+    // create-order/capture flow. Requires iDEAL to be enabled on the PayPal
+    // business account.
+    script.src =
+      `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}` +
+      `&currency=${encodeURIComponent(currency)}` +
+      `&enable-funding=ideal,bancontact`;
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error("Failed to load PayPal SDK."));
