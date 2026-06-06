@@ -809,6 +809,17 @@
   .actionSecondary {
     font-size: 13px;
     padding: 12px 12px;
+    min-height: 44px;
+  }
+
+  /* On a single-column mobile layout the cards are wide enough to show full
+     text; wrapping prevents key values (road-tax estimate, market value) from
+     being clipped by the desktop ellipsis. */
+  .detailCardLabel,
+  .detailCardValue {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
 }
 
