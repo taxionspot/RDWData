@@ -98,6 +98,13 @@ function toVehicleProfile(input) {
             napLastYear: num(m.jaar_laatste_registratie_tellerstand),
             // Financial
             cataloguePrice: num(m.catalogusprijs),
+            // Extra registration / towing details
+            extra: {
+                grossBpm: num(m.bruto_bpm),
+                towingWeightBraked: num(m.maximum_trekken_massa_geremd),
+                towingWeightUnbraked: num(m.maximum_massa_trekken_ongeremd),
+                vehicleCategory: str(m.europese_voertuigcategorie)
+            },
             recallsCount: input.recalls.length
         },
         inspections: input.apk,

@@ -66,6 +66,14 @@ export type VehicleProfile = {
     // Financial
     cataloguePrice: number | null;               // catalogusprijs in EUR
 
+    // Extra registration / towing details (RDW main dataset)
+    extra: {
+      grossBpm: number | null;             // bruto_bpm — one-off registration tax paid when new
+      towingWeightBraked: number | null;    // maximum_trekken_massa_geremd (kg)
+      towingWeightUnbraked: number | null;  // maximum_massa_trekken_ongeremd (kg)
+      vehicleCategory: string | null;       // europese_voertuigcategorie (M1, N1, ...)
+    };
+
     recallsCount: number;
   };
   inspections: RdwRecord[];

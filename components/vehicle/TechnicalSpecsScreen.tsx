@@ -202,7 +202,9 @@ export function TechnicalSpecsScreen({ plate }: Props) {
       { id: "axles", label: locale === "nl" ? "Assen" : "Axles", value: formatNumber(v.axles), icon: Ruler },
       { id: "weight-empty", label: locale === "nl" ? "Leeggewicht" : "Empty weight", value: formatNumber(v.weight?.empty, "kg"), icon: Ruler },
       { id: "weight-max", label: locale === "nl" ? "Max gewicht" : "Max weight", value: formatNumber(v.weight?.max, "kg"), icon: Ruler },
-      { id: "payload", label: locale === "nl" ? "Laadvermogen" : "Payload", value: formatNumber(v.weight?.payload, "kg"), icon: Ruler }
+      { id: "payload", label: locale === "nl" ? "Laadvermogen" : "Payload", value: formatNumber(v.weight?.payload, "kg"), icon: Ruler },
+      { id: "towing-braked", label: locale === "nl" ? "Max. trekgewicht (geremd)" : "Max towing (braked)", value: formatNumber(v.extra?.towingWeightBraked, "kg"), meta: locale === "nl" ? "Voor aanhanger/caravan met remmen" : "For a braked trailer/caravan", icon: Ruler },
+      { id: "towing-unbraked", label: locale === "nl" ? "Max. trekgewicht (ongeremd)" : "Max towing (unbraked)", value: formatNumber(v.extra?.towingWeightUnbraked, "kg"), icon: Ruler }
     ].filter((spec) => spec.value) as Array<{ id: string; label: string; value: string; meta?: string; icon: ElementType }>;
 
     return [
@@ -233,6 +235,20 @@ export function TechnicalSpecsScreen({ plate }: Props) {
         subtitle: locale === "nl" ? "Belangrijke RDW-datums en APK-status" : "Key RDW registration dates and APK status",
         icon: ShieldCheck,
         specs: [
+          {
+            id: "category",
+            label: locale === "nl" ? "Voertuigcategorie" : "Vehicle category",
+            value: v.extra?.vehicleCategory ?? null,
+            meta: locale === "nl" ? "EU-categorie (M1 = personenauto, N1 = bestelauto)" : "EU category (M1 = passenger car, N1 = van)",
+            icon: ShieldCheck
+          },
+          {
+            id: "bpm",
+            label: locale === "nl" ? "BPM (registratiebelasting)" : "BPM (registration tax)",
+            value: v.extra?.grossBpm != null ? `EUR ${v.extra.grossBpm.toLocaleString("nl-NL")}` : null,
+            meta: locale === "nl" ? "Eenmalig betaald bij eerste registratie (nieuwprijs)." : "One-off tax paid at first registration (when new).",
+            icon: ShieldCheck
+          },
           {
             id: "first-nl",
             label: locale === "nl" ? "Eerste toelating (NL)" : "First registration (NL)",

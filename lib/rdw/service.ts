@@ -95,6 +95,12 @@ function withProfileDefaults(profile: Partial<VehicleProfile>): VehicleProfile {
       napVerdict: v.napVerdict ?? null,
       napLastYear: v.napLastYear ?? null,
       cataloguePrice: v.cataloguePrice ?? null,
+      extra: {
+        grossBpm: v.extra?.grossBpm ?? null,
+        towingWeightBraked: v.extra?.towingWeightBraked ?? null,
+        towingWeightUnbraked: v.extra?.towingWeightUnbraked ?? null,
+        vehicleCategory: v.extra?.vehicleCategory ?? null
+      },
       recallsCount: v.recallsCount ?? 0
     },
     inspections: profile.inspections ?? [],
