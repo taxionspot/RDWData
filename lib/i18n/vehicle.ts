@@ -63,6 +63,20 @@ function toEn(value: string | null, map: Record<string, string>): string | null 
   return map[value] ?? value;
 }
 
+// Fuel type can be a combined multi-fuel string ("Benzine / Elektriciteit" for a
+// plug-in hybrid); translate each part so the whole label is localized.
+function toEnFuel(value: string | null): string | null {
+  if (!value) return value;
+  return value
+    .split("/")
+    .map((part) => map_(part.trim()))
+    .join(" / ");
+}
+
+function map_(part: string): string {
+  return fuelMapEn[part] ?? part;
+}
+
 export function localizeVehicleProfile(profile: VehicleProfile, locale: Locale): VehicleProfile {
   if (locale === "nl") {
     const enriched = profile.enriched
@@ -89,7 +103,7 @@ export function localizeVehicleProfile(profile: VehicleProfile, locale: Locale):
 
   const vehicle = {
     ...profile.vehicle,
-    fuelType: toEn(profile.vehicle.fuelType, fuelMapEn),
+    fuelType: toEnFuel(profile.vehicle.fuelType),
     color: {
       primary: toEn(profile.vehicle.color.primary, colorMapEn),
       secondary: toEn(profile.vehicle.color.secondary, colorMapEn)

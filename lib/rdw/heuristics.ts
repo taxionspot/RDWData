@@ -414,18 +414,37 @@ function estimateMileage(profile: VehicleProfile, registrationDate: Date | null)
   };
 }
 
+export type FuelKind = {
+  isPetrol: boolean;
+  isDiesel: boolean;
+  isElectric: boolean;
+  isHybrid: boolean;
+  isLpg: boolean;
+  isCng: boolean;
+  isHydrogen: boolean;
+};
+
+/**
+ * Robustly classify a fuel-type string. Uses substring matching (not exact
+ * equality) so it works for localized values AND combined multi-fuel strings
+ * like "Benzine / Elektriciteit" (plug-in hybrids), where exact === checks
+ * previously failed silently.
+ */
+export function classifyFuel(fuelType: string | null | undefined): FuelKind {
+  const f = (fuelType ?? "").toLowerCase();
+  const isElectric = f.includes("elektr") || f.includes("electric");
+  const isPetrol = f.includes("benz") || f.includes("petrol");
+  const isDiesel = f.includes("diesel");
+  const isLpg = f.includes("lpg");
+  const isCng = f.includes("cng") || f.includes("aardgas");
+  const isHydrogen = f.includes("waterstof") || f.includes("hydrogen");
+  const isHybrid = f.includes("hybr") || f.includes("plug") || (isElectric && (isPetrol || isDiesel));
+  return { isPetrol, isDiesel, isElectric, isHybrid, isLpg, isCng, isHydrogen };
+}
+
 function fuelOffset({ fuelType, bodyType, ageYears }: { fuelType: string | null; bodyType: string | null; ageYears: number }) {
-  const fuel = (fuelType ?? "").toLowerCase();
+  const { isDiesel, isPetrol, isElectric, isHybrid, isLpg, isCng, isHydrogen } = classifyFuel(fuelType);
   const body = (bodyType ?? "").toLowerCase();
-
-  const isDiesel = fuel.includes("diesel");
-  const isPetrol = fuel.includes("benz") || fuel.includes("petrol");
-  const isElectric = fuel.includes("elektr");
-  const isHybrid = fuel.includes("hybr");
-  const isLpg = fuel.includes("lpg");
-  const isCng = fuel.includes("cng") || fuel.includes("aardgas");
-  const isHydrogen = fuel.includes("waterstof") || fuel.includes("hydrogen");
-
   const isVan = body.includes("bestel") || body.includes("van") || body.includes("mpv");
 
   if (isElectric && !isHybrid && !isDiesel && !isPetrol) {
@@ -435,7 +454,7 @@ function fuelOffset({ fuelType, bodyType, ageYears }: { fuelType: string | null;
   }
 
   if (isHybrid) {
-    const isPlugIn = fuel.includes("plug") || (isElectric && (isPetrol || isDiesel));
+    const isPlugIn = isElectric && (isPetrol || isDiesel);
     return isPlugIn ? 0.02 : 0.03;
   }
 
@@ -556,7 +575,7 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
   if (v.weight?.empty && v.weight.empty > 1500) {
     riskScore += 1.0; // Heavier = more wear (brakes, suspension)
   }
-  if (v.fuelType === "Diesel") riskScore += 0.5;
+  if (classifyFuel(v.fuelType).isDiesel) riskScore += 0.5;
   riskScore = Math.min(Math.max(riskScore, 1.0), 9.9);
 
   const registrationDate = v.firstRegistrationWorld ? parseDate(v.firstRegistrationWorld) : null;
@@ -604,48 +623,53 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     repairChances.push({ name: "Shock absorbers", chance: 55, estMin: 300, estMax: 500 });
   }
 
-  // 7. Road Tax Estimate (Extremely simplified)
+  // 7. Road Tax Estimate (rough indication only — NOT the official MRB, which
+  //    depends on the exact Belastingdienst weight brackets + provincial
+  //    opcenten. Labelled as an estimate in the report.)
+  const fuelKind = classifyFuel(v.fuelType);
   let taxMin = 0; let taxMax = 0;
   if (v.weight?.empty) {
     const w = v.weight.empty;
-    if (v.fuelType === "Benzine") {
-      taxMin = Math.floor(w * 0.05); taxMax = taxMin + 15;
-    } else if (v.fuelType === "Diesel") {
+    if (fuelKind.isElectric && !fuelKind.isPetrol && !fuelKind.isDiesel) {
+      taxMin = 0; taxMax = 0;
+    } else if (fuelKind.isDiesel) {
       taxMin = Math.floor(w * 0.09); taxMax = taxMin + 25;
-    } else if (v.fuelType === "Elektriciteit") {
-      taxMin = 0; taxMax = 0; // temporary exemption
     } else {
       taxMin = Math.floor(w * 0.05); taxMax = taxMin + 20;
     }
   }
   const tax = taxMin > 0 ? { min: taxMin, max: taxMax } : null;
 
-  // 8. Insurance Estimate (Heuristic based on Value & Weight)
-  // Very rough heuristic: Base 25 + (Value * 0.0015) + (Weight * 0.01)
-  let insuranceEst = null;
-  if (marketValue.value && v.weight?.empty) {
-    insuranceEst = 25 + (marketValue.value * 0.0015) + (v.weight.empty * 0.01);
-    if (v.engine?.powerKw && v.engine.powerKw > 150) insuranceEst += 15; // fast car premium
-    insuranceEst = Math.round(insuranceEst);
-  }
+  // 8. Insurance: no defensible data-only estimate exists (it depends on driver
+  //    profile, claims history, coverage). Previously a fabricated formula —
+  //    now reported as unavailable rather than misleading.
+  const insuranceEst: number | null = null;
 
-  // 9. Fuel Cost Estimate (Heuristic based on 1000km/month + Fuel Type + Weight)
-  let fuelEst = null;
-  if (v.fuelType && v.weight?.empty) {
-    let consumptionAvg = 7.0; // liters per 100km default
-    if (v.weight.empty < 1000) consumptionAvg = 5.5;
-    else if (v.weight.empty > 1500) consumptionAvg = 8.5;
-    else if (v.weight.empty > 2000) consumptionAvg = 11.0;
-
-    let pricePerUnit = 2.05; // Benzine
-    if (v.fuelType === "Diesel") pricePerUnit = 1.75;
-    if (v.fuelType === "LPG") pricePerUnit = 0.85;
-    if (v.fuelType === "Elektriciteit") {
-      consumptionAvg = 18; // kWh per 100km
-      pricePerUnit = 0.40; // Price per kWh
+  // 9. Fuel Cost Estimate — grounded in the vehicle's REAL combined consumption
+  //    from RDW when available (l/100km, or kWh/100km for EVs); falls back to a
+  //    weight-based default only when RDW has no consumption figure.
+  //    Assumes ~1000 km/month.
+  const MONTHLY_KM = 1000;
+  let fuelEst: number | null = null;
+  const realConsumption =
+    v.consumptionCombined != null && v.consumptionCombined > 0 ? v.consumptionCombined : null;
+  if (v.fuelType && (v.weight?.empty || realConsumption)) {
+    if (fuelKind.isElectric && !fuelKind.isPetrol && !fuelKind.isDiesel) {
+      const kwhPer100 = realConsumption ?? 18; // kWh/100km
+      fuelEst = Math.round((MONTHLY_KM / 100) * kwhPer100 * 0.4); // EUR/kWh
+    } else {
+      let litersPer100 = realConsumption;
+      if (litersPer100 == null && v.weight?.empty) {
+        if (v.weight.empty > 2000) litersPer100 = 11.0;
+        else if (v.weight.empty > 1500) litersPer100 = 8.5;
+        else if (v.weight.empty < 1000) litersPer100 = 5.5;
+        else litersPer100 = 7.0;
+      }
+      if (litersPer100 != null) {
+        const pricePerLiter = fuelKind.isDiesel ? 1.95 : fuelKind.isLpg ? 0.95 : 2.1;
+        fuelEst = Math.round((MONTHLY_KM / 100) * litersPer100 * pricePerLiter);
+      }
     }
-
-    fuelEst = Math.round((1000 / 100) * consumptionAvg * pricePerUnit);
   }
 
   // 10. Known Issues (Mocked heuristics)

@@ -29,8 +29,12 @@ function dateStr(v) {
 }
 function toVehicleProfile(input) {
     const m = input.main[0] ?? {};
-    // fuel[0] = primary fuel (petrol/diesel); fuel[1] = secondary (electric)
+    // fuel[0] = primary fuel (petrol/diesel); fuel[1+] = secondary (e.g. electric
+    // for a plug-in hybrid). Numeric specs are read from the primary row, but the
+    // fuel TYPE combines all rows so PHEV/dual-fuel vehicles are shown correctly.
     const f = input.fuel[0] ?? {};
+    const fuelDescriptions = Array.from(new Set(input.fuel.map((r) => str(r.brandstof_omschrijving)).filter((x) => Boolean(x))));
+    const fuelType = fuelDescriptions.length ? fuelDescriptions.join(" / ") : null;
     // Prefer fuel's emission standard, fall back to main
     const allFuelStandards = input.fuel
         .map((r) => str(r.uitlaatemissieniveau))
@@ -57,7 +61,7 @@ function toVehicleProfile(input) {
             seats: num(m.aantal_zitplaatsen),
             axles: num(m.aantal_assen),
             // Fuel & Emissions
-            fuelType: str(f.brandstof_omschrijving),
+            fuelType,
             co2: num(f.co2_uitstoot_gecombineerd),
             energyLabel: str(m.zuinigheidsclassificatie ?? f.zuinigheidsclassificatie),
             consumptionCombined: num(f.brandstofverbruik_gecombineerd),
