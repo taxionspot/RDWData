@@ -257,6 +257,10 @@ export function TechnicalSpecsScreen({ plate }: Props) {
             value: data.enriched?.roadTaxEstQuarter
               ? `EUR ${data.enriched.roadTaxEstQuarter.min} - EUR ${data.enriched.roadTaxEstQuarter.max} / ${locale === "nl" ? "kw" : "qtr"}`
               : null,
+            meta:
+              locale === "nl"
+                ? "Schatting o.b.v. gewicht & brandstof. Werkelijke MRB verschilt per provincie — bereken exact op belastingdienst.nl."
+                : "Estimate from weight & fuel. Actual road tax varies by province — calculate the exact amount at belastingdienst.nl.",
             icon: ShieldCheck
           }
         ].filter((spec) => spec.value) as Array<{ id: string; label: string; value: string; meta?: string; icon: ElementType }>

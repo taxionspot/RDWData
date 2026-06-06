@@ -142,7 +142,9 @@ export function RiskOverviewScreen({ plate }: Props) {
     v.hasOpenRecall ? (nl ? "openstaande terugroepactie" : "open recall") : null,
     apkExpired ? (nl ? "verlopen APK" : "expired APK") : null,
     data.defects.length > 3 ? (nl ? `${data.defects.length} defectrecords` : `${data.defects.length} defect records`) : null,
-    (v.owners.count ?? 0) > 4 ? (nl ? "veel eigenaren" : "many owners") : null
+    (v.owners.count ?? 0) > 4 ? (nl ? "veel tenaamstellingen" : "many registrations") : null,
+    v.isTaxi ? (nl ? "ex-taxi (intensief gebruik)" : "ex-taxi (intensive use)") : null,
+    v.exportIndicator ? (nl ? "gemarkeerd voor export" : "marked for export") : null
   ].filter(Boolean) as string[];
   const riskLevel: "low" | "medium" | "high" =
     napIllogical || v.wok ? "high" : attentionItems.length > 0 ? "medium" : "low";
