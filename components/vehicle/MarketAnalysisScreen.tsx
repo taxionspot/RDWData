@@ -113,9 +113,12 @@ export function MarketAnalysisScreen({ plate }: Props) {
       brand: data.vehicle.brand,
       fuelType: data.vehicle.fuelType,
       bodyType: data.vehicle.bodyType,
-      mileage: appliedMileage
+      mileage: appliedMileage,
+      // Apply the same condition discount the rest of the app uses, so this
+      // screen never shows a higher value than the Overview.
+      condition: data.enriched?.marketValueCondition ?? undefined
     });
-  }, [data?.vehicle, appliedMileage]);
+  }, [data, appliedMileage]);
 
   const marketValue = valuation?.value ?? data?.enriched?.estimatedValueNow ?? data?.vehicle.cataloguePrice ?? null;
   const marketValueMin = valuation?.min ?? data?.enriched?.estimatedValueMin ?? null;
@@ -162,27 +165,41 @@ export function MarketAnalysisScreen({ plate }: Props) {
     };
   }, [marketValue, sellerPrice, locale]);
 
+  // Real model-based value trajectory: run the SAME depreciation model
+  // (computeMarketValueV3) at the vehicle's age in each of the last 5 years,
+  // with mileage walked back along the estimated slope. No fabricated curve and
+  // no "comparable listings" — points before the vehicle existed are left blank.
   const chartPoints = useMemo((): Array<{ label: string; value: number | null }> => {
     const year = new Date().getFullYear();
-    if (!marketValue) {
-      return [
-        { label: String(year - 4), value: null },
-        { label: String(year - 3), value: null },
-        { label: String(year - 2), value: null },
-        { label: String(year - 1), value: null },
-        { label: locale === "nl" ? "Vandaag" : "Today", value: null }
-      ];
+    const offsets = [4, 3, 2, 1, 0];
+    const labelFor = (k: number) => (k === 0 ? (locale === "nl" ? "Vandaag" : "Today") : String(year - k));
+    const first = data?.vehicle.firstRegistrationWorld ? new Date(data.vehicle.firstRegistrationWorld) : null;
+    const ageNow =
+      first && !Number.isNaN(first.getTime())
+        ? Math.max((Date.now() - first.getTime()) / (1000 * 60 * 60 * 24 * 365.25), 0)
+        : null;
+    if (!marketValue || ageNow == null || !data?.vehicle) {
+      return offsets.map((k) => ({ label: labelFor(k), value: null }));
     }
-    const start = marketValue * 1.65;
-    const step = (start - marketValue) / 4;
-    return [
-      { label: String(year - 4), value: Math.round(start) },
-      { label: String(year - 3), value: Math.round(start - step) },
-      { label: String(year - 2), value: Math.round(start - step * 2) },
-      { label: String(year - 1), value: Math.round(start - step * 3) },
-      { label: locale === "nl" ? "Vandaag" : "Today", value: Math.round(marketValue) }
-    ];
-  }, [marketValue, locale]);
+    const v = data.vehicle;
+    const cond = data.enriched?.marketValueCondition ?? undefined;
+    const slope = data.enriched?.mileageSlopeKmPerYear ?? 0;
+    return offsets.map((k) => {
+      const age = ageNow - k;
+      if (age < 0.4) return { label: labelFor(k), value: null };
+      const mileage = appliedMileage != null ? Math.max(0, Math.round(appliedMileage - slope * k)) : null;
+      const res = computeMarketValueV3({
+        catalogPrice: v.cataloguePrice,
+        ageYears: age,
+        brand: v.brand,
+        fuelType: v.fuelType,
+        bodyType: v.bodyType,
+        mileage,
+        condition: cond
+      });
+      return { label: labelFor(k), value: res.value };
+    });
+  }, [marketValue, data, appliedMileage, locale]);
 
   if (!isValid || isError) {
     return (
@@ -276,7 +293,7 @@ export function MarketAnalysisScreen({ plate }: Props) {
               <div className={styles.chartContainer}>
                 <div className={styles.chartHeader}>
                   <div className={styles.chartTitle}>{locale === "nl" ? "Waardetrend over tijd" : "Value trend over time"}</div>
-                  <div className={styles.chartNote}>{locale === "nl" ? "Gebaseerd op vergelijkbare advertenties" : "Based on similar listings"}</div>
+                  <div className={styles.chartNote}>{locale === "nl" ? "Modelmatige waardeontwikkeling (afschrijving o.b.v. leeftijd & km)" : "Model-based value trajectory (age & mileage depreciation)"}</div>
                 </div>
 
                 <div className={styles.chartInteractive}>
