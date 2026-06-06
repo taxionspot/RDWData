@@ -189,7 +189,7 @@ export function generateVehicleReportHtml(args: {
     ${recallsRows || `<tr><td colspan="3">-</td></tr>`}
   </table>
 
-  <h2>${escape(locale === "nl" ? "Marktwaarde en kosten" : "Market value and costs")}</h2>
+  <h2>${escape(locale === "nl" ? "Marktwaarde en kosten (schatting)" : "Market value and costs (estimate)")}</h2>
   <table>
     <tr><th>${escape(locale === "nl" ? "Onderdeel" : "Section")}</th><th>${escape(locale === "nl" ? "Waarde" : "Value")}</th></tr>
     <tr><td>${escape(locale === "nl" ? "Huidige marktwaarde" : "Current market value")}</td><td>EUR ${escape(enriched.estimatedValueNow ?? "-")}</td></tr>
@@ -200,19 +200,25 @@ export function generateVehicleReportHtml(args: {
     <tr><td>${escape(locale === "nl" ? "Brandstof per maand" : "Fuel per month")}</td><td>EUR ${escape(enriched.fuelEstMonth ?? "-")}</td></tr>
   </table>
 
-  <h2>${escape(locale === "nl" ? "Reparatiekansen" : "Repair chances")}</h2>
+  <h2>${escape(locale === "nl" ? "Reparatiekansen (indicatie)" : "Repair chances (indicative)")}</h2>
   <table>
     <tr><th>${escape(locale === "nl" ? "Onderdeel" : "Part")}</th><th>${escape(locale === "nl" ? "Kans" : "Chance")}</th><th>${escape(locale === "nl" ? "Kostenindicatie" : "Estimated cost")}</th></tr>
     ${repairRows || `<tr><td colspan="3">-</td></tr>`}
   </table>
 
-  <h2>${escape(locale === "nl" ? "Bekende aandachtspunten" : "Known issues")}</h2>
+  <h2>${escape(locale === "nl" ? "Aandachtspunten (algemeen, niet voertuigspecifiek)" : "Known issues (general, not vehicle-specific)")}</h2>
   <table>
     <tr><th>${escape(locale === "nl" ? "Issue" : "Issue")}</th><th>${escape(locale === "nl" ? "Ernst" : "Severity")}</th><th>${escape(locale === "nl" ? "Doelgroep" : "Target")}</th><th>${escape(locale === "nl" ? "Advies" : "Advice")}</th></tr>
     ${issuesRows || `<tr><td colspan="4">-</td></tr>`}
   </table>
   ${aiValuationSection}
   ${aiSummarySection}
+  <h2>${escape(locale === "nl" ? "Disclaimer" : "Disclaimer")}</h2>
+  <p style="color:#64748b;font-size:11px;line-height:1.5;">${escape(
+    locale === "nl"
+      ? "Feitelijke RDW-gegevens (identiteit, APK-historie, terugroepacties) komen rechtstreeks uit open RDW-data. Marktwaarde, maandlasten (wegenbelasting, verzekering, brandstof), reparatiekansen en aandachtspunten zijn data-gedreven schattingen en algemene indicaties — geen formele taxatie, geen garantie en geen voertuigspecifieke diagnose. Werkelijke waarden en kosten kunnen afwijken. Combineer dit rapport altijd met een fysieke inspectie en aankoopkeuring."
+      : "Factual RDW data (identity, inspection history, recalls) comes directly from open RDW data. Market value, monthly costs (road tax, insurance, fuel), repair likelihoods and known issues are data-driven estimates and general indications — not a formal appraisal, guarantee, or vehicle-specific diagnosis. Actual values and costs may differ. Always combine this report with a physical inspection and pre-purchase check."
+  )}</p>
 </body>
 </html>`;
 }

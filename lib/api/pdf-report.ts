@@ -236,6 +236,22 @@ class PdfLayout {
     items.forEach((item, index) => this.keyValue(`${index + 1}.`, item));
   }
 
+  paragraph(text: string, size = 8.5) {
+    const lines = splitText(text, this.regular, size, CONTENT_WIDTH - 8);
+    const blockHeight = lines.length * (size + 3) + 6;
+    this.ensureHeight(blockHeight + 2);
+    lines.forEach((line, i) => {
+      this.page.drawText(line, {
+        x: MARGIN + 4,
+        y: this.y - (size + 4) - i * (size + 3),
+        font: this.regular,
+        size,
+        color: rgb(0.42, 0.48, 0.56)
+      });
+    });
+    this.y -= blockHeight + 4;
+  }
+
   table(headers: string[], rows: string[][]) {
     const widths = [0.22, 0.18, 0.3, 0.3].slice(0, headers.length).map((w) => w * CONTENT_WIDTH);
     const adjust = CONTENT_WIDTH - widths.reduce((a, b) => a + b, 0);
@@ -344,7 +360,6 @@ function drawHeroVisuals(args: {
   bold: PDFFont;
   data: Record<string, unknown>;
   image?: PDFImage | null;
-  map?: PDFImage | null;
   aiInsights?: AiInsights | null;
   aiValuation?: AiValuation | null;
   locale: "nl" | "en";
@@ -503,21 +518,34 @@ function drawHeroVisuals(args: {
     });
   }
 
-  args.page.drawText(args.locale === "nl" ? "Markt-/locatiekaart" : "Market/location map", {
+  // Honest, vehicle-specific facts instead of a generic static country map.
+  const enrichedRow = asRow(args.data.enriched);
+  const vehicleRow = asRow(args.data.vehicle);
+  const mileageNow = toNumber(enrichedRow.estimatedMileageNow);
+  const mileageText = mileageNow != null ? `${mileageNow.toLocaleString("nl-NL")} km` : "-";
+  const napVerdict = s(vehicleRow.napVerdict);
+
+  args.page.drawText(args.locale === "nl" ? "Kerncijfers" : "Key figures", {
     x: rightX + 8,
     y: cardY + 54,
     font: args.bold,
     size: 9,
     color: rgb(0.08, 0.2, 0.45)
   });
-  if (args.map) {
-    args.page.drawImage(args.map, {
-      x: rightX + 8,
-      y: cardY + 8,
-      width: rightW - 16,
-      height: 42
-    });
-  }
+  args.page.drawText(`${args.locale === "nl" ? "Geschat km-stand" : "Estimated mileage"}: ${mileageText}`, {
+    x: rightX + 8,
+    y: cardY + 38,
+    font: args.regular,
+    size: 8.5,
+    color: rgb(0.16, 0.24, 0.35)
+  });
+  args.page.drawText(`${args.locale === "nl" ? "NAP-oordeel" : "Odometer verdict"}: ${napVerdict}`, {
+    x: rightX + 8,
+    y: cardY + 24,
+    font: args.regular,
+    size: 8.5,
+    color: rgb(0.16, 0.24, 0.35)
+  });
 }
 
 function buildReportSections(layout: PdfLayout, args: ReportArgs) {
@@ -584,7 +612,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   layout.keyValue(locale === "nl" ? "APK vervaldatum" : "APK expiry", s(vehicle.apkExpiryDate));
   layout.keyValue(locale === "nl" ? "Statusflags" : "Status flags", `WOK: ${boolLabel(vehicle.wok)}, Export: ${boolLabel(vehicle.exportIndicator)}, Transfer: ${boolLabel(vehicle.transferPossible)}, Insured: ${boolLabel(vehicle.insured)}, Taxi: ${boolLabel(vehicle.isTaxi)}, Recall open: ${boolLabel(vehicle.hasOpenRecall)}`);
 
-  layout.section(locale === "nl" ? "Waarde en kosteninschatting" : "Value and Cost Estimation");
+  layout.section(locale === "nl" ? "Waarde en kosten (schatting)" : "Value and Cost (estimate)");
   layout.keyValue(locale === "nl" ? "Marktwaarde nu / volgend jaar" : "Market value now / next year", `${currency(enriched.estimatedValueNow)} / ${currency(enriched.estimatedValueNextYear)}`);
   layout.keyValue(locale === "nl" ? "Marktbandbreedte" : "Market range", `${currency(enriched.estimatedValueMin)} - ${currency(enriched.estimatedValueMax)} (${s(enriched.marketValueConfidence)} confidence)`);
   layout.keyValue(locale === "nl" ? "APK kans / onderhoudsrisico" : "APK chance / maintenance risk", `${s(enriched.apkPassChance)}% / ${s(enriched.maintenanceRiskScore)}`);
@@ -633,13 +661,13 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     ]
   );
 
-  layout.section(locale === "nl" ? "Reparatiekansen" : "Repair Chances");
+  layout.section(locale === "nl" ? "Reparatiekansen (indicatie)" : "Repair Chances (indicative)");
   layout.table(
     [locale === "nl" ? "Onderdeel" : "Part", locale === "nl" ? "Kans" : "Chance", locale === "nl" ? "Kosten min" : "Cost min", locale === "nl" ? "Kosten max" : "Cost max"],
     repairChances.map((it) => [s(it.name), `${s(it.chance)}%`, currency(it.estMin), currency(it.estMax)])
   );
 
-  layout.section(locale === "nl" ? "Bekende aandachtspunten" : "Known Issues");
+  layout.section(locale === "nl" ? "Aandachtspunten (algemeen, niet voertuigspecifiek)" : "Known Issues (general, not vehicle-specific)");
   layout.table(
     [locale === "nl" ? "Issue" : "Issue", locale === "nl" ? "Ernst" : "Severity", locale === "nl" ? "Doel" : "Target", locale === "nl" ? "Advies" : "Advice"],
     knownIssues.map((it) => [s(it.title), s(it.severity), s(it.target), s(it.advice)])
@@ -675,6 +703,12 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   layout.keyValue("raw.body", `${body.length} ${locale === "nl" ? "records" : "records"}`);
   layout.keyValue("raw.typeApprovals", `${typeApprovals.length} ${locale === "nl" ? "records" : "records"}`);
 
+  layout.section(locale === "nl" ? "Disclaimer" : "Disclaimer");
+  layout.paragraph(
+    locale === "nl"
+      ? "Feitelijke RDW-gegevens (identiteit, APK-historie, terugroepacties, brandstof, gewicht) komen rechtstreeks uit open RDW-data. Marktwaarde, maandlasten (wegenbelasting, verzekering, brandstof), reparatiekansen en aandachtspunten zijn data-gedreven schattingen en algemene indicaties — geen formele taxatie, geen garantie en geen voertuigspecifieke diagnose. Werkelijke waarden en kosten kunnen afwijken. Gebruik dit rapport als hulpmiddel en combineer het altijd met een fysieke inspectie en aankoopkeuring."
+      : "Factual RDW data (identity, inspection history, recalls, fuel, weight) comes directly from open RDW data. Market value, monthly costs (road tax, insurance, fuel), repair likelihoods and known issues are data-driven estimates and general indications — not a formal appraisal, guarantee, or vehicle-specific diagnosis. Actual values and costs may differ. Use this report as guidance and always combine it with a physical inspection and pre-purchase check."
+  );
 }
 
 async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; contentType: string } | null> {
@@ -724,27 +758,23 @@ export async function generateVehicleReportPdf(args: ReportArgs): Promise<Buffer
   const layout = new PdfLayout(doc, regular, bold, args);
   const vehicle = asRow(args.data.vehicle);
   const vehicleColor = asRow(vehicle.color).primary;
-  const imageUrl = getVehicleImageUrl(
-    typeof vehicle.brand === "string" ? vehicle.brand : null,
-    typeof vehicle.tradeName === "string" ? vehicle.tradeName : null,
-    {
-      angle: "01",
-      zoomtype: "relative",
-      color: typeof vehicleColor === "string" ? vehicleColor : null
-    }
-  );
-  const fallbackImageUrl =
-    "https://storage.googleapis.com/banani-generated-images/generated-images/e0649eef-2848-49b1-a352-34ec7d23ba0c.jpg";
-  const mapUrl = "https://staticmap.openstreetmap.de/staticmap.php?center=52.1326,5.2913&zoom=7&size=640x260&markers=52.1326,5.2913,red-pushpin";
-  const [primaryVehicleImage, mapImage] = await Promise.all([embedImageIfAvailable(doc, imageUrl), embedImageIfAvailable(doc, mapUrl)]);
-  const vehicleImage = primaryVehicleImage ?? (await embedImageIfAvailable(doc, fallbackImageUrl));
+  // Only embed a real, brand-derived vehicle image. If it is unavailable we show
+  // a neutral placeholder rather than an unrelated stock photo of another car.
+  const brand = typeof vehicle.brand === "string" && vehicle.brand.trim() ? vehicle.brand : null;
+  const imageUrl = brand
+    ? getVehicleImageUrl(brand, typeof vehicle.tradeName === "string" ? vehicle.tradeName : null, {
+        angle: "01",
+        zoomtype: "relative",
+        color: typeof vehicleColor === "string" ? vehicleColor : null
+      })
+    : null;
+  const vehicleImage = imageUrl ? await embedImageIfAvailable(doc, imageUrl) : null;
   drawHeroVisuals({
     page: layout.page,
     regular,
     bold,
     data: args.data,
     image: vehicleImage,
-    map: mapImage,
     aiInsights: args.aiInsights,
     aiValuation: args.aiValuation,
     locale: args.locale
