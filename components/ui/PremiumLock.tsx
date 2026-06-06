@@ -4,7 +4,7 @@ import { Button } from "./Button";
 import { Lock } from "lucide-react";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { useI18n } from "@/lib/i18n/context";
-import { hasPaidAccessForPlate } from "@/lib/payments/access";
+import { hasPaidAccessForPlate, grantPaidAccessForPlate } from "@/lib/payments/access";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
 
@@ -26,8 +26,25 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
 
   useEffect(() => {
     if (!plate) return;
-    const localPaid = hasPaidAccessForPlate(plate);
-    setIsUnlockedForPlate(localPaid);
+    setIsUnlockedForPlate(hasPaidAccessForPlate(plate));
+    // Reconcile with the server so a paid plate stays unlocked across reloads.
+    let active = true;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/payments/access/${encodeURIComponent(plate)}`, { cache: "no-store" });
+        if (!response.ok || !active) return;
+        const payload = (await response.json()) as { paid?: boolean };
+        if (active && payload.paid) {
+          grantPaidAccessForPlate(plate);
+          setIsUnlockedForPlate(true);
+        }
+      } catch {
+        // Best-effort; server still enforces access on the actual report fetch.
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [plate]);
 
   const lockByAdmin = sectionKey ? settings.lockSections[sectionKey] : isLocked;

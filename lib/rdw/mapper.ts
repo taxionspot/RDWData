@@ -14,11 +14,6 @@ function bool(v: unknown): boolean {
   const s = String(v ?? "").toLowerCase();
   return s === "ja" || s === "j" || v === true || s === "yes";
 }
-function notBool(v: unknown): boolean {
-  // "Nee" / "Geen" / "N" → false → hasOpenRecall = false means NO open recall
-  const s = String(v ?? "").toLowerCase();
-  return s === "ja" || s === "j" || v === true || s === "yes";
-}
 function dateStr(v: unknown): string | null {
   const s = str(v);
   if (!s) return null;
@@ -110,7 +105,7 @@ export function toVehicleProfile(input: {
       transferPossible: bool(m.tenaamstellen_mogelijk),
       insured: bool(m.wam_verzekerd),
       isTaxi: bool(m.taxi_indicator),
-      hasOpenRecall: notBool(m.openstaande_terugroepactie_indicator),
+      hasOpenRecall: bool(m.openstaande_terugroepactie_indicator),
 
       // NAP mileage verdict
       napVerdict: str(m.tellerstandoordeel),

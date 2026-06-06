@@ -249,7 +249,7 @@ function estimateMileage(profile: VehicleProfile, registrationDate: Date | null)
       estimatedMileageNow: latest,
       estimatedMileageMin: null,
       estimatedMileageMax: null,
-      mileageVerdict: latest != null ? "UNKNOWN" : "UNKNOWN" as MileageVerdict,
+      mileageVerdict: "UNKNOWN" as MileageVerdict,
       mileageUsageProfile: null,
       mileageSlopeKmPerYear: null,
       mileageAnomalies: [] as MileageAnomaly[],

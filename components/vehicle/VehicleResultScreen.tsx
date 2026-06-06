@@ -26,7 +26,7 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import { getVehicleImageUrl } from "@/lib/utils/imagin";
 import { useI18n } from "@/lib/i18n/context";
-import { hasPaidAccessForPlate } from "@/lib/payments/access";
+import { hasPaidAccessForPlate, grantPaidAccessForPlate } from "@/lib/payments/access";
 import styles from "./VehicleResultScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
@@ -287,7 +287,7 @@ function ScoreModule({
       </div>
 
       <div className={styles.scoreActions}>
-        <button className={styles.actionPrimary} type="button" onClick={onDownload} disabled={isDownloading}>
+        <button className={styles.actionPrimary} type="button" onClick={onDownload} disabled={isDownloading} aria-busy={isDownloading}>
           {isDownloading ? <RefreshCw size={18} className={styles.inlineSpinner} /> : <Download size={18} />}
           {isDownloading
             ? locale === "nl"
@@ -417,7 +417,27 @@ export function VehicleResultScreen({ plate }: Props) {
       setIsPaidForPlate(false);
       return;
     }
+    // Optimistic: trust the in-memory grant from this session immediately...
     setIsPaidForPlate(hasPaidAccessForPlate(normalizedPlate));
+    // ...then reconcile with the server so a previously paid plate stays
+    // unlocked across reloads (the in-memory set is cleared on refresh).
+    let active = true;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/payments/access/${encodeURIComponent(normalizedPlate)}`, { cache: "no-store" });
+        if (!response.ok || !active) return;
+        const payload = (await response.json()) as { paid?: boolean };
+        if (active && payload.paid) {
+          grantPaidAccessForPlate(normalizedPlate);
+          setIsPaidForPlate(true);
+        }
+      } catch {
+        // Best-effort; the server still enforces access on download.
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [normalizedPlate]);
 
   useEffect(() => {
@@ -449,6 +469,14 @@ export function VehicleResultScreen({ plate }: Props) {
         await sendReportByEmail(normalizedPlate, locale, recipientEmail);
       }
     } catch (error) {
+      // Server says this plate is not unlocked: open the checkout instead of
+      // surfacing a raw error (e.g. after a reload cleared the in-session grant).
+      if (error instanceof PaymentRequiredError) {
+        setIsPaidForPlate(false);
+        setDownloadAfterUnlock(true);
+        setShowPayment(true);
+        return;
+      }
       const message =
         error instanceof Error
           ? error.message
@@ -716,6 +744,8 @@ export function VehicleResultScreen({ plate }: Props) {
   );
 }
 
+class PaymentRequiredError extends Error {}
+
 async function downloadReportFile(plate: string, locale: "nl" | "en", mileage?: number | null): Promise<void> {
   const response = await fetch(`/api/vehicle/${encodeURIComponent(plate)}?lang=${encodeURIComponent(locale)}&download=1${
     typeof mileage === "number" && Number.isFinite(mileage) ? `&mileage=${encodeURIComponent(String(mileage))}` : ""
@@ -724,6 +754,9 @@ async function downloadReportFile(plate: string, locale: "nl" | "en", mileage?: 
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    if (response.status === 402) {
+      throw new PaymentRequiredError(payload.error ?? "Payment required.");
+    }
     throw new Error(payload.error ?? "Report download failed.");
   }
   const blob = await response.blob();
