@@ -466,6 +466,46 @@ function fuelOffset({ fuelType, bodyType, ageYears }: { fuelType: string | null;
   return 0.0;
 }
 
+/**
+ * Rough indication of the quarterly motorrijtuigenbelasting (MRB / road tax),
+ * derived from the RDW empty weight + fuel type.
+ *
+ * This is NOT the official amount. The real MRB uses the Belastingdienst weight
+ * brackets, fuel surcharges (brandstoftoeslag) and PER-PROVINCE opcenten — and
+ * the province depends on the owner, which RDW does not expose. The model below
+ * is calibrated to public reference points (notably a ~EUR 100/quarter diesel
+ * surcharge around 1200 kg and an average provincial opcenten level) and is
+ * returned as a RANGE to reflect the province-to-province spread. Always verify
+ * the exact figure with the official calculator at belastingdienst.nl.
+ */
+export function estimateRoadTaxQuarter(
+  emptyWeightKg: number | null | undefined,
+  fuelType: string | null | undefined
+): { min: number; max: number } | null {
+  if (!emptyWeightKg || emptyWeightKg <= 0) return null;
+  const w = emptyWeightKg;
+  const fuel = classifyFuel(fuelType);
+
+  // Pure EV: heavily reduced (the MRB exemption is being phased out), keep a low
+  // indication rather than zero so buyers still see a ballpark.
+  if (fuel.isElectric && !fuel.isPetrol && !fuel.isDiesel) {
+    const ev = w * 0.035;
+    return { min: Math.max(0, Math.round((ev * 0.6) / 5) * 5), max: Math.round((ev * 1.1) / 5) * 5 };
+  }
+
+  // Petrol baseline per kg/quarter incl. average provincial opcenten, plus a
+  // fuel surcharge for diesel / LPG / CNG.
+  let point = w * 0.135 - 25;
+  if (fuel.isDiesel) point += w * 0.085;
+  else if (fuel.isLpg) point += w * 0.04;
+  else if (fuel.isCng) point += w * 0.02;
+  point = Math.max(0, point);
+
+  const min = Math.max(0, Math.round((point * 0.85) / 5) * 5);
+  const max = Math.round((point * 1.18) / 5) * 5;
+  return max > 0 ? { min, max } : null;
+}
+
 export function computeMarketValueV3(params: {
   catalogPrice: number | null;
   ageYears: number | null;
@@ -623,22 +663,11 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     repairChances.push({ name: "Shock absorbers", chance: 55, estMin: 300, estMax: 500 });
   }
 
-  // 7. Road Tax Estimate (rough indication only — NOT the official MRB, which
-  //    depends on the exact Belastingdienst weight brackets + provincial
-  //    opcenten. Labelled as an estimate in the report.)
+  // 7. Road Tax (MRB) — indication from RDW empty weight + fuel type. Returned
+  //    as a range (province opcenten vary); clearly labelled as an estimate and
+  //    pointed at the official calculator in the report.
   const fuelKind = classifyFuel(v.fuelType);
-  let taxMin = 0; let taxMax = 0;
-  if (v.weight?.empty) {
-    const w = v.weight.empty;
-    if (fuelKind.isElectric && !fuelKind.isPetrol && !fuelKind.isDiesel) {
-      taxMin = 0; taxMax = 0;
-    } else if (fuelKind.isDiesel) {
-      taxMin = Math.floor(w * 0.09); taxMax = taxMin + 25;
-    } else {
-      taxMin = Math.floor(w * 0.05); taxMax = taxMin + 20;
-    }
-  }
-  const tax = taxMin > 0 ? { min: taxMin, max: taxMax } : null;
+  const tax = estimateRoadTaxQuarter(v.weight?.empty ?? null, v.fuelType);
 
   // 8. Insurance: no defensible data-only estimate exists (it depends on driver
   //    profile, claims history, coverage). Previously a fabricated formula —

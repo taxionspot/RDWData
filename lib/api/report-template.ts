@@ -185,7 +185,7 @@ export function generateVehicleReportHtml(args: {
     <tr><td>${escape(locale === "nl" ? "Huidige marktwaarde" : "Current market value")}</td><td>EUR ${escape(enriched.estimatedValueNow ?? "-")}</td></tr>
     <tr><td>${escape(locale === "nl" ? "Bandbreedte" : "Range")}</td><td>EUR ${escape(enriched.estimatedValueMin ?? "-")} - EUR ${escape(enriched.estimatedValueMax ?? "-")}</td></tr>
     <tr><td>${escape(locale === "nl" ? "Waarde volgend jaar" : "Estimated value next year")}</td><td>EUR ${escape(enriched.estimatedValueNextYear ?? "-")}</td></tr>
-    <tr><td>${escape(locale === "nl" ? "Wegenbelasting per kwartaal" : "Road tax per quarter")}</td><td>EUR ${escape((enriched.roadTaxEstQuarter as Record<string, unknown> | undefined)?.min ?? "-")} - EUR ${escape((enriched.roadTaxEstQuarter as Record<string, unknown> | undefined)?.max ?? "-")}</td></tr>
+    <tr><td>${escape(locale === "nl" ? "Wegenbelasting per kwartaal" : "Road tax per quarter")}</td><td>EUR ${escape((enriched.roadTaxEstQuarter as Record<string, unknown> | undefined)?.min ?? "-")} - EUR ${escape((enriched.roadTaxEstQuarter as Record<string, unknown> | undefined)?.max ?? "-")} <span style="color:#94a3b8;font-size:11px;">${escape(locale === "nl" ? "(schatting incl. gem. opcenten; exact via belastingdienst.nl)" : "(estimate incl. avg. surcharge; exact via belastingdienst.nl)")}</span></td></tr>
     <tr><td>${escape(locale === "nl" ? "Verzekering per maand" : "Insurance per month")}</td><td>EUR ${escape(enriched.insuranceEstMonth ?? "-")}</td></tr>
     <tr><td>${escape(locale === "nl" ? "Brandstof per maand" : "Fuel per month")}</td><td>EUR ${escape(enriched.fuelEstMonth ?? "-")}</td></tr>
   </table>

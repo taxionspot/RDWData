@@ -605,7 +605,14 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   layout.keyValue(locale === "nl" ? "Marktwaarde nu / volgend jaar" : "Market value now / next year", `${currency(enriched.estimatedValueNow)} / ${currency(enriched.estimatedValueNextYear)}`);
   layout.keyValue(locale === "nl" ? "Marktbandbreedte" : "Market range", `${currency(enriched.estimatedValueMin)} - ${currency(enriched.estimatedValueMax)} (${s(enriched.marketValueConfidence)} confidence)`);
   layout.keyValue(locale === "nl" ? "APK kans / onderhoudsrisico" : "APK chance / maintenance risk", `${s(enriched.apkPassChance)}% / ${s(enriched.maintenanceRiskScore)}`);
-  layout.keyValue(locale === "nl" ? "Wegenbelasting per kwartaal" : "Road tax per quarter", `${currency(asRow(enriched.roadTaxEstQuarter).min)} - ${currency(asRow(enriched.roadTaxEstQuarter).max)}`);
+  layout.keyValue(
+    locale === "nl" ? "Wegenbelasting per kwartaal" : "Road tax per quarter",
+    `${currency(asRow(enriched.roadTaxEstQuarter).min)} - ${currency(asRow(enriched.roadTaxEstQuarter).max)} ${
+      locale === "nl"
+        ? "(schatting incl. gem. opcenten; exact via belastingdienst.nl)"
+        : "(estimate incl. avg. provincial surcharge; exact via belastingdienst.nl)"
+    }`
+  );
   layout.keyValue(locale === "nl" ? "Verzekering / brandstof per maand" : "Insurance / fuel per month", `${currency(enriched.insuranceEstMonth)} / ${currency(enriched.fuelEstMonth)}`);
 
   layout.section(locale === "nl" ? "APK inspecties" : "APK Inspections");
