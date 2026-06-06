@@ -776,16 +776,10 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
   if (ageInMonths && ageInMonths > 120) passChance -= 15;
   if (isImported) passChance -= 5;
 
-  // 6. Repair Chances (Mocked for UI testing, would need B2B data for real)
-  const repairChances = [] as { name: string; chance: number; estMin: number; estMax: number }[];
-  if (ageInMonths && ageInMonths > 80) {
-    repairChances.push({ name: "Brakes (discs/pads)", chance: 75, estMin: 350, estMax: 600 });
-    repairChances.push({ name: "Battery replacement", chance: 40, estMin: 100, estMax: 250 });
-  }
-  if (ageInMonths && ageInMonths > 140) {
-    repairChances.push({ name: "Timing belt/chain", chance: 65, estMin: 400, estMax: 800 });
-    repairChances.push({ name: "Shock absorbers", chance: 55, estMin: 300, estMax: 500 });
-  }
+  // 6. Repair forecast: RDW exposes no repair probability or cost data (that needs
+  //    B2B sources), so we do not fabricate it. The real maintenance signal is the
+  //    defect history, surfaced on the inspection/APK screens.
+  const repairChances: { name: string; chance: number; estMin: number; estMax: number }[] = [];
 
   // 7. Road Tax (MRB) — indication from RDW empty weight + fuel type. Returned
   //    as a range (province opcenten vary); clearly labelled as an estimate and
@@ -825,24 +819,35 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     }
   }
 
-  // 10. Known Issues (Mocked heuristics)
-  const knownIssues = [] as { title: string; severity: string; target: string; advice: string }[];
-  const brand = (v.brand || "").toUpperCase();
-  if (ageInMonths && ageInMonths > (10 * 12)) {
-    if (brand.includes("TOYOTA")) {
-      knownIssues.push({
-        title: "Timing chain wear", severity: "Moderate", target: "Older VVT-i engines", advice: "Check for rattling noises during cold start."
-      });
-    }
-    if (brand.includes("VOLKSWAGEN") || brand.includes("AUDI")) {
-      knownIssues.push({
-        title: "Oil consumption TFSI", severity: "High", target: "1.8 and 2.0 engines (2008-2012)", advice: "Ask for oil consumption history."
-      });
-    }
+  // 10. Known issues: derived from the vehicle's REAL signals -- an open recall and
+  //     defects that recur across its APK inspections -- not brand stereotypes.
+  const knownIssues: { title: string; severity: string; target: string; advice: string }[] = [];
+  if (v.hasOpenRecall) {
     knownIssues.push({
-      title: "Clutch issues", severity: "Common", target: "All years", advice: "Check for wear during test drive."
+      title: "Openstaande terugroepactie (recall)",
+      severity: "Hoog",
+      target: "RDW",
+      advice: "Laat dit kosteloos verhelpen bij een merkdealer."
     });
   }
+  const defectFrequency = new Map<string, number>();
+  for (const record of profile.defects) {
+    const code = String((record as Record<string, unknown>).gebrek_identificatie ?? "");
+    const description = (profile.defectDescriptions[code] ?? code).trim();
+    if (description) defectFrequency.set(description, (defectFrequency.get(description) ?? 0) + 1);
+  }
+  Array.from(defectFrequency.entries())
+    .filter(([, count]) => count > 1)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .forEach(([description, count]) => {
+      knownIssues.push({
+        title: description,
+        severity: `${count}× gemeld bij APK`,
+        target: "APK",
+        advice: "Controleer of dit defect inmiddels is verholpen."
+      });
+    });
 
   return {
     ageInMonths,
