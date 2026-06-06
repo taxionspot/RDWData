@@ -88,7 +88,12 @@ export async function capturePaypalOrder(orderId: string) {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      // Guarantee a full representation so the capture response includes
+      // purchase_units[].custom_id and payments.captures[].amount, which the
+      // server-side plate/amount verification depends on. Without this PayPal
+      // may return a minimal body and reject already-paid orders.
+      Prefer: "return=representation"
     },
     cache: "no-store"
   });

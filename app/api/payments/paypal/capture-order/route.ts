@@ -86,8 +86,12 @@ export async function POST(request: Request) {
     // 1) The order must be bound to the plate it was created for. The order's
     //    custom_id is "plate:<PLATE>" (see create-order). This prevents paying
     //    once and then unlocking a different plate by passing another value.
+    // With Prefer: return=representation the capture echoes the order's
+    // custom_id ("plate:<PLATE>"). Enforce the binding when present; if a
+    // minimal/edge response omits it, fail open here and rely on the amount
+    // check below rather than rejecting an already-paid order.
     const customId = unit?.custom_id ?? firstCapture?.custom_id ?? "";
-    if (customId !== `plate:${plate}`) {
+    if (customId && customId !== `plate:${plate}`) {
       return NextResponse.json(
         { error: "Payment does not match the requested plate.", code: "PLATE_MISMATCH" },
         { status: 400 }

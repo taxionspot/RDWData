@@ -26,5 +26,10 @@ export function sanitizeWinAnsi(text: string): string {
     .replace(cls(0x00a0, 0x2007, 0x2009, 0x200a, 0x202f), " ")
     .replace(new RegExp(String.fromCharCode(0x20ac), "g"), "EUR")
     .replace(cls(0x200b, 0x200c, 0x200d, 0xfeff), "")
+    // C0/C1 control ranges, NUL and DEL are within Latin-1 but are NOT WinAnsi-
+    // encodable (cp1252 maps those byte values to different glyphs) and would
+    // still crash drawText. Map them to a space before the final strip.
+    .replace(new RegExp("[\\u0000-\\u001f\\u007f-\\u009f]", "g"), " ")
+    // Final safety net: drop anything beyond the Latin-1 range.
     .replace(new RegExp("[^\\u0000-\\u00ff]", "g"), "");
 }

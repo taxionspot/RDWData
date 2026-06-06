@@ -73,6 +73,6 @@ export function isCapturedAmountSufficient(
   const capturedCurrency = String(captured.currency ?? "").toUpperCase();
   const expectedCurrency = String(expected.currency ?? "").toUpperCase();
   if (capturedCurrency !== expectedCurrency) return false;
-  // 1 cent tolerance for rounding; blocks meaningful underpayment.
+  // Half-cent rounding tolerance; still blocks any meaningful underpayment.
   return capturedValue + 0.005 >= expectedValue;
 }

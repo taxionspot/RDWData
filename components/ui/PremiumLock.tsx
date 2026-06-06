@@ -24,8 +24,13 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
   const [showModal, setShowModal] = useState(false);
   const [isUnlockedForPlate, setIsUnlockedForPlate] = useState(false);
 
+  const lockByAdmin = sectionKey ? settings.lockSections[sectionKey] : isLocked;
+  const shouldLock = settings.paymentEnabled && lockByAdmin && isLocked;
+
   useEffect(() => {
-    if (!plate) return;
+    // Only reconcile access for sections that are actually gated, so a page with
+    // several PremiumLocks doesn't fire N identical access checks for nothing.
+    if (!plate || !shouldLock) return;
     setIsUnlockedForPlate(hasPaidAccessForPlate(plate));
     // Reconcile with the server so a paid plate stays unlocked across reloads.
     let active = true;
@@ -45,10 +50,7 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
     return () => {
       active = false;
     };
-  }, [plate]);
-
-  const lockByAdmin = sectionKey ? settings.lockSections[sectionKey] : isLocked;
-  const shouldLock = settings.paymentEnabled && lockByAdmin && isLocked;
+  }, [plate, shouldLock]);
 
   if (!shouldLock || isUnlockedForPlate) return <>{children}</>;
 

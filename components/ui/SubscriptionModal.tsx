@@ -117,14 +117,23 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
                 type="button"
                 className={styles.skipButton}
                 onClick={async () => {
+                  // Only treat the demo unlock as granted if the SERVER actually
+                  // grants it. Otherwise the download would 402 and reopen this
+                  // modal in a loop (e.g. when the public flag is on but the
+                  // server-side PAYMENT_DEMO_BYPASS is off).
                   try {
-                    await fetch(`/api/payments/access/${encodeURIComponent(plate)}`, {
+                    const response = await fetch(`/api/payments/access/${encodeURIComponent(plate)}`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ email: email.trim().toLowerCase() || undefined })
                     });
+                    if (!response.ok) {
+                      setError(locale === "nl" ? "Demo-toegang is uitgeschakeld." : "Demo access is disabled.");
+                      return;
+                    }
                   } catch {
-                    // Keep demo UX non-blocking even if backend grant fails.
+                    setError(locale === "nl" ? "Demo-toegang kon niet worden verleend." : "Could not grant demo access.");
+                    return;
                   }
                   grantPaidAccessForPlate(plate);
                   onUnlocked?.({ email: email.trim().toLowerCase() || undefined });

@@ -25,6 +25,14 @@ test("sanitizeWinAnsi maps the euro sign to EUR", () => {
   assert.equal(sanitizeWinAnsi(String.fromCharCode(0x20ac) + "10"), "EUR10");
 });
 
+test("sanitizeWinAnsi maps non-WinAnsi control chars (NUL, C0, DEL, C1) to spaces", () => {
+  const input =
+    "a" + String.fromCharCode(0x00) + "b" + String.fromCharCode(0x07) +
+    "c" + String.fromCharCode(0x7f) + "d" + String.fromCharCode(0x80) +
+    "e" + String.fromCharCode(0x9f) + "f";
+  assert.equal(sanitizeWinAnsi(input), "a b c d e f");
+});
+
 test("sanitizeWinAnsi is a no-op for empty input", () => {
   assert.equal(sanitizeWinAnsi(""), "");
 });

@@ -460,13 +460,16 @@ export function VehicleResultScreen({ plate }: Props) {
   const e = data.enriched;
   const displayPlate = formatDisplayPlate(normalizedPlate);
 
-  const downloadReport = async () => {
+  const downloadReport = async (emailOverride?: string | null) => {
     if (isDownloading) return;
     setIsDownloading(true);
     try {
       await downloadReportFile(normalizedPlate, locale, mileageInput);
-      if (recipientEmail) {
-        await sendReportByEmail(normalizedPlate, locale, recipientEmail);
+      // Prefer an explicit override: on the unlock->auto-download path the
+      // recipientEmail state hasn't re-rendered yet, so the closure value is stale.
+      const email = emailOverride ?? recipientEmail;
+      if (email) {
+        await sendReportByEmail(normalizedPlate, locale, email);
       }
     } catch (error) {
       // Server says this plate is not unlocked: open the checkout instead of
@@ -727,7 +730,7 @@ export function VehicleResultScreen({ plate }: Props) {
           setIsPaidForPlate(true);
           setRecipientEmail(payload?.email ?? null);
           if (downloadAfterUnlock) {
-            void downloadReport();
+            void downloadReport(payload?.email ?? null);
           }
           setDownloadAfterUnlock(false);
         }}
