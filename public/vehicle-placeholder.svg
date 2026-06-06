@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 580 340" role="img" aria-label="Voertuigafbeelding niet beschikbaar">
+  <rect width="580" height="340" fill="#f1f5f9"/>
+  <g fill="none" stroke="#94a3b8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M120 214 l34 -64 c8 -15 22 -24 39 -24 h128 c14 0 27 7 35 19 l40 60 58 12 c16 3 28 17 28 34 v25 h-58" />
+    <path d="M120 214 h-14 c-12 0 -22 10 -22 22 v24 h74" />
+    <line x1="232" y1="276" x2="372" y2="276" />
+    <circle cx="196" cy="276" r="30" fill="#f1f5f9"/>
+    <circle cx="408" cy="276" r="30" fill="#f1f5f9"/>
+    <path d="M188 150 v62 M300 132 v82" />
+  </g>
+  <text x="290" y="316" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#94a3b8">Geen voertuigafbeelding</text>
+</svg>
