@@ -1,7 +1,7 @@
 "use client";
 
 
-import { AlertCircle, BarChart3, CheckCircle2, Wrench } from "lucide-react";
+import { AlertCircle, BarChart3, CheckCircle2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 import { VehicleNavBar } from "./VehicleNavBar";
@@ -19,14 +19,6 @@ function toCategory(description: string): string {
   if (text.includes("licht") || text.includes("lamp")) return "Lighting & Electrical";
   if (text.includes("ophang") || text.includes("schok") || text.includes("susp")) return "Suspension & Chassis";
   return "General Mechanical";
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("nl-NL", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0
-  }).format(value);
 }
 
 export function ApkFailureIntelligenceScreen({ plate }: Props) {
@@ -74,13 +66,6 @@ export function ApkFailureIntelligenceScreen({ plate }: Props) {
     .map(([category, info]) => ({ category, ...info }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
-
-  const repairBands = recurringCategories.map((item, index) => {
-    const base = 180 + index * 70;
-    const min = Math.round(base + item.count * 60);
-    const max = Math.round(min * 1.9);
-    return { category: item.category, min, max, frequency: item.count, samples: item.samples };
-  });
 
   return (
     <div className={styles.pageContainer}>
@@ -153,18 +138,6 @@ export function ApkFailureIntelligenceScreen({ plate }: Props) {
             )}
           </div>
 
-          <div className={styles.panel}>
-            <h3>{locale === "nl" ? "Geschatte reparatieband per defectgroep" : "Estimated repair band by defect group"}</h3>
-            <div className={styles.repairGrid}>
-              {repairBands.map((band) => (
-                <div key={band.category} className={styles.repairCard}>
-                  <div className={styles.repairHead}><Wrench size={14} /> {band.category}</div>
-                  <div className={styles.repairValue}>{formatCurrency(band.min)} - {formatCurrency(band.max)}</div>
-                  <div className={styles.repairMeta}>{band.frequency} {locale === "nl" ? "historische signalen" : "historical signals"}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </PremiumLock>
       </div>
     </div>
