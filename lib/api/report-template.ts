@@ -1,21 +1,9 @@
 import { formatDisplayPlate } from "@/lib/rdw/normalize";
+import type { ClaudeInsightResult, ClaudeValuationResult } from "@/lib/api/claude";
 
-export type AiInsights = {
-  summary: string;
-  positives: string[];
-  risks: string[];
-  recommendation: string;
-};
-
-export type AiValuation = {
-  currency: "EUR";
-  estimatedValueNow: number;
-  estimatedValueMin: number;
-  estimatedValueMax: number;
-  confidence: "LOW" | "MEDIUM" | "HIGH";
-  factors: string[];
-  explanation: string;
-};
+// Single source of truth for the AI shapes (shared with the PDF report).
+export type AiInsights = ClaudeInsightResult;
+export type AiValuation = ClaudeValuationResult;
 
 export type ReportScore = {
   score: number;
@@ -107,10 +95,12 @@ export function generateVehicleReportHtml(args: {
   <h2>${escape(locale === "nl" ? "AI rapportinzichten" : "AI report insights")}</h2>
   <table>
     <tr><th>${escape(locale === "nl" ? "Onderdeel" : "Section")}</th><th>${escape(locale === "nl" ? "Inhoud" : "Content")}</th></tr>
+    <tr><td>${escape(locale === "nl" ? "Aankoopadvies" : "Purchase verdict")}</td><td>${escape(aiInsights.purchaseVerdict)} (${escape(locale === "nl" ? "risico" : "risk")}: ${escape(aiInsights.riskLevel)})</td></tr>
     <tr><td>${escape(locale === "nl" ? "Samenvatting" : "Summary")}</td><td>${escape(aiInsights.summary || "-")}</td></tr>
     <tr><td>${escape(locale === "nl" ? "Sterke punten" : "Positives")}</td><td>${escape(aiInsights.positives.join(" | ") || "-")}</td></tr>
     <tr><td>${escape(locale === "nl" ? "Risico's" : "Risks")}</td><td>${escape(aiInsights.risks.join(" | ") || "-")}</td></tr>
     <tr><td>${escape(locale === "nl" ? "Aanbeveling" : "Recommendation")}</td><td>${escape(aiInsights.recommendation || "-")}</td></tr>
+    <tr><td>${escape(locale === "nl" ? "Vervolgstappen" : "Next steps")}</td><td>${escape(aiInsights.recommendations.join(" | ") || "-")}</td></tr>
   </table>`
     : "";
 

@@ -1,26 +1,12 @@
 import { PDFDocument, rgb, StandardFonts, type PDFPage, type PDFFont, type PDFImage } from "pdf-lib";
 import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import { getVehicleImageUrl } from "@/lib/utils/imagin";
+import { sanitizeWinAnsi } from "./pdf-text";
+import type { ClaudeInsightResult, ClaudeValuationResult } from "@/lib/api/claude";
 
-type AiInsights = {
-  summary: string;
-  positives: string[];
-  risks: string[];
-  recommendation: string;
-  purchaseVerdict: "BUY" | "CONSIDER" | "CAUTION" | "AVOID";
-  riskLevel: "LOW" | "MEDIUM" | "HIGH";
-  recommendations: string[];
-};
-
-type AiValuation = {
-  currency: "EUR";
-  estimatedValueNow: number;
-  estimatedValueMin: number;
-  estimatedValueMax: number;
-  confidence: "LOW" | "MEDIUM" | "HIGH";
-  factors: string[];
-  explanation: string;
-};
+// Single source of truth for the AI shapes (shared with the HTML report).
+type AiInsights = ClaudeInsightResult;
+type AiValuation = ClaudeValuationResult;
 
 type ReportArgs = {
   plate: string;
@@ -51,7 +37,7 @@ function asRow(value: unknown): Row {
 
 function s(value: unknown): string {
   if (value === null || value === undefined || value === "") return "-";
-  return String(value);
+  return sanitizeWinAnsi(String(value));
 }
 
 function boolLabel(value: unknown): string {
@@ -86,7 +72,7 @@ function riskColor(level: AiInsights["riskLevel"]) {
 
 function splitText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
   if (!text) return [""];
-  const safe = text.replace(/[\u2013\u2014]/g, "-");
+  const safe = sanitizeWinAnsi(text);
   const words = safe.split(/\s+/);
   const lines: string[] = [];
   let line = "";

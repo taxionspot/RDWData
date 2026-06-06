@@ -4,7 +4,8 @@ import { parsePlateOrThrow } from "@/lib/api/plate";
 import { errorResponse } from "@/lib/api/errors";
 import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
-import { buildFallbackVehicleAiReport, generateVehicleAiReport } from "@/lib/api/claude";
+import { buildFallbackVehicleAiReport } from "@/lib/api/claude";
+import { getOrGenerateVehicleAiReport } from "@/lib/api/ai-report-cache";
 import { connectMongo } from "@/lib/db/mongodb";
 import { hasPaidPlateAccess } from "@/lib/payments/server-access";
 import { generateVehicleReportHtml } from "@/lib/api/report-template";
@@ -49,9 +50,10 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
     };
   }
   try {
-    const aiReport = await generateVehicleAiReport({
+    const aiReport = await getOrGenerateVehicleAiReport({
       plate,
       locale,
+      mileage: userMileage,
       vehicleData: {
         ...localized,
         userContext: userMileage !== null ? { mileageInput: userMileage } : undefined
