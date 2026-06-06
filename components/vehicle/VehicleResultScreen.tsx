@@ -706,8 +706,8 @@ export function VehicleResultScreen({ plate }: Props) {
               <InsightCard
                 icon={Coins}
                 title={locale === "nl" ? "Geschatte waarde" : "Estimated value"}
-                value={formatCurrency(claudeValue ?? e.estimatedValueNow)}
-                isLoading={isCalculatingClaude && !claudeValue}
+                value={formatCurrency(e.estimatedValueNow ?? claudeValue)}
+                isLoading={isCalculatingClaude && e.estimatedValueNow == null && claudeValue == null}
               />
               <InsightCard
                 icon={Clock3}

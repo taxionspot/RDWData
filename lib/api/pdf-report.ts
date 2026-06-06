@@ -431,9 +431,12 @@ function drawHeroVisuals(args: {
       });
     });
 
-  const vNow = valuation?.estimatedValueNow ?? toNumber(asRow(args.data.enriched).estimatedValueNow);
-  const vMin = valuation?.estimatedValueMin ?? toNumber(asRow(args.data.enriched).estimatedValueMin);
-  const vMax = valuation?.estimatedValueMax ?? toNumber(asRow(args.data.enriched).estimatedValueMax);
+  // Canonical headline value = the consolidated enriched value (model first,
+  // AI-backfilled server-side when the model has none); fall back to the raw AI
+  // valuation only if enriched is somehow absent.
+  const vNow = toNumber(asRow(args.data.enriched).estimatedValueNow) ?? valuation?.estimatedValueNow;
+  const vMin = toNumber(asRow(args.data.enriched).estimatedValueMin) ?? valuation?.estimatedValueMin;
+  const vMax = toNumber(asRow(args.data.enriched).estimatedValueMax) ?? valuation?.estimatedValueMax;
   args.page.drawText(args.locale === "nl" ? "Marktwaarde (AI)" : "Market value (AI)", {
     x: leftX + 10,
     y: cardY + 45,
@@ -580,7 +583,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     },
     {
       title: locale === "nl" ? "Waarde nu" : "Value now",
-      value: args.aiValuation ? `${args.aiValuation.currency} ${args.aiValuation.estimatedValueNow.toLocaleString("nl-NL")}` : currency(enriched.estimatedValueNow),
+      value: currency(enriched.estimatedValueNow),
       accent: rgb(0.08, 0.2, 0.45)
     }
   ]);

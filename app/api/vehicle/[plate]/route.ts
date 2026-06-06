@@ -49,6 +49,8 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
           : null
     };
   }
+  let aiInsights;
+  let aiValuation;
   try {
     const aiReport = await getOrGenerateVehicleAiReport({
       plate,
@@ -59,19 +61,34 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
         userContext: userMileage !== null ? { mileageInput: userMileage } : undefined
       }
     });
-    return {
-      localized,
-      aiInsights: aiReport.insights,
-      aiValuation: aiReport.valuation
-    };
+    aiInsights = aiReport.insights;
+    aiValuation = aiReport.valuation;
   } catch {
     const fallback = buildFallbackVehicleAiReport({ locale, vehicleData: localized });
-    return {
-      localized,
-      aiInsights: fallback.insights,
-      aiValuation: fallback.valuation
-    };
+    aiInsights = fallback.insights;
+    aiValuation = fallback.valuation;
   }
+
+  // Consolidate to ONE canonical headline value. The model valuation (enriched)
+  // is authoritative; when it is unavailable (e.g. no catalogue price) we fall
+  // back to the AI valuation so the hero, cards and PDF all show the same
+  // number instead of three that disagree. The AI figure remains visible as a
+  // labelled second opinion in its own section.
+  const enriched = (localized.enriched ?? {}) as Record<string, unknown>;
+  if (enriched.estimatedValueNow == null && aiValuation) {
+    localized.enriched = {
+      ...enriched,
+      estimatedValueNow: aiValuation.estimatedValueNow,
+      estimatedValueMin: aiValuation.estimatedValueMin,
+      estimatedValueMax: aiValuation.estimatedValueMax,
+      marketValueConfidence: enriched.marketValueConfidence ?? aiValuation.confidence,
+      marketValueSource: "ai"
+    };
+  } else {
+    localized.enriched = { ...enriched, marketValueSource: "model" };
+  }
+
+  return { localized, aiInsights, aiValuation };
 }
 
 async function trackReportIfUserLoggedIn(args: {
