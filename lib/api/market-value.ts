@@ -1,4 +1,4 @@
-import { computeMarketValueV3 } from "@/lib/rdw/heuristics";
+import { computeMarketValueV3, type MarketValueCondition } from "@/lib/rdw/heuristics";
 
 function parseFirstRegistration(value: unknown): Date | null {
   if (typeof value !== "string") return null;
@@ -23,13 +23,18 @@ export function applyMileageValuationOverride(localized: Record<string, unknown>
       ? null
       : Math.max((Date.now() - firstRegistration.getTime()) / (1000 * 60 * 60 * 24 * 365.25), 0);
 
+  // Reuse the condition discount computed (from raw RDW data) during enrichment so
+  // a user-entered mileage doesn't silently drop the odometer/WOK/import penalties.
+  const condition = (enriched.marketValueCondition as MarketValueCondition | undefined) ?? undefined;
+
   const current = computeMarketValueV3({
     catalogPrice: Number(vehicle.cataloguePrice ?? 0) || null,
     ageYears,
     brand: (vehicle.brand as string | null | undefined) ?? null,
     fuelType: (vehicle.fuelType as string | null | undefined) ?? null,
     bodyType: (vehicle.bodyType as string | null | undefined) ?? null,
-    mileage
+    mileage,
+    condition
   });
 
   let nextYearValue: number | null = null;
@@ -42,7 +47,8 @@ export function applyMileageValuationOverride(localized: Record<string, unknown>
       brand: (vehicle.brand as string | null | undefined) ?? null,
       fuelType: (vehicle.fuelType as string | null | undefined) ?? null,
       bodyType: (vehicle.bodyType as string | null | undefined) ?? null,
-      mileage: projectedMileage
+      mileage: projectedMileage,
+      condition
     });
     nextYearValue = next.value;
   }

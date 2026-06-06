@@ -22,6 +22,7 @@ export type EnrichedData = {
   estimatedValueNextYear: number | null;
   marketValueConfidence: MarketValueConfidence | null;
   marketValueSe: number | null;
+  marketValueCondition: MarketValueCondition | null;
 
   estimatedMileageNow: number | null;
   estimatedMileageMin: number | null;
@@ -47,6 +48,16 @@ export type MarketValueResult = {
   max: number | null;
   se: number | null;
   confidence: MarketValueConfidence | null;
+};
+
+// Condition/history discount derived from free RDW signals (odometer integrity,
+// WOK, import, owners, APK, recalls). Computed once from the raw (untranslated)
+// vehicle data so it can be applied consistently wherever the value is (re)computed.
+export type MarketValueCondition = {
+  factor: number;              // multiplicative adjustment to the value (<= 1)
+  extraSe: number;             // extra standard error from condition uncertainty
+  forceLowConfidence: boolean; // hard-cap confidence to LOW (e.g. odometer fraud)
+  reasons: string[];           // why the value was adjusted
 };
 
 const BRAND_OFFSETS: Record<string, number> = {
@@ -506,6 +517,94 @@ export function estimateRoadTaxQuarter(
   return max > 0 ? { min, max } : null;
 }
 
+/**
+ * Derive a condition/history adjustment from free RDW signals. Each signal that
+ * destroys value (odometer fraud, registration block, import, many owners,
+ * expired APK, open recall) lowers the multiplicative `factor` and/or widens the
+ * uncertainty. Calibrated conservatively; the combined factor is floored at 0.40
+ * so signals never stack into an implausible near-zero value.
+ */
+export function computeConditionAdjustment(input: {
+  napVerdict: string | null;
+  mileageVerdict: MileageVerdict;
+  wok: boolean;
+  isImported: boolean;
+  ownersCount: number | null;
+  apkExpiryDate: string | null;
+  hasOpenRecall: boolean;
+}): MarketValueCondition {
+  let factor = 1;
+  let extraSe = 0;
+  let forceLowConfidence = false;
+  const reasons: string[] = [];
+
+  // Odometer integrity — worst of RDW's official NAP verdict and our APK-based verdict.
+  const nap = (input.napVerdict ?? "").toLowerCase();
+  const napIllogical = nap.includes("onlogisch") || nap.includes("illogical");
+  const napNoVerdict = nap.includes("geen oordeel") || nap.includes("no verdict");
+  if (napIllogical || input.mileageVerdict === "ONLOGISCH") {
+    factor *= 0.62;
+    extraSe += 0.12;
+    forceLowConfidence = true;
+    reasons.push("Odometer reading illogical (rollback risk)");
+  } else if (input.mileageVerdict === "TWIJFELACHTIG") {
+    factor *= 0.9;
+    extraSe += 0.05;
+    reasons.push("Odometer history doubtful");
+  } else if (napNoVerdict) {
+    extraSe += 0.04;
+    reasons.push("No NAP verdict available");
+  }
+
+  // WOK — registration block; not road-legal until re-inspected.
+  if (input.wok) {
+    factor *= 0.7;
+    extraSe += 0.08;
+    forceLowConfidence = true;
+    reasons.push("Registration block (WOK)");
+  }
+
+  // Imported vehicle — typically a lower / harder-to-realise NL market value.
+  if (input.isImported) {
+    factor *= 0.95;
+    extraSe += 0.03;
+    reasons.push("Imported vehicle");
+  }
+
+  // Number of previous owners.
+  if (input.ownersCount != null) {
+    if (input.ownersCount >= 7) {
+      factor *= 0.95;
+      reasons.push("Many previous owners");
+    } else if (input.ownersCount >= 5) {
+      factor *= 0.975;
+      reasons.push("Several previous owners");
+    }
+  }
+
+  // Expired APK — buyer must budget inspection plus likely repairs.
+  if (input.apkExpiryDate) {
+    const d = new Date(input.apkExpiryDate);
+    if (!Number.isNaN(d.getTime()) && d.getTime() < Date.now()) {
+      factor *= 0.96;
+      reasons.push("APK expired");
+    }
+  }
+
+  // Open recall.
+  if (input.hasOpenRecall) {
+    factor *= 0.98;
+    reasons.push("Open recall");
+  }
+
+  return {
+    factor: clamp(factor, 0.4, 1),
+    extraSe: clamp(extraSe, 0, 0.3),
+    forceLowConfidence,
+    reasons
+  };
+}
+
 export function computeMarketValueV3(params: {
   catalogPrice: number | null;
   ageYears: number | null;
@@ -513,8 +612,9 @@ export function computeMarketValueV3(params: {
   fuelType: string | null;
   bodyType: string | null;
   mileage: number | null;
+  condition?: MarketValueCondition;
 }): MarketValueResult {
-  const { catalogPrice, ageYears, brand, fuelType, bodyType, mileage } = params;
+  const { catalogPrice, ageYears, brand, fuelType, bodyType, mileage, condition } = params;
   if (!catalogPrice || ageYears == null || ageYears < 0) {
     return { value: null, min: null, max: null, se: null, confidence: null };
   }
@@ -545,34 +645,43 @@ export function computeMarketValueV3(params: {
   const brandOffset = getBrandOffset(brand).offset;
   const lnP = Math.log(catalogPrice) + f + g + h + fuelOffset({ fuelType, bodyType, ageYears: t }) + brandOffset;
 
-  let estimated = roundTo(Math.exp(lnP), 50);
-  let minimum = roundTo(Math.exp(lnP - 1.28 * 0.14), 50);
-  let maximum = roundTo(Math.exp(lnP + 1.28 * 0.14), 50);
-
   let se = 0.14;
   if (!hasMileage) se += 0.10;
   if (t > 15) se += 0.06;
   if (hasMileage && Math.abs(r) > 1.0) se += 0.04;
   const brandKnown = getBrandOffset(brand).known;
   if (!brandKnown) se += 0.03;
+  if (condition) se += condition.extraSe;
 
-  minimum = roundTo(Math.exp(lnP - 1.28 * se), 50);
-  maximum = roundTo(Math.exp(lnP + 1.28 * se), 50);
+  let estimated = roundTo(Math.exp(lnP), 50);
+  let minimum = roundTo(Math.exp(lnP - 1.28 * se), 50);
+  let maximum = roundTo(Math.exp(lnP + 1.28 * se), 50);
 
-  const minFloor = 250;
-  estimated = Math.max(estimated, minFloor);
-  minimum = Math.max(minimum, minFloor);
-  maximum = Math.max(maximum, minFloor);
-
+  // A used car can't be worth more than its original catalogue price (except
+  // >25y classics, which can appreciate); cap before applying any condition discount.
   if (t < 25) {
     estimated = Math.min(estimated, catalogPrice);
     minimum = Math.min(minimum, catalogPrice);
     maximum = Math.min(maximum, catalogPrice);
   }
 
+  // Condition/history discount from RDW signals (odometer integrity, WOK, import,
+  // owners, APK, recalls), applied to the depreciation-based value.
+  if (condition) {
+    estimated = roundTo(estimated * condition.factor, 50);
+    minimum = roundTo(minimum * condition.factor, 50);
+    maximum = roundTo(maximum * condition.factor, 50);
+  }
+
+  const minFloor = 250;
+  estimated = Math.max(estimated, minFloor);
+  minimum = Math.max(minimum, minFloor);
+  maximum = Math.max(maximum, minFloor);
+
   let confidence: MarketValueConfidence = "LOW";
   if (se <= 0.16) confidence = "HIGH";
   else if (se <= 0.22) confidence = "MEDIUM";
+  if (condition?.forceLowConfidence) confidence = "LOW";
 
   return {
     value: estimated,
@@ -620,13 +729,27 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
 
   const registrationDate = v.firstRegistrationWorld ? parseDate(v.firstRegistrationWorld) : null;
   const mileageEst = estimateMileage(profile, registrationDate);
+
+  // Condition/history discount from free RDW signals — computed once from the raw
+  // (untranslated) data so it applies consistently here and in any later override.
+  const valuationCondition = computeConditionAdjustment({
+    napVerdict: v.napVerdict,
+    mileageVerdict: mileageEst.mileageVerdict,
+    wok: v.wok,
+    isImported,
+    ownersCount: v.owners?.count ?? null,
+    apkExpiryDate: v.apkExpiryDate,
+    hasOpenRecall: v.hasOpenRecall
+  });
+
   const marketValue = computeMarketValueV3({
     catalogPrice: v.cataloguePrice,
     ageYears,
     brand: v.brand,
     fuelType: v.fuelType,
     bodyType: v.bodyType,
-    mileage: mileageEst.latestMileage ?? mileageEst.estimatedMileageNow
+    mileage: mileageEst.latestMileage ?? mileageEst.estimatedMileageNow,
+    condition: valuationCondition
   });
 
   let estimatedValueNextYear: number | null = null;
@@ -642,7 +765,8 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
       brand: v.brand,
       fuelType: v.fuelType,
       bodyType: v.bodyType,
-      mileage: projectedMileage ?? null
+      mileage: projectedMileage ?? null,
+      condition: valuationCondition
     });
     estimatedValueNextYear = nextValue.value;
   }
@@ -732,6 +856,7 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     estimatedValueNextYear: estimatedValueNextYear,
     marketValueConfidence: marketValue.confidence,
     marketValueSe: marketValue.se,
+    marketValueCondition: valuationCondition,
 
     estimatedMileageNow: mileageEst.estimatedMileageNow,
     estimatedMileageMin: mileageEst.estimatedMileageMin,

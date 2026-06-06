@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyFuel, estimateRoadTaxQuarter } from "../lib/rdw/heuristics";
+import {
+  classifyFuel,
+  estimateRoadTaxQuarter,
+  computeConditionAdjustment,
+  computeMarketValueV3
+} from "../lib/rdw/heuristics";
 
 test("classifyFuel detects single fuels", () => {
   assert.equal(classifyFuel("Benzine").isPetrol, true);
@@ -37,4 +42,71 @@ test("estimateRoadTaxQuarter: null for missing weight, sane ranges, fuel orderin
   const ev = estimateRoadTaxQuarter(1500, "Elektriciteit");
   const petrol1500 = estimateRoadTaxQuarter(1500, "Benzine");
   assert.ok(ev && petrol1500 && ev.max < petrol1500.min);
+});
+
+test("computeConditionAdjustment: clean vehicle is neutral", () => {
+  const clean = computeConditionAdjustment({
+    napVerdict: "Logisch",
+    mileageVerdict: "LOGISCH",
+    wok: false,
+    isImported: false,
+    ownersCount: 1,
+    apkExpiryDate: null,
+    hasOpenRecall: false
+  });
+  assert.equal(clean.factor, 1);
+  assert.equal(clean.forceLowConfidence, false);
+  assert.equal(clean.reasons.length, 0);
+});
+
+test("computeConditionAdjustment: illogical odometer discounts and forces LOW confidence", () => {
+  const cond = computeConditionAdjustment({
+    napVerdict: "Onlogisch",
+    mileageVerdict: "LOGISCH",
+    wok: false,
+    isImported: false,
+    ownersCount: 2,
+    apkExpiryDate: null,
+    hasOpenRecall: false
+  });
+  assert.ok(cond.factor < 0.7);
+  assert.equal(cond.forceLowConfidence, true);
+});
+
+test("computeConditionAdjustment: stacked negatives are floored at 0.40", () => {
+  const worst = computeConditionAdjustment({
+    napVerdict: "Onlogisch",
+    mileageVerdict: "ONLOGISCH",
+    wok: true,
+    isImported: true,
+    ownersCount: 9,
+    apkExpiryDate: "2000-01-01",
+    hasOpenRecall: true
+  });
+  assert.equal(worst.factor, 0.4);
+  assert.equal(worst.forceLowConfidence, true);
+});
+
+test("computeMarketValueV3: condition discount lowers value vs baseline", () => {
+  const params = {
+    catalogPrice: 30000,
+    ageYears: 5,
+    brand: "Volkswagen",
+    fuelType: "Benzine",
+    bodyType: null as string | null,
+    mileage: 80000
+  };
+  const base = computeMarketValueV3(params);
+  const cond = computeConditionAdjustment({
+    napVerdict: "Onlogisch",
+    mileageVerdict: "ONLOGISCH",
+    wok: false,
+    isImported: false,
+    ownersCount: 2,
+    apkExpiryDate: null,
+    hasOpenRecall: false
+  });
+  const adjusted = computeMarketValueV3({ ...params, condition: cond });
+  assert.ok(base.value && adjusted.value && adjusted.value < base.value);
+  assert.equal(adjusted.confidence, "LOW");
 });
