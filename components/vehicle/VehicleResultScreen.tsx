@@ -460,6 +460,14 @@ export function VehicleResultScreen({ plate }: Props) {
   const e = data.enriched;
   const displayPlate = formatDisplayPlate(normalizedPlate);
 
+  const priceLabel =
+    settings.payment.currency === "EUR"
+      ? `€${String(settings.payment.amount).replace(".", ",")}`
+      : `${settings.payment.currency} ${settings.payment.amount}`;
+  // Mobile-only sticky unlock bar: shown while the report is locked, hidden once
+  // paid or while the checkout modal itself is open.
+  const showStickyCta = settings.paymentEnabled && !isPaidForPlate && !showPayment;
+
   const downloadReport = async (emailOverride?: string | null) => {
     if (isDownloading) return;
     setIsDownloading(true);
@@ -596,7 +604,7 @@ export function VehicleResultScreen({ plate }: Props) {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageContainer}>
+      <div className={`${styles.pageContainer}${showStickyCta ? ` ${styles.hasStickyCta}` : ""}`}>
         <div className={styles.contentContainer}>
           <VehicleNavBar plate={normalizedPlate} />
 
@@ -718,6 +726,19 @@ export function VehicleResultScreen({ plate }: Props) {
           </div>
         </div>
       </div>
+      {showStickyCta && (
+        <div className={styles.stickyCta}>
+          <div className={styles.stickyCtaText}>
+            <strong>{locale === "nl" ? "Volledig rapport" : "Full report"}</strong>
+            <span>
+              {priceLabel} · {locale === "nl" ? "eenmalig" : "one-time"}
+            </span>
+          </div>
+          <button type="button" className={styles.stickyCtaBtn} onClick={() => setShowPayment(true)}>
+            {locale === "nl" ? "Ontgrendelen" : "Unlock"}
+          </button>
+        </div>
+      )}
       <SubscriptionModal
         isOpen={showPayment}
         onClose={() => {
