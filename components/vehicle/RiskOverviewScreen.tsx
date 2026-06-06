@@ -134,6 +134,36 @@ export function RiskOverviewScreen({ plate }: Props) {
     !v.hasOpenRecall
   ].filter(Boolean).length;
 
+  // Trust snapshot computed from the real RDW signals (no hardcoded verdict).
+  const nl = locale === "nl";
+  const napIllogical = !!v.napVerdict && v.napVerdict.toLowerCase().includes("onlogisch");
+  const apkExpired = !!v.apkExpiryDate && new Date(v.apkExpiryDate).getTime() < Date.now();
+  const attentionItems = [
+    v.hasOpenRecall ? (nl ? "openstaande terugroepactie" : "open recall") : null,
+    apkExpired ? (nl ? "verlopen APK" : "expired APK") : null,
+    data.defects.length > 3 ? (nl ? `${data.defects.length} defectrecords` : `${data.defects.length} defect records`) : null,
+    (v.owners.count ?? 0) > 4 ? (nl ? "veel eigenaren" : "many owners") : null
+  ].filter(Boolean) as string[];
+  const riskLevel: "low" | "medium" | "high" =
+    napIllogical || v.wok ? "high" : attentionItems.length > 0 ? "medium" : "low";
+  const riskLabel =
+    riskLevel === "high" ? (nl ? "Hoog risico" : "High risk") : riskLevel === "medium" ? (nl ? "Aandachtspunten" : "Needs attention") : (nl ? "Laag risico" : "Low risk");
+  const riskColor = riskLevel === "high" ? "#dc2626" : riskLevel === "medium" ? "#d97706" : undefined;
+  const riskNote =
+    riskLevel === "high"
+      ? napIllogical
+        ? nl ? "Tellerstand is door RDW als onlogisch gemarkeerd (NAP)." : "Odometer is flagged illogical by RDW (NAP)."
+        : nl ? "Registratieblokkade (WOK) actief op dit voertuig." : "Registration block (WOK) active on this vehicle."
+      : riskLevel === "medium"
+      ? nl ? `Let op: ${attentionItems.join(", ")}.` : `Attention: ${attentionItems.join(", ")}.`
+      : nl ? "Geen grote rode vlaggen in de belangrijkste RDW-datasets." : "No major red flags in the key RDW datasets.";
+  const nextAction =
+    napIllogical || data.enriched?.mileageVerdict === "ONLOGISCH"
+      ? nl ? "Open de kilometerhistorie om de tellerstand te controleren." : "Open mileage history to verify the odometer."
+      : data.defects.length > 0
+      ? nl ? "Open de schadehistorie om de gemelde defecten te bekijken." : "Open damage history to review the reported defects."
+      : nl ? "Open de eigendomshistorie om de registratiedatums te bekijken." : "Open ownership history to review the registration dates.";
+
   const metrics = [
     { label: locale === "nl" ? "Positieve controles" : "Positive checks", value: `${positiveChecks} / 3` },
     { label: locale === "nl" ? "Nadere controle" : "Needs review", value: `${v.wok || v.hasOpenRecall ? 1 : 0} ${locale === "nl" ? "item" : "item"}` },
@@ -246,20 +276,12 @@ export function RiskOverviewScreen({ plate }: Props) {
               <div className={styles.heroSide}>
                 <div className={styles.spotlightCard}>
                   <div className={styles.spotlightLabel}>{locale === "nl" ? "Vertrouwenssnapshot" : "Vehicle trust snapshot"}</div>
-                  <div className={styles.spotlightValue}>{locale === "nl" ? "Laag risico" : "Low risk"}</div>
-                  <div className={styles.spotlightNote}>
-                    {locale === "nl"
-                      ? "Historie oogt stabiel zonder grote rode vlaggen in de belangrijkste datasets."
-                      : "History looks stable with no major red flags in the key datasets."}
-                  </div>
+                  <div className={styles.spotlightValue} style={{ color: riskColor }}>{riskLabel}</div>
+                  <div className={styles.spotlightNote}>{riskNote}</div>
                 </div>
                 <div className={styles.spotlightCard}>
                   <div className={styles.spotlightLabel}>{locale === "nl" ? "Beste vervolgstap" : "Next best action"}</div>
-                  <div className={styles.spotlightNote}>
-                    {locale === "nl"
-                      ? "Open eigendomshistorie om overdrachtsmomenten en eigendomspatroon te controleren."
-                      : "Open ownership history to review transfer timing and confirm the ownership pattern."}
-                  </div>
+                  <div className={styles.spotlightNote}>{nextAction}</div>
                 </div>
               </div>
             </div>
