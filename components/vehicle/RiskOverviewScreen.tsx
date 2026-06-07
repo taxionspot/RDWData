@@ -159,6 +159,68 @@ export function RiskOverviewScreen({ plate }: Props) {
       ? nl ? "Open de schadehistorie om de gemelde defecten te bekijken." : "Open damage history to review the reported defects."
       : nl ? "Open de eigendomshistorie om de registratiedatums te bekijken." : "Open ownership history to review the registration dates.";
 
+  // Full, data-grounded analysis: every relevant RDW signal turned into a plain
+  // language finding with a severity. This is the "analyse van alle data met de
+  // bevindingen" — deterministic (no AI dependency) so it is always available.
+  type Severity = "high" | "medium" | "low" | "info";
+  type Finding = { id: string; severity: Severity; title: string; detail: string };
+  const findings: Finding[] = [];
+  const fmtEur = (n: number | null | undefined) =>
+    n == null ? "-" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+
+  if (napIllogical || data.enriched?.mileageVerdict === "ONLOGISCH") {
+    findings.push({ id: "odo", severity: "high", title: nl ? "Kilometerstand onlogisch (NAP)" : "Odometer illogical (NAP)", detail: nl ? "RDW markeert de tellerstand als onlogisch. Serieus risico op een teruggedraaide teller; koop niet zonder onafhankelijke controle." : "RDW marks the odometer as illogical. Serious rollback risk; do not buy without an independent check." });
+  } else if (data.enriched?.mileageVerdict === "TWIJFELACHTIG") {
+    findings.push({ id: "odo", severity: "medium", title: nl ? "Kilometerstand twijfelachtig" : "Odometer doubtful", detail: nl ? "De kilometerhistorie vertoont onregelmatigheden. Vraag facturen en het onderhoudsboekje op." : "The mileage history shows irregularities. Ask for invoices and the service book." });
+  }
+  if (v.wok) findings.push({ id: "wok", severity: "high", title: nl ? "Registratieblokkade (WOK)" : "Registration block (WOK)", detail: nl ? "Het voertuig is niet rijklaar tot een herkeuring akkoord is. Dit is een serieus aandachtspunt." : "Not road-legal until it passes a re-inspection. A serious concern." });
+  if (v.hasOpenRecall) findings.push({ id: "recall", severity: "medium", title: nl ? "Openstaande terugroepactie" : "Open recall", detail: nl ? "Er staat een terugroepactie open. Laat dit kosteloos verhelpen bij een merkdealer." : "An open recall exists. Have it fixed free of charge at a brand dealer." });
+  if (apkExpired) findings.push({ id: "apk", severity: "medium", title: nl ? "APK verlopen" : "MOT expired", detail: nl ? "De APK is verlopen; reken op een keuring en mogelijk herstel voordat je mag rijden." : "The MOT has expired; budget for an inspection and possible repairs before driving." });
+  else if (v.apkExpiryDate) findings.push({ id: "apk", severity: "info", title: nl ? "APK geldig" : "MOT valid", detail: `${nl ? "Geldig tot" : "Valid until"} ${formatDate(v.apkExpiryDate)}.` });
+  if (v.isTaxi) findings.push({ id: "taxi", severity: "medium", title: nl ? "Ex-taxi (intensief gebruik)" : "Ex-taxi (intensive use)", detail: nl ? "Geregistreerd als taxi: hoog jaarkilometrage en meer slijtage. Weegt mee in onze kilometer- en waardeschatting." : "Registered as a taxi: high annual mileage and more wear. Factored into our mileage and value estimate." });
+  if (v.exportIndicator) findings.push({ id: "export", severity: "medium", title: nl ? "Gemarkeerd voor export" : "Marked for export", detail: nl ? "Het voertuig staat als export gemarkeerd; controleer de status voordat je koopt." : "The vehicle is marked for export; verify the status before buying." });
+  if (data.enriched?.isImported) findings.push({ id: "import", severity: "low", title: nl ? "Geïmporteerd voertuig" : "Imported vehicle", detail: nl ? "Eerste toelating in het buitenland. Vaak een iets lagere of lastiger te bepalen marktwaarde." : "First admitted abroad. Often a slightly lower or harder-to-determine market value." });
+  if ((v.owners.count ?? 0) > 4) findings.push({ id: "owners", severity: "medium", title: `${v.owners.count} ${nl ? "tenaamstellingen" : "registrations"}`, detail: nl ? "Relatief veel registraties. Vraag naar de reden van de wisselingen." : "Relatively many registrations. Ask why it changed hands so often." });
+
+  // Recurring defects from the real APK records (top 4 by frequency).
+  const defectFreq = new Map<string, { count: number; desc: string }>();
+  for (const row of data.defects as Array<Record<string, unknown>>) {
+    const code = String(row.gebrek_identificatie ?? "").trim();
+    if (!code) continue;
+    const desc = data.defectDescriptions[code] || code;
+    const cur = defectFreq.get(code);
+    if (cur) cur.count += 1;
+    else defectFreq.set(code, { count: 1, desc });
+  }
+  Array.from(defectFreq.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 4)
+    .forEach((d, i) =>
+      findings.push({
+        id: `defect-${i}`,
+        severity: d.count > 1 ? "medium" : "low",
+        title: d.desc,
+        detail: `${d.count}× ${nl ? "geconstateerd bij de APK. Controleer of dit is verholpen." : "found at the APK. Check whether it has been fixed."}`
+      })
+    );
+
+  if (data.enriched?.estimatedMileageNow != null) {
+    findings.push({ id: "km", severity: "info", title: nl ? "Geschatte kilometerstand" : "Estimated mileage", detail: `~${Math.round(data.enriched.estimatedMileageNow).toLocaleString("nl-NL")} km${data.enriched.mileageEstimateSource === "formula" ? (nl ? " (schatting o.b.v. leeftijd en gebruik; RDW publiceert geen kilometerhistorie)" : " (estimate from age and usage; RDW publishes no odometer history)") : ""}.` });
+  }
+  if (data.enriched?.estimatedValueNow != null) {
+    findings.push({ id: "value", severity: "info", title: nl ? "Geschatte marktwaarde" : "Estimated market value", detail: `${fmtEur(data.enriched.estimatedValueNow)}${data.enriched.marketValueConfidence ? ` (${nl ? "betrouwbaarheid" : "confidence"} ${data.enriched.marketValueConfidence})` : ""}.` });
+  }
+  if (!findings.some((f) => f.severity === "high" || f.severity === "medium")) {
+    findings.unshift({ id: "clean", severity: "low", title: nl ? "Geen grote rode vlaggen" : "No major red flags", detail: nl ? "In de belangrijkste RDW-datasets vonden we geen zware risicosignalen. Beoordeel de auto altijd ook fysiek." : "We found no serious risk signals in the key RDW datasets. Always inspect the car physically too." });
+  }
+
+  const severityMeta: Record<Severity, { label: string; color: string; bg: string }> = {
+    high: { label: nl ? "Hoog" : "High", color: "#991b1b", bg: "#fef2f2" },
+    medium: { label: nl ? "Aandacht" : "Attention", color: "#92400e", bg: "#fffbeb" },
+    low: { label: nl ? "Laag" : "Low", color: "#3f6212", bg: "#f7fee7" },
+    info: { label: "Info", color: "#1e3a8a", bg: "#eff6ff" }
+  };
+
   const resolvedMileageVerdict =
     data.enriched?.mileageVerdict && data.enriched.mileageVerdict !== "UNKNOWN"
       ? data.enriched.mileageVerdict
@@ -264,6 +326,59 @@ export function RiskOverviewScreen({ plate }: Props) {
                   <div className={styles.spotlightLabel}>{locale === "nl" ? "Beste vervolgstap" : "Next best action"}</div>
                   <div className={styles.spotlightNote}>{nextAction}</div>
                 </div>
+              </div>
+            </div>
+
+            <div className={`${styles.riskSection} ${styles.glassPanel}`}>
+              <div style={{ marginBottom: "16px" }}>
+                <div className={styles.heroTitle} style={{ fontSize: "20px" }}>
+                  {nl ? "Volledige analyse: bevindingen en risico's" : "Full analysis: findings and risks"}
+                </div>
+                <div className={styles.heroSubtitle} style={{ marginTop: "4px" }}>
+                  {nl
+                    ? "Elke relevante RDW-bron beoordeeld en vertaald naar wat het voor jou als koper betekent."
+                    : "Every relevant RDW source assessed and translated into what it means for you as a buyer."}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {findings.map((f) => {
+                  const meta = severityMeta[f.severity];
+                  return (
+                    <div
+                      key={f.id}
+                      style={{
+                        display: "flex",
+                        gap: "12px",
+                        alignItems: "flex-start",
+                        padding: "12px 14px",
+                        borderRadius: "12px",
+                        background: meta.bg,
+                        border: `1px solid ${meta.color}22`
+                      }}
+                    >
+                      <span
+                        style={{
+                          flexShrink: 0,
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          color: meta.color,
+                          background: "#ffffff",
+                          border: `1px solid ${meta.color}33`,
+                          borderRadius: "999px",
+                          padding: "3px 9px",
+                          minWidth: "62px",
+                          textAlign: "center"
+                        }}
+                      >
+                        {meta.label}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a" }}>{f.title}</div>
+                        <div style={{ fontSize: "13px", color: "#475569", lineHeight: 1.5, marginTop: "2px" }}>{f.detail}</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
