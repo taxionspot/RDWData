@@ -70,6 +70,12 @@ function resolveLegalHref(label: string): string | null {
   return null;
 }
 
+function resolveCompanyHref(label: string): string | null {
+  const normalized = label.trim().toLowerCase();
+  if (normalized === "contact") return "/contact";
+  return null;
+}
+
 function PlateSearch() {
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -230,11 +236,18 @@ export default function LandingPage() {
           <div>
             <div className={styles["footer-title"]}>{settings.landing.footer.companyTitle}</div>
             <div className={styles["footer-links"]}>
-              {toLinkLabels(settings.landing.footer.companyLinks).map((item) => (
-                <div key={item} className={styles["footer-link"]}>
-                  {item}
-                </div>
-              ))}
+              {toLinkLabels(settings.landing.footer.companyLinks).map((item) => {
+                const href = resolveCompanyHref(item);
+                return href ? (
+                  <Link key={item} href={href} className={styles["footer-link"]}>
+                    {item}
+                  </Link>
+                ) : (
+                  <div key={item} className={styles["footer-link"]}>
+                    {item}
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div>
