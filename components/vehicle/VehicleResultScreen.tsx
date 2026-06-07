@@ -35,6 +35,8 @@ import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
 import { PremiumLock } from "@/components/ui/PremiumLock";
 import { UserAuthModal } from "@/components/ui/UserAuthModal";
 import { PlateBadge } from "@/components/ui/PlateBadge";
+import { AgentReport } from "./AgentReport";
+import type { VehicleReport } from "@/lib/agents/types";
 
 type Props = { plate: string };
 
@@ -432,6 +434,7 @@ export function VehicleResultScreen({ plate }: Props) {
   const [isCalculatingClaude, setIsCalculatingClaude] = useState(false);
   const [aiAdvice, setAiAdvice] = useState<AiAdvice | null>(null);
   const [aiSource, setAiSource] = useState<"ai" | "fallback" | null>(null);
+  const [report, setReport] = useState<VehicleReport | null>(null);
 
   useEffect(() => {
     if (!normalized || isError) return;
@@ -451,6 +454,9 @@ export function VehicleResultScreen({ plate }: Props) {
         if (payload.aiInsights && typeof payload.aiInsights === "object") {
           setAiAdvice(payload.aiInsights as AiAdvice);
           setAiSource(payload.aiSource === "fallback" ? "fallback" : "ai");
+        }
+        if (payload.report && typeof payload.report === "object") {
+          setReport(payload.report as VehicleReport);
         }
       } catch {
         // silently fallback
@@ -796,7 +802,13 @@ export function VehicleResultScreen({ plate }: Props) {
               />
             </div>
 
-            {aiAdvice && (
+            {report && (
+              <PremiumLock featureName={locale === "nl" ? "AI-rapport" : "AI report"} isLocked={true} plate={normalizedPlate}>
+                <AgentReport report={report} locale={locale} />
+              </PremiumLock>
+            )}
+
+            {!report && aiAdvice && (
               <PremiumLock featureName={locale === "nl" ? "AI-aankoopadvies" : "AI purchase advice"} isLocked={true} plate={normalizedPlate}>
                 <div className={styles.aiCard}>
                   <div className={styles.aiHeader}>
