@@ -13,6 +13,7 @@ import {
   Download,
   Fuel,
   Gauge,
+  Lock,
   RefreshCw,
   Settings2,
   Share2,
@@ -250,6 +251,8 @@ function InsightCard({
 function ScoreModule({
   score,
   locale,
+  locked,
+  onUnlock,
   onDownload,
   isDownloading,
   onSave,
@@ -258,29 +261,32 @@ function ScoreModule({
 }: {
   score: ScoreResult;
   locale: "nl" | "en";
+  locked: boolean;
+  onUnlock: () => void;
   onDownload: () => void;
   isDownloading: boolean;
   onSave: () => void;
   isSaving: boolean;
   isSaved: boolean;
 }) {
-  const degrees = Math.round((score.score / 100) * 360);
-  const ringColor =
-    score.tone === "strong"
-      ? "var(--success)"
-      : score.tone === "steady"
-      ? "#38BDF8"
-      : score.tone === "mixed"
-      ? "var(--warning)"
-      : "var(--destructive)";
+  const degrees = locked ? 360 : Math.round((score.score / 100) * 360);
+  const ringColor = locked
+    ? "rgba(148,163,184,0.45)"
+    : score.tone === "strong"
+    ? "var(--success)"
+    : score.tone === "steady"
+    ? "#38BDF8"
+    : score.tone === "mixed"
+    ? "var(--warning)"
+    : "var(--destructive)";
 
   return (
     <div className={styles.scoreModule}>
       <div className={styles.scoreHeader}>
         <div className={styles.scoreTitle}>Kentekenrapport Score</div>
         <div className={styles.scoreBadge}>
-          <ScoreBadgeIcon />
-          {score.label}
+          {locked ? <Lock size={12} /> : <ScoreBadgeIcon />}
+          {locked ? "Premium" : score.label}
         </div>
       </div>
 
@@ -292,24 +298,56 @@ function ScoreModule({
           }}
         >
           <div className={styles.gaugeContent}>
-            <div className={styles.scoreValue}>{score.score}</div>
-            <div className={styles.scoreMax}>{locale === "nl" ? "van 100" : "out of 100"}</div>
+            {locked ? (
+              <button
+                type="button"
+                onClick={onUnlock}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "inherit",
+                  padding: 0
+                }}
+                aria-label={locale === "nl" ? "Score ontgrendelen" : "Unlock score"}
+              >
+                <Lock size={26} />
+                <span className={styles.scoreMax}>Premium</span>
+              </button>
+            ) : (
+              <>
+                <div className={styles.scoreValue}>{score.score}</div>
+                <div className={styles.scoreMax}>{locale === "nl" ? "van 100" : "out of 100"}</div>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      <div className={styles.scoreCopy}>{score.description}</div>
-
-      <div className={styles.scoreMetrics}>
-        <div className={styles.scoreMetricCard}>
-          <div className={styles.scoreMetricLabel}>{locale === "nl" ? "Betrouwbaarheid" : "Confidence"}</div>
-          <div className={styles.scoreMetricValue}>{score.confidence}</div>
-        </div>
-        <div className={styles.scoreMetricCard}>
-          <div className={styles.scoreMetricLabel}>{locale === "nl" ? "Risico-indicatie" : "Risk flag"}</div>
-          <div className={styles.scoreMetricValue}>{score.riskFlag}</div>
-        </div>
+      <div className={styles.scoreCopy}>
+        {locked
+          ? locale === "nl"
+            ? "Ontgrendel je Kentekenrapport Score en het volledige rapport voor dit kenteken."
+            : "Unlock your vehicle score and the full report for this plate."
+          : score.description}
       </div>
+
+      {!locked && (
+        <div className={styles.scoreMetrics}>
+          <div className={styles.scoreMetricCard}>
+            <div className={styles.scoreMetricLabel}>{locale === "nl" ? "Betrouwbaarheid" : "Confidence"}</div>
+            <div className={styles.scoreMetricValue}>{score.confidence}</div>
+          </div>
+          <div className={styles.scoreMetricCard}>
+            <div className={styles.scoreMetricLabel}>{locale === "nl" ? "Risico-indicatie" : "Risk flag"}</div>
+            <div className={styles.scoreMetricValue}>{score.riskFlag}</div>
+          </div>
+        </div>
+      )}
 
       <div className={styles.scoreActions}>
         <button className={styles.actionPrimary} type="button" onClick={onDownload} disabled={isDownloading} aria-busy={isDownloading}>
@@ -724,6 +762,8 @@ export function VehicleResultScreen({ plate }: Props) {
                 <ScoreModule
                   score={score}
                   locale={locale}
+                  locked={settings.paymentEnabled && !isPaidForPlate}
+                  onUnlock={() => setShowPayment(true)}
                   onDownload={handleDownload}
                   isDownloading={isDownloading}
                   onSave={() => {
