@@ -22,11 +22,25 @@ type Row = Record<string, unknown>;
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
-const MARGIN = 36;
+const MARGIN = 40;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-const HEADER_HEIGHT = 92;
-const FONT_SIZE = 10;
-const LINE_HEIGHT = 14;
+const HEADER_HEIGHT = 88;
+const FOOTER_HEIGHT = 30;
+
+// Palette
+const NAVY = rgb(0.06, 0.16, 0.36);
+const NAVY_SOFT = rgb(0.93, 0.95, 0.99);
+const INK = rgb(0.11, 0.15, 0.22);
+const SUBINK = rgb(0.28, 0.34, 0.43);
+const MUTED = rgb(0.46, 0.52, 0.6);
+const LINE = rgb(0.85, 0.88, 0.93);
+const ROW_ALT = rgb(0.975, 0.982, 0.992);
+const WHITE = rgb(1, 1, 1);
+const GREEN = rgb(0.09, 0.5, 0.3);
+const AMBER = rgb(0.7, 0.45, 0.07);
+const RED = rgb(0.72, 0.12, 0.18);
+const PLATE_YELLOW = rgb(0.99, 0.81, 0.12);
+const PLATE_BLUE = rgb(0.05, 0.21, 0.66);
 
 function asRows(value: unknown): Row[] {
   return Array.isArray(value) ? (value as Row[]) : [];
@@ -41,34 +55,46 @@ function s(value: unknown): string {
   return sanitizeWinAnsi(String(value));
 }
 
-function boolLabel(value: unknown): string {
-  if (value === true) return "Yes";
-  if (value === false) return "No";
-  return "-";
-}
-
 function currency(value: unknown): string {
   const num = Number(value);
   if (!Number.isFinite(num)) return "-";
   return `EUR ${Math.round(num).toLocaleString("nl-NL")}`;
 }
 
-function toNumber(value: unknown): number | null {
+function km(value: unknown): string {
   const num = Number(value);
-  return Number.isFinite(num) ? num : null;
+  if (!Number.isFinite(num)) return "-";
+  return `${Math.round(num).toLocaleString("nl-NL")} km`;
+}
+
+function formatDateLabel(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw === "-") return "-";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 8) {
+    return `${digits.slice(6, 8)}-${digits.slice(4, 6)}-${digits.slice(0, 4)}`;
+  }
+  const d = new Date(raw);
+  if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("nl-NL");
+  return sanitizeWinAnsi(raw);
 }
 
 function verdictColor(verdict: AiInsights["purchaseVerdict"]) {
-  if (verdict === "BUY") return rgb(0.08, 0.55, 0.28);
+  if (verdict === "BUY") return GREEN;
   if (verdict === "CONSIDER") return rgb(0.07, 0.44, 0.63);
-  if (verdict === "CAUTION") return rgb(0.78, 0.5, 0.08);
-  return rgb(0.72, 0.12, 0.18);
+  if (verdict === "CAUTION") return AMBER;
+  return RED;
 }
 
-function riskColor(level: AiInsights["riskLevel"]) {
-  if (level === "LOW") return rgb(0.08, 0.55, 0.28);
-  if (level === "MEDIUM") return rgb(0.78, 0.5, 0.08);
-  return rgb(0.72, 0.12, 0.18);
+function verdictLabel(verdict: AiInsights["purchaseVerdict"] | undefined, locale: "nl" | "en") {
+  const map: Record<string, { nl: string; en: string }> = {
+    BUY: { nl: "Kopen", en: "Buy" },
+    CONSIDER: { nl: "Overwegen", en: "Consider" },
+    CAUTION: { nl: "Voorzichtig", en: "Caution" },
+    AVOID: { nl: "Vermijden", en: "Avoid" }
+  };
+  if (!verdict || !map[verdict]) return "-";
+  return map[verdict][locale];
 }
 
 function splitText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
@@ -105,177 +131,168 @@ function splitText(text: string, font: PDFFont, size: number, maxWidth: number):
   return lines.length ? lines : [safe];
 }
 
+/** Yellow Dutch plate badge with a blue NL strip, drawn at the given top-left-ish anchor. */
+function drawPlateBadge(page: PDFPage, bold: PDFFont, plate: string, rightX: number, topY: number) {
+  const text = formatDisplayPlate(plate);
+  const size = 15;
+  const padX = 10;
+  const stripW = 16;
+  const textW = bold.widthOfTextAtSize(text, size);
+  const w = stripW + padX + textW + padX;
+  const h = 26;
+  const x = rightX - w;
+  const y = topY - h;
+  page.drawRectangle({ x, y, width: w, height: h, color: PLATE_YELLOW, borderColor: rgb(0.1, 0.12, 0.16), borderWidth: 1 });
+  page.drawRectangle({ x, y, width: stripW, height: h, color: PLATE_BLUE });
+  page.drawText("NL", { x: x + 2.5, y: y + h / 2 - 3, font: bold, size: 7, color: WHITE });
+  page.drawText(text, { x: x + stripW + padX, y: y + h / 2 - size / 2 + 2, font: bold, size, color: rgb(0.08, 0.09, 0.12) });
+}
+
 function drawHeader(page: PDFPage, bold: PDFFont, regular: PDFFont, args: ReportArgs) {
-  page.drawRectangle({
-    x: 0,
-    y: PAGE_HEIGHT - HEADER_HEIGHT,
-    width: PAGE_WIDTH,
-    height: HEADER_HEIGHT,
-    color: rgb(0.05, 0.2, 0.45)
-  });
-  page.drawText("Kentekenrapport", {
-    x: MARGIN,
-    y: PAGE_HEIGHT - 36,
-    font: bold,
-    size: 22,
-    color: rgb(1, 1, 1)
-  });
-  page.drawText(`${args.locale === "nl" ? "Kenteken" : "Plate"}: ${formatDisplayPlate(args.plate)}`, {
-    x: MARGIN,
-    y: PAGE_HEIGHT - 58,
-    font: regular,
-    size: 11,
-    color: rgb(0.9, 0.94, 1)
-  });
+  page.drawRectangle({ x: 0, y: PAGE_HEIGHT - HEADER_HEIGHT, width: PAGE_WIDTH, height: HEADER_HEIGHT, color: NAVY });
+  // thin accent strip at the very bottom of the header band
+  page.drawRectangle({ x: 0, y: PAGE_HEIGHT - HEADER_HEIGHT, width: PAGE_WIDTH, height: 3, color: PLATE_YELLOW });
+
+  page.drawText("Kentekenrapport", { x: MARGIN, y: PAGE_HEIGHT - 40, font: bold, size: 22, color: WHITE });
   page.drawText(
-    `${args.locale === "nl" ? "Gegenereerd op" : "Generated at"}: ${args.generatedAt.toLocaleString(args.locale === "nl" ? "nl-NL" : "en-US")}`,
-    {
-      x: MARGIN,
-      y: PAGE_HEIGHT - 74,
-      font: regular,
-      size: 10,
-      color: rgb(0.8, 0.9, 1)
-    }
+    args.locale === "nl"
+      ? "Voertuigrapport op basis van officiële RDW-data"
+      : "Vehicle report based on official RDW data",
+    { x: MARGIN, y: PAGE_HEIGHT - 58, font: regular, size: 9.5, color: rgb(0.78, 0.85, 0.95) }
   );
+  page.drawText(
+    `${args.locale === "nl" ? "Gegenereerd" : "Generated"}: ${args.generatedAt.toLocaleDateString(args.locale === "nl" ? "nl-NL" : "en-US", { day: "2-digit", month: "long", year: "numeric" })}`,
+    { x: MARGIN, y: PAGE_HEIGHT - 74, font: regular, size: 9, color: rgb(0.72, 0.8, 0.92) }
+  );
+
+  drawPlateBadge(page, bold, args.plate, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 30);
 }
 
 class PdfLayout {
   private doc: PDFDocument;
-  private bold: PDFFont;
-  private regular: PDFFont;
+  public bold: PDFFont;
+  public regular: PDFFont;
   private args: ReportArgs;
   public page: PDFPage;
   public y: number;
+  public pages: PDFPage[] = [];
 
   constructor(doc: PDFDocument, regular: PDFFont, bold: PDFFont, args: ReportArgs) {
     this.doc = doc;
     this.regular = regular;
     this.bold = bold;
     this.args = args;
-    this.page = this.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawHeader(this.page, this.bold, this.regular, args);
-    this.y = PAGE_HEIGHT - HEADER_HEIGHT - 16;
+    this.page = this.newPage();
+    this.y = PAGE_HEIGHT - HEADER_HEIGHT - 18;
   }
 
-  private addPage() {
-    this.page = this.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawHeader(this.page, this.bold, this.regular, this.args);
-    this.y = PAGE_HEIGHT - HEADER_HEIGHT - 16;
+  private newPage(): PDFPage {
+    const page = this.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    drawHeader(page, this.bold, this.regular, this.args);
+    this.pages.push(page);
+    this.page = page;
+    this.y = PAGE_HEIGHT - HEADER_HEIGHT - 18;
+    return page;
   }
 
-  private ensureHeight(height: number) {
-    if (this.y - height < MARGIN) this.addPage();
+  ensureHeight(height: number) {
+    if (this.y - height < MARGIN + FOOTER_HEIGHT) this.newPage();
   }
 
-  section(title: string) {
-    this.ensureHeight(28);
-    this.page.drawRectangle({
-      x: MARGIN,
-      y: this.y - 20,
-      width: CONTENT_WIDTH,
-      height: 20,
-      color: rgb(0.92, 0.95, 1)
-    });
-    this.page.drawText(title, {
-      x: MARGIN + 8,
-      y: this.y - 14,
-      font: this.bold,
-      size: 11,
-      color: rgb(0.08, 0.2, 0.45)
-    });
-    this.y -= 28;
+  gap(h = 6) {
+    this.y -= h;
   }
 
-  keyValue(label: string, value: string) {
-    const labelLines = splitText(label, this.bold, FONT_SIZE, 140);
-    const valueLines = splitText(value, this.regular, FONT_SIZE, CONTENT_WIDTH - 160);
-    const rows = Math.max(labelLines.length, valueLines.length);
-    const blockHeight = rows * LINE_HEIGHT + 6;
-    this.ensureHeight(blockHeight + 2);
-
-    this.page.drawRectangle({
-      x: MARGIN,
-      y: this.y - blockHeight,
-      width: CONTENT_WIDTH,
-      height: blockHeight,
-      color: rgb(0.985, 0.99, 1),
-      borderColor: rgb(0.86, 0.9, 0.96),
-      borderWidth: 0.5
-    });
-
-    for (let i = 0; i < rows; i += 1) {
-      const ly = this.y - 14 - i * LINE_HEIGHT;
-      if (labelLines[i]) {
-        this.page.drawText(labelLines[i], { x: MARGIN + 8, y: ly, font: this.bold, size: FONT_SIZE, color: rgb(0.15, 0.22, 0.34) });
-      }
-      if (valueLines[i]) {
-        this.page.drawText(valueLines[i], { x: MARGIN + 154, y: ly, font: this.regular, size: FONT_SIZE, color: rgb(0.18, 0.26, 0.38) });
-      }
+  section(title: string, subtitle?: string) {
+    this.ensureHeight(subtitle ? 40 : 28);
+    this.y -= 6;
+    // accent bar + title (no heavy background band)
+    this.page.drawRectangle({ x: MARGIN, y: this.y - 13, width: 4, height: 15, color: NAVY });
+    this.page.drawText(title, { x: MARGIN + 12, y: this.y - 11, font: this.bold, size: 12.5, color: NAVY });
+    this.y -= 18;
+    if (subtitle) {
+      this.page.drawText(subtitle, { x: MARGIN + 12, y: this.y - 9, font: this.regular, size: 8.5, color: MUTED });
+      this.y -= 13;
     }
-    this.y -= blockHeight + 4;
+    this.page.drawLine({ start: { x: MARGIN, y: this.y - 2 }, end: { x: MARGIN + CONTENT_WIDTH, y: this.y - 2 }, thickness: 0.6, color: LINE });
+    this.y -= 8;
   }
 
-  bullets(items: string[]) {
-    if (items.length === 0) {
-      this.keyValue("-", "-");
-      return;
-    }
-    items.forEach((item, index) => this.keyValue(`${index + 1}.`, item));
-  }
-
-  paragraph(text: string, size = 8.5) {
-    const lines = splitText(text, this.regular, size, CONTENT_WIDTH - 8);
-    const blockHeight = lines.length * (size + 3) + 6;
-    this.ensureHeight(blockHeight + 2);
-    lines.forEach((line, i) => {
-      this.page.drawText(line, {
-        x: MARGIN + 4,
-        y: this.y - (size + 4) - i * (size + 3),
-        font: this.regular,
-        size,
-        color: rgb(0.42, 0.48, 0.56)
+  // Two-column grid of label/value pairs (compact, alternating background).
+  pairs(items: Array<{ label: string; value: string }>, columns = 2) {
+    const colGap = 14;
+    const colWidth = (CONTENT_WIDTH - colGap * (columns - 1)) / columns;
+    const rowH = 22;
+    for (let i = 0; i < items.length; i += columns) {
+      this.ensureHeight(rowH + 2);
+      const rowItems = items.slice(i, i + columns);
+      const rowIndex = i / columns;
+      if (rowIndex % 2 === 1) {
+        this.page.drawRectangle({ x: MARGIN, y: this.y - rowH, width: CONTENT_WIDTH, height: rowH, color: ROW_ALT });
+      }
+      rowItems.forEach((item, c) => {
+        const x = MARGIN + c * (colWidth + colGap);
+        this.page.drawText(sanitizeWinAnsi(item.label).toUpperCase(), { x: x + 6, y: this.y - 9, font: this.bold, size: 6.8, color: MUTED });
+        const valLines = splitText(item.value, this.regular, 9.5, colWidth - 12).slice(0, 1);
+        this.page.drawText(valLines[0] ?? "-", { x: x + 6, y: this.y - 19, font: this.regular, size: 9.5, color: INK });
       });
-    });
-    this.y -= blockHeight + 4;
+      this.y -= rowH;
+    }
+    this.y -= 4;
   }
 
-  table(headers: string[], rows: string[][]) {
-    const widths = [0.22, 0.18, 0.3, 0.3].slice(0, headers.length).map((w) => w * CONTENT_WIDTH);
-    const adjust = CONTENT_WIDTH - widths.reduce((a, b) => a + b, 0);
-    if (widths.length > 0) widths[widths.length - 1] += adjust;
+  paragraph(text: string, size = 9, color = SUBINK) {
+    const lines = splitText(text, this.regular, size, CONTENT_WIDTH - 4);
+    const lh = size + 4;
+    this.ensureHeight(lines.length * lh + 4);
+    lines.forEach((line, i) => {
+      this.page.drawText(line, { x: MARGIN + 2, y: this.y - lh + 2 - i * lh, font: this.regular, size, color });
+    });
+    this.y -= lines.length * lh + 6;
+  }
 
-    const drawRow = (cols: string[], header: boolean) => {
-      const wrapped = cols.map((col, idx) => splitText(col, header ? this.bold : this.regular, 9, widths[idx] - 8));
+  bullets(items: string[], accent = NAVY) {
+    if (!items.length) return;
+    const size = 9;
+    const lh = size + 4;
+    for (const item of items) {
+      const lines = splitText(item, this.regular, size, CONTENT_WIDTH - 22);
+      this.ensureHeight(lines.length * lh + 4);
+      this.page.drawCircle({ x: MARGIN + 6, y: this.y - 8, size: 1.8, color: accent });
+      lines.forEach((line, i) => {
+        this.page.drawText(line, { x: MARGIN + 16, y: this.y - lh + 2 - i * lh, font: this.regular, size, color: SUBINK });
+      });
+      this.y -= lines.length * lh + 4;
+    }
+    this.y -= 2;
+  }
+
+  table(headers: string[], rows: string[][], weights?: number[]) {
+    const ws = (weights ?? headers.map(() => 1 / headers.length));
+    const total = ws.reduce((a, b) => a + b, 0);
+    const widths = ws.map((w) => (w / total) * CONTENT_WIDTH);
+
+    const drawRow = (cols: string[], opts: { header?: boolean; alt?: boolean }) => {
+      const wrapped = cols.map((col, idx) => splitText(col, opts.header ? this.bold : this.regular, 8.5, widths[idx] - 10));
       const maxLines = Math.max(...wrapped.map((w) => w.length), 1);
-      const h = maxLines * 12 + 8;
+      const h = maxLines * 11 + 8;
       this.ensureHeight(h + 2);
       this.page.drawRectangle({
         x: MARGIN,
         y: this.y - h,
         width: CONTENT_WIDTH,
         height: h,
-        color: header ? rgb(0.9, 0.94, 1) : rgb(1, 1, 1),
-        borderColor: rgb(0.85, 0.9, 0.96),
-        borderWidth: 0.5
+        color: opts.header ? NAVY : opts.alt ? ROW_ALT : WHITE
       });
       let x = MARGIN;
       for (let c = 0; c < widths.length; c += 1) {
-        if (c > 0) {
-          this.page.drawLine({
-            start: { x, y: this.y - h },
-            end: { x, y: this.y },
-            thickness: 0.4,
-            color: rgb(0.85, 0.9, 0.96)
-          });
-        }
-        const lines = wrapped[c];
-        lines.forEach((line, i) => {
+        wrapped[c].forEach((line, i) => {
           this.page.drawText(line, {
-            x: x + 4,
-            y: this.y - 12 - i * 12,
-            font: header ? this.bold : this.regular,
-            size: 9,
-            color: rgb(0.16, 0.24, 0.35)
+            x: x + 5,
+            y: this.y - 11 - i * 11,
+            font: opts.header ? this.bold : this.regular,
+            size: 8.5,
+            color: opts.header ? WHITE : INK
           });
         });
         x += widths[c];
@@ -283,259 +300,148 @@ class PdfLayout {
       this.y -= h;
     };
 
-    drawRow(headers, true);
+    drawRow(headers, { header: true });
     if (rows.length === 0) {
-      drawRow(Array(headers.length).fill("-"), false);
+      drawRow(Array(headers.length).fill("-"), { alt: false });
     } else {
-      rows.forEach((r) => drawRow(r.slice(0, headers.length), false));
+      rows.forEach((r, i) => drawRow(r.slice(0, headers.length), { alt: i % 2 === 1 }));
     }
-    this.y -= 6;
+    // outer border
+    this.y -= 0;
+    this.y -= 8;
   }
 
-  drawCardRow(cards: Array<{ title: string; value: string; accent?: ReturnType<typeof rgb> }>) {
-    if (cards.length === 0) return;
+  // Summary metric cards in a row.
+  cards(items: Array<{ title: string; value: string; sub?: string; accent?: ReturnType<typeof rgb> }>) {
+    if (!items.length) return;
     const gap = 8;
-    const cardWidth = (CONTENT_WIDTH - gap * (cards.length - 1)) / cards.length;
-    const cardHeight = 66;
-    this.ensureHeight(cardHeight + 8);
-    cards.forEach((card, index) => {
-      const x = MARGIN + index * (cardWidth + gap);
-      this.page.drawRectangle({
-        x,
-        y: this.y - cardHeight,
-        width: cardWidth,
-        height: cardHeight,
-        color: rgb(0.985, 0.99, 1),
-        borderColor: rgb(0.86, 0.9, 0.96),
-        borderWidth: 0.8
+    const cardW = (CONTENT_WIDTH - gap * (items.length - 1)) / items.length;
+    const cardH = 58;
+    this.ensureHeight(cardH + 8);
+    items.forEach((card, index) => {
+      const x = MARGIN + index * (cardW + gap);
+      this.page.drawRectangle({ x, y: this.y - cardH, width: cardW, height: cardH, color: NAVY_SOFT, borderColor: LINE, borderWidth: 0.8 });
+      this.page.drawRectangle({ x, y: this.y - cardH, width: 3.5, height: cardH, color: card.accent ?? NAVY });
+      this.page.drawText(sanitizeWinAnsi(card.title).toUpperCase(), { x: x + 10, y: this.y - 15, font: this.bold, size: 6.8, color: MUTED });
+      splitText(card.value, this.bold, 13, cardW - 18).slice(0, 1).forEach((line) => {
+        this.page.drawText(line, { x: x + 10, y: this.y - 33, font: this.bold, size: 13, color: INK });
       });
-      if (card.accent) {
-        this.page.drawRectangle({
-          x,
-          y: this.y - cardHeight,
-          width: 4,
-          height: cardHeight,
-          color: card.accent
-        });
+      if (card.sub) {
+        this.page.drawText(splitText(card.sub, this.regular, 7.5, cardW - 18)[0] ?? "", { x: x + 10, y: this.y - 47, font: this.regular, size: 7.5, color: MUTED });
       }
-      this.page.drawText(card.title, {
-        x: x + 10,
-        y: this.y - 18,
-        font: this.bold,
-        size: 9,
-        color: rgb(0.2, 0.3, 0.42)
-      });
-      splitText(card.value, this.regular, 11, cardWidth - 20)
-        .slice(0, 2)
-        .forEach((line, lineIndex) => {
-          this.page.drawText(line, {
-            x: x + 10,
-            y: this.y - 36 - lineIndex * 13,
-            font: this.regular,
-            size: 11,
-            color: rgb(0.12, 0.2, 0.3)
-          });
-        });
     });
-    this.y -= cardHeight + 8;
+    this.y -= cardH + 10;
+  }
+
+  // Coloured callout box (verdict / note).
+  callout(title: string, body: string, accent: ReturnType<typeof rgb>) {
+    const bodyLines = splitText(body, this.regular, 9, CONTENT_WIDTH - 24);
+    const h = 22 + bodyLines.length * 12 + 8;
+    this.ensureHeight(h + 4);
+    this.page.drawRectangle({ x: MARGIN, y: this.y - h, width: CONTENT_WIDTH, height: h, color: rgb(0.98, 0.985, 0.995), borderColor: LINE, borderWidth: 0.8 });
+    this.page.drawRectangle({ x: MARGIN, y: this.y - h, width: 4, height: h, color: accent });
+    this.page.drawText(sanitizeWinAnsi(title), { x: MARGIN + 14, y: this.y - 16, font: this.bold, size: 10, color: accent });
+    bodyLines.forEach((line, i) => {
+      this.page.drawText(line, { x: MARGIN + 14, y: this.y - 30 - i * 12, font: this.regular, size: 9, color: SUBINK });
+    });
+    this.y -= h + 8;
+  }
+
+  finalize() {
+    const total = this.pages.length;
+    const label = (i: number) =>
+      this.args.locale === "nl"
+        ? `Kentekenrapport  -  ${formatDisplayPlate(this.args.plate)}  -  pagina ${i + 1} van ${total}`
+        : `Kentekenrapport  -  ${formatDisplayPlate(this.args.plate)}  -  page ${i + 1} of ${total}`;
+    this.pages.forEach((page, i) => {
+      page.drawLine({ start: { x: MARGIN, y: FOOTER_HEIGHT }, end: { x: PAGE_WIDTH - MARGIN, y: FOOTER_HEIGHT }, thickness: 0.6, color: LINE });
+      page.drawText(label(i), { x: MARGIN, y: FOOTER_HEIGHT - 12, font: this.regular, size: 7.5, color: MUTED });
+      const right = "kentekenrapport.com";
+      page.drawText(right, { x: PAGE_WIDTH - MARGIN - this.regular.widthOfTextAtSize(right, 7.5), y: FOOTER_HEIGHT - 12, font: this.regular, size: 7.5, color: MUTED });
+    });
   }
 }
 
-function drawHeroVisuals(args: {
-  page: PDFPage;
-  regular: PDFFont;
-  bold: PDFFont;
-  data: Record<string, unknown>;
-  image?: PDFImage | null;
-  aiInsights?: AiInsights | null;
-  aiValuation?: AiValuation | null;
-  locale: "nl" | "en";
-}) {
-  const heroTop = PAGE_HEIGHT - HEADER_HEIGHT - 8;
-  const heroHeight = 165;
-  const leftW = CONTENT_WIDTH * 0.57;
-  const rightW = CONTENT_WIDTH - leftW - 8;
-  const leftX = MARGIN;
-  const rightX = leftX + leftW + 8;
-  const cardY = heroTop - heroHeight;
+function drawHero(layout: PdfLayout, args: ReportArgs, image: PDFImage | null) {
+  const { locale, data } = args;
+  const vehicle = asRow(data.vehicle);
+  const enriched = asRow(data.enriched);
+  const page = layout.page;
 
-  args.page.drawRectangle({
-    x: leftX,
-    y: cardY,
-    width: leftW,
-    height: heroHeight,
-    color: rgb(0.97, 0.985, 1),
-    borderColor: rgb(0.85, 0.9, 0.96),
-    borderWidth: 0.8
-  });
-  args.page.drawRectangle({
-    x: rightX,
-    y: cardY,
-    width: rightW,
-    height: heroHeight,
-    color: rgb(0.97, 0.985, 1),
-    borderColor: rgb(0.85, 0.9, 0.96),
-    borderWidth: 0.8
+  const heroH = 118;
+  layout.ensureHeight(heroH + 6);
+  const top = layout.y;
+  const imgW = 168;
+  const textW = CONTENT_WIDTH - imgW - 14;
+
+  // container
+  page.drawRectangle({ x: MARGIN, y: top - heroH, width: CONTENT_WIDTH, height: heroH, color: WHITE, borderColor: LINE, borderWidth: 0.8 });
+
+  // vehicle title
+  const title = [s(vehicle.brand), s(vehicle.tradeName)].filter((t) => t !== "-").join(" ") || "-";
+  page.drawText(splitText(title, layout.bold, 16, textW - 20)[0] ?? title, { x: MARGIN + 14, y: top - 26, font: layout.bold, size: 16, color: INK });
+  const sub = [s(vehicle.year), s(vehicle.fuelType), s(vehicle.bodyType)].filter((t) => t !== "-").join("  -  ");
+  page.drawText(sub, { x: MARGIN + 14, y: top - 42, font: layout.regular, size: 9, color: MUTED });
+
+  // mini facts
+  const facts: Array<[string, string]> = [
+    [locale === "nl" ? "APK geldig tot" : "MOT valid until", formatDateLabel(vehicle.apkExpiryDate)],
+    [locale === "nl" ? "NAP-oordeel" : "Odometer verdict", s(vehicle.napVerdict)],
+    [locale === "nl" ? "Geschatte km-stand" : "Estimated mileage", km(enriched.estimatedMileageNow)],
+    [locale === "nl" ? "Tenaamstellingen" : "Registrations", s(asRow(vehicle.owners).count)]
+  ];
+  facts.forEach(([k, val], i) => {
+    const fx = MARGIN + 14 + (i % 2) * (textW / 2);
+    const fy = top - 62 - Math.floor(i / 2) * 26;
+    page.drawText(k.toUpperCase(), { x: fx, y: fy, font: layout.bold, size: 6.5, color: MUTED });
+    page.drawText(val, { x: fx, y: fy - 11, font: layout.regular, size: 9.5, color: INK });
   });
 
-  const ai = args.aiInsights;
-  const valuation = args.aiValuation;
-  const verdictLabel = ai?.purchaseVerdict ?? "-";
-  const riskLabel = ai?.riskLevel ?? "-";
-  const summary = ai?.summary ?? (args.locale === "nl" ? "AI-analyse niet beschikbaar." : "AI analysis unavailable.");
-
-  args.page.drawText(args.locale === "nl" ? "AI aankoopadvies" : "AI purchase recommendation", {
-    x: leftX + 10,
-    y: heroTop - 18,
-    font: args.bold,
-    size: 11,
-    color: rgb(0.08, 0.2, 0.45)
-  });
-  args.page.drawRectangle({
-    x: leftX + 10,
-    y: heroTop - 44,
-    width: 120,
-    height: 18,
-    color: verdictColor(ai?.purchaseVerdict ?? "AVOID")
-  });
-  args.page.drawText(`${args.locale === "nl" ? "Verdict" : "Verdict"}: ${verdictLabel}`, {
-    x: leftX + 15,
-    y: heroTop - 38,
-    font: args.bold,
-    size: 9,
-    color: rgb(1, 1, 1)
-  });
-  args.page.drawRectangle({
-    x: leftX + 138,
-    y: heroTop - 44,
-    width: 95,
-    height: 18,
-    color: riskColor(ai?.riskLevel ?? "HIGH")
-  });
-  args.page.drawText(`${args.locale === "nl" ? "Risico" : "Risk"}: ${riskLabel}`, {
-    x: leftX + 143,
-    y: heroTop - 38,
-    font: args.bold,
-    size: 9,
-    color: rgb(1, 1, 1)
-  });
-
-  splitText(summary, args.regular, 9.5, leftW - 20)
-    .slice(0, 5)
-    .forEach((line, idx) => {
-      args.page.drawText(line, {
-        x: leftX + 10,
-        y: heroTop - 63 - idx * 12,
-        font: args.regular,
-        size: 9.5,
-        color: rgb(0.15, 0.25, 0.38)
-      });
-    });
-
-  // Canonical headline value = the consolidated enriched value (model first,
-  // AI-backfilled server-side when the model has none); fall back to the raw AI
-  // valuation only if enriched is somehow absent.
-  const vNow = toNumber(asRow(args.data.enriched).estimatedValueNow) ?? valuation?.estimatedValueNow;
-  const vMin = toNumber(asRow(args.data.enriched).estimatedValueMin) ?? valuation?.estimatedValueMin;
-  const vMax = toNumber(asRow(args.data.enriched).estimatedValueMax) ?? valuation?.estimatedValueMax;
-  args.page.drawText(args.locale === "nl" ? "Marktwaarde (AI)" : "Market value (AI)", {
-    x: leftX + 10,
-    y: cardY + 45,
-    font: args.bold,
-    size: 10,
-    color: rgb(0.08, 0.2, 0.45)
-  });
-
-  if (vNow && vMin && vMax && vMax > vMin) {
-    const barWidth = leftW - 20;
-    const barY = cardY + 28;
-    const rangeMin = vMin * 0.9;
-    const rangeMax = vMax * 1.1;
-    const diff = rangeMax - rangeMin;
-    
-    // Background track
-    args.page.drawLine({
-      start: { x: leftX + 10, y: barY },
-      end: { x: leftX + 10 + barWidth, y: barY },
-      thickness: 6,
-      color: rgb(0.9, 0.92, 0.96),
-    });
-
-    // Expected Range
-    const startX = leftX + 10 + ((vMin - rangeMin) / diff) * barWidth;
-    const endX = leftX + 10 + ((vMax - rangeMin) / diff) * barWidth;
-    args.page.drawLine({
-      start: { x: startX, y: barY },
-      end: { x: endX, y: barY },
-      thickness: 6,
-      color: rgb(0.2, 0.6, 1),
-    });
-
-    // Current Marker
-    const px = leftX + 10 + Math.max(0, Math.min(barWidth, ((vNow - rangeMin) / diff) * barWidth));
-    args.page.drawCircle({ x: px, y: barY, size: 5, color: rgb(0.05, 0.15, 0.3) });
-
-    // Labels
-    args.page.drawText(currency(vMin), { x: startX, y: barY - 14, font: args.regular, size: 8, color: rgb(0.4, 0.5, 0.6) });
-    args.page.drawText(currency(vMax), { x: endX - 25, y: barY - 14, font: args.regular, size: 8, color: rgb(0.4, 0.5, 0.6) });
-    args.page.drawText(currency(vNow), { x: px - 15, y: barY + 8, font: args.bold, size: 9, color: rgb(0.05, 0.15, 0.3) });
+  // image panel
+  const imgX = MARGIN + CONTENT_WIDTH - imgW;
+  page.drawRectangle({ x: imgX, y: top - heroH, width: imgW, height: heroH, color: rgb(0.97, 0.98, 0.99) });
+  page.drawLine({ start: { x: imgX, y: top - heroH }, end: { x: imgX, y: top }, thickness: 0.8, color: LINE });
+  if (image) {
+    const pad = 12;
+    const availW = imgW - pad * 2;
+    const availH = heroH - pad * 2;
+    const scale = Math.min(availW / image.width, availH / image.height);
+    const w = image.width * scale;
+    const h = image.height * scale;
+    page.drawImage(image, { x: imgX + (imgW - w) / 2, y: top - heroH + (heroH - h) / 2, width: w, height: h });
   } else {
-    args.page.drawText(`${currency(vNow)}  (${currency(vMin)} - ${currency(vMax)})`, {
-      x: leftX + 10,
-      y: cardY + 28,
-      font: args.regular,
-      size: 9,
-      color: rgb(0.14, 0.24, 0.36)
-    });
+    page.drawText(locale === "nl" ? "Geen voertuigbeeld" : "No vehicle image", { x: imgX + 18, y: top - heroH / 2, font: layout.regular, size: 8.5, color: MUTED });
   }
 
-  if (args.image) {
-    const imageW = rightW - 16;
-    const imageH = 92;
-    args.page.drawImage(args.image, {
-      x: rightX + 8,
-      y: heroTop - 104,
-      width: imageW,
-      height: imageH
-    });
-  } else {
-    args.page.drawText(args.locale === "nl" ? "Voertuigbeeld niet beschikbaar" : "Vehicle image unavailable", {
-      x: rightX + 14,
-      y: heroTop - 60,
-      font: args.regular,
-      size: 9,
-      color: rgb(0.42, 0.5, 0.6)
-    });
+  layout.y = top - heroH - 12;
+}
+
+function groupDefects(args: ReportArgs): Array<{ code: string; desc: string; count: number; last: string }> {
+  const inspections = asRows(args.data.inspections);
+  const defects = asRows(args.data.defects);
+  const defectDescriptions = asRow(args.data.defectDescriptions);
+  const source = defects.length ? defects : inspections;
+  const map = new Map<string, { code: string; desc: string; count: number; lastVal: number; last: string }>();
+  for (const row of source) {
+    const code = String(row.gebrek_identificatie ?? "").trim();
+    if (!code) continue;
+    const desc = String(defectDescriptions[code] ?? row.gebrek_omschrijving ?? code);
+    const dateRaw = row.meld_datum_door_keuringsinstantie_dt ?? row.meld_datum_door_keuringsinstantie ?? "";
+    const lastVal = Number(String(dateRaw).replace(/\D/g, "")) || 0;
+    const cur = map.get(code);
+    if (cur) {
+      cur.count += 1;
+      if (lastVal > cur.lastVal) {
+        cur.lastVal = lastVal;
+        cur.last = formatDateLabel(dateRaw);
+      }
+    } else {
+      map.set(code, { code, desc, count: 1, lastVal, last: formatDateLabel(dateRaw) });
+    }
   }
-
-  // Honest, vehicle-specific facts instead of a generic static country map.
-  const enrichedRow = asRow(args.data.enriched);
-  const vehicleRow = asRow(args.data.vehicle);
-  const mileageNow = toNumber(enrichedRow.estimatedMileageNow);
-  const mileageText = mileageNow != null ? `${mileageNow.toLocaleString("nl-NL")} km` : "-";
-  const napVerdict = s(vehicleRow.napVerdict);
-
-  args.page.drawText(args.locale === "nl" ? "Kerncijfers" : "Key figures", {
-    x: rightX + 8,
-    y: cardY + 54,
-    font: args.bold,
-    size: 9,
-    color: rgb(0.08, 0.2, 0.45)
-  });
-  args.page.drawText(`${args.locale === "nl" ? "Geschat km-stand" : "Estimated mileage"}: ${mileageText}`, {
-    x: rightX + 8,
-    y: cardY + 38,
-    font: args.regular,
-    size: 8.5,
-    color: rgb(0.16, 0.24, 0.35)
-  });
-  args.page.drawText(`${args.locale === "nl" ? "NAP-oordeel" : "Odometer verdict"}: ${napVerdict}`, {
-    x: rightX + 8,
-    y: cardY + 24,
-    font: args.regular,
-    size: 8.5,
-    color: rgb(0.16, 0.24, 0.35)
-  });
+  return Array.from(map.values())
+    .sort((a, b) => b.count - a.count || b.lastVal - a.lastVal)
+    .map(({ code, desc, count, last }) => ({ code, desc, count, last }));
 }
 
 function buildReportSections(layout: PdfLayout, args: ReportArgs) {
@@ -543,174 +449,175 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   const vehicle = asRow(data.vehicle);
   const enriched = asRow(data.enriched);
   const inspections = asRows(data.inspections);
-  const defects = asRows(data.defects);
   const recalls = asRows(data.recalls);
-  const raw = asRow(data.raw);
-  const fuel = asRows(raw.fuel);
-  const body = asRows(raw.body);
-  const typeApprovals = asRows(raw.typeApprovals);
-  const rawMain = asRows(raw.main);
-  const rawApk = asRows(raw.apk);
-  const rawDefects = asRows(raw.defects);
-  const rawRecalls = asRows(raw.recalls);
-  const defectDescriptions = asRow(data.defectDescriptions);
-  const knownIssues = asRows(enriched.knownIssues);
+  const engine = asRow(vehicle.engine);
+  const weight = asRow(vehicle.weight);
+  const extra = asRow(vehicle.extra);
+  const groupedDefects = groupDefects(args);
 
-  const derivedDefects =
-    defects.length > 0
-      ? defects
-      : inspections.map((it) => {
-          const code = s(it.gebrek_identificatie);
-          return {
-            gebrek_identificatie: code,
-            gebrek_omschrijving: s(defectDescriptions[code])
-          };
-        });
-
-  layout.y -= 172;
-
-  layout.section(locale === "nl" ? "Beslissingsdashboard" : "Decision Dashboard");
-  layout.drawCardRow([
+  // ---- Summary cards ----
+  const verdict = aiInsights?.purchaseVerdict;
+  layout.cards([
     {
-      title: locale === "nl" ? "AI Verdict" : "AI Verdict",
-      value: args.aiInsights?.purchaseVerdict ?? "-",
-      accent: verdictColor(args.aiInsights?.purchaseVerdict ?? "AVOID")
-    },
-    {
-      title: locale === "nl" ? "Risiconiveau" : "Risk level",
-      value: args.aiInsights?.riskLevel ?? "-",
-      accent: riskColor(args.aiInsights?.riskLevel ?? "HIGH")
-    },
-    {
-      title: locale === "nl" ? "Waarde nu" : "Value now",
+      title: locale === "nl" ? "Geschatte marktwaarde" : "Estimated market value",
       value: currency(enriched.estimatedValueNow),
-      accent: rgb(0.08, 0.2, 0.45)
+      sub:
+        enriched.estimatedValueMin != null && enriched.estimatedValueMax != null
+          ? `${currency(enriched.estimatedValueMin)} - ${currency(enriched.estimatedValueMax)}`
+          : undefined,
+      accent: NAVY
+    },
+    {
+      title: locale === "nl" ? "Geschatte km-stand" : "Estimated mileage",
+      value: km(enriched.estimatedMileageNow),
+      sub: s(enriched.mileageUsageProfile) !== "-" ? s(enriched.mileageUsageProfile) : undefined,
+      accent: rgb(0.07, 0.44, 0.63)
+    },
+    {
+      title: locale === "nl" ? "AI-aankoopadvies" : "AI recommendation",
+      value: verdictLabel(verdict, locale),
+      sub: aiInsights?.riskLevel ? `${locale === "nl" ? "Risico" : "Risk"}: ${aiInsights.riskLevel}` : undefined,
+      accent: verdictColor(verdict ?? "AVOID")
     }
   ]);
 
-  if (args.aiInsights?.recommendations?.length) {
-    layout.keyValue(locale === "nl" ? "Actieplan" : "Action plan", args.aiInsights.recommendations.join(" | "));
+  // ---- Vehicle details ----
+  layout.section(locale === "nl" ? "Voertuiggegevens" : "Vehicle details");
+  layout.pairs([
+    { label: locale === "nl" ? "Merk / model" : "Brand / model", value: `${s(vehicle.brand)} ${s(vehicle.tradeName)}`.trim() },
+    { label: locale === "nl" ? "Bouwjaar" : "Year", value: s(vehicle.year) },
+    { label: locale === "nl" ? "Carrosserie" : "Body", value: s(vehicle.bodyType) },
+    { label: locale === "nl" ? "Kleur" : "Colour", value: s(asRow(vehicle.color).primary) },
+    { label: locale === "nl" ? "Brandstof" : "Fuel", value: s(vehicle.fuelType) },
+    { label: locale === "nl" ? "Emissieklasse" : "Emission class", value: s(vehicle.emissionStandard) },
+    { label: locale === "nl" ? "Motor" : "Engine", value: `${s(engine.displacement)} cc, ${s(engine.powerKw)} kW` },
+    { label: "CO2", value: s(vehicle.co2) !== "-" ? `${s(vehicle.co2)} g/km` : "-" },
+    { label: locale === "nl" ? "Massa leeg" : "Empty weight", value: s(weight.empty) !== "-" ? `${s(weight.empty)} kg` : "-" },
+    { label: locale === "nl" ? "Voertuigcategorie" : "Vehicle category", value: s(extra.vehicleCategory) },
+    { label: "APK", value: formatDateLabel(vehicle.apkExpiryDate) },
+    { label: locale === "nl" ? "Eigenaar sinds" : "Owner since", value: formatDateLabel(vehicle.currentOwnerSince) }
+  ]);
+
+  // status flags as a single line
+  const flags = [
+    vehicle.wok ? "WOK" : null,
+    vehicle.isTaxi ? (locale === "nl" ? "Taxi" : "Taxi") : null,
+    vehicle.exportIndicator ? (locale === "nl" ? "Export" : "Export") : null,
+    vehicle.hasOpenRecall ? (locale === "nl" ? "Open recall" : "Open recall") : null,
+    vehicle.insured ? (locale === "nl" ? "Verzekerd" : "Insured") : null
+  ].filter(Boolean) as string[];
+  layout.pairs([
+    { label: locale === "nl" ? "Statusflags" : "Status flags", value: flags.length ? flags.join(", ") : locale === "nl" ? "Geen bijzonderheden" : "None" }
+  ], 1);
+
+  // ---- Value & costs ----
+  layout.section(
+    locale === "nl" ? "Waarde en kosten" : "Value and costs",
+    locale === "nl"
+      ? "Schattingen op basis van RDW-data en onze modellen, geen taxatie."
+      : "Estimates based on RDW data and our models, not an appraisal."
+  );
+  layout.pairs([
+    { label: locale === "nl" ? "Marktwaarde nu" : "Market value now", value: currency(enriched.estimatedValueNow) },
+    { label: locale === "nl" ? "Bandbreedte" : "Range", value: `${currency(enriched.estimatedValueMin)} - ${currency(enriched.estimatedValueMax)}` },
+    { label: locale === "nl" ? "Betrouwbaarheid" : "Confidence", value: s(enriched.marketValueConfidence) },
+    { label: locale === "nl" ? "Waarde volgend jaar" : "Value next year", value: currency(enriched.estimatedValueNextYear) },
+    {
+      label: locale === "nl" ? "Wegenbelasting / kwartaal" : "Road tax / quarter",
+      value: `${currency(asRow(enriched.roadTaxEstQuarter).min)} - ${currency(asRow(enriched.roadTaxEstQuarter).max)}`
+    },
+    { label: locale === "nl" ? "Brandstof / maand" : "Fuel / month", value: currency(enriched.fuelEstMonth) }
+  ]);
+  layout.paragraph(
+    locale === "nl"
+      ? "De marktwaarde is gebaseerd op de catalogusprijs, leeftijd en de geschatte kilometerstand (RDW publiceert geen kilometerhistorie). Wegenbelasting is een indicatie; het exacte bedrag hangt af van de provincie (opcenten), bereken het op belastingdienst.nl."
+      : "The market value is based on the catalogue price, age and the estimated mileage (RDW publishes no odometer history). Road tax is an indication; the exact amount depends on the province, calculate it at belastingdienst.nl.",
+    8
+  );
+
+  // ---- Mileage ----
+  layout.section(locale === "nl" ? "Kilometerstand en NAP" : "Mileage and odometer check");
+  layout.pairs([
+    { label: locale === "nl" ? "Onze schatting nu" : "Our estimate now", value: km(enriched.estimatedMileageNow) },
+    { label: locale === "nl" ? "Bandbreedte" : "Range", value: `${km(enriched.estimatedMileageMin)} - ${km(enriched.estimatedMileageMax)}` },
+    { label: locale === "nl" ? "Gem. per jaar" : "Avg. per year", value: km(enriched.mileageSlopeKmPerYear) },
+    { label: locale === "nl" ? "Gebruiksprofiel" : "Usage profile", value: s(enriched.mileageUsageProfile) },
+    { label: locale === "nl" ? "RDW NAP-oordeel" : "RDW odometer verdict", value: s(vehicle.napVerdict) },
+    { label: locale === "nl" ? "Bron schatting" : "Estimate source", value: enriched.mileageEstimateSource === "formula" ? (locale === "nl" ? "Formule (leeftijd x gebruik)" : "Formula (age x usage)") : (locale === "nl" ? "APK-metingen" : "Inspection readings") }
+  ]);
+
+  // ---- APK & defects ----
+  layout.section(locale === "nl" ? "APK en gebreken" : "Inspections and defects");
+  if (groupedDefects.length === 0) {
+    layout.paragraph(locale === "nl" ? "In de beschikbare RDW- en APK-historie zijn geen gebreken gemeld." : "No defects are reported in the available RDW and APK history.");
+  } else {
+    layout.table(
+      [locale === "nl" ? "Gebrek" : "Defect", locale === "nl" ? "Code" : "Code", locale === "nl" ? "Aantal keer" : "Times", locale === "nl" ? "Laatst" : "Last"],
+      groupedDefects.map((d) => [d.desc, d.code, `${d.count}x`, d.last]),
+      [0.5, 0.16, 0.16, 0.18]
+    );
   }
+  layout.pairs([
+    { label: locale === "nl" ? "Keuringen met gebreken" : "Inspections with defects", value: String(new Set(inspections.map((it) => String(it.meld_datum_door_keuringsinstantie_dt ?? it.meld_datum_door_keuringsinstantie ?? ""))).size || 0) },
+    { label: locale === "nl" ? "Unieke gebreken" : "Unique defects", value: String(groupedDefects.length) }
+  ]);
 
-  layout.section(locale === "nl" ? "Voertuigoverzicht" : "Vehicle Overview");
-  layout.keyValue(locale === "nl" ? "Merk / Model" : "Brand / Model", `${s(vehicle.brand)} ${s(vehicle.tradeName)}`.trim());
-  layout.keyValue(locale === "nl" ? "Bouwjaar / Carrosserie" : "Year / Body type", `${s(vehicle.year)} / ${s(vehicle.bodyType)}`);
-  layout.keyValue(locale === "nl" ? "Brandstof / Kleur" : "Fuel / Color", `${s(vehicle.fuelType)} / ${s(asRow(vehicle.color).primary)}`);
-  layout.keyValue(locale === "nl" ? "Motor" : "Engine", `${s(asRow(vehicle.engine).displacement)} cc, ${s(asRow(vehicle.engine).cylinders)} cyl, ${s(asRow(vehicle.engine).powerKw)} kW`);
-  layout.keyValue(locale === "nl" ? "Gewicht" : "Weight", `${s(asRow(vehicle.weight).empty)} kg empty, ${s(asRow(vehicle.weight).max)} kg max`);
-  layout.keyValue(locale === "nl" ? "APK vervaldatum" : "APK expiry", s(vehicle.apkExpiryDate));
-  layout.keyValue(locale === "nl" ? "Statusflags" : "Status flags", `WOK: ${boolLabel(vehicle.wok)}, Export: ${boolLabel(vehicle.exportIndicator)}, Transfer: ${boolLabel(vehicle.transferPossible)}, Insured: ${boolLabel(vehicle.insured)}, Taxi: ${boolLabel(vehicle.isTaxi)}, Recall open: ${boolLabel(vehicle.hasOpenRecall)}`);
-
-  layout.section(locale === "nl" ? "Waarde en kosten (schatting)" : "Value and Cost (estimate)");
-  layout.keyValue(locale === "nl" ? "Marktwaarde nu / volgend jaar" : "Market value now / next year", `${currency(enriched.estimatedValueNow)} / ${currency(enriched.estimatedValueNextYear)}`);
-  layout.keyValue(locale === "nl" ? "Marktbandbreedte" : "Market range", `${currency(enriched.estimatedValueMin)} - ${currency(enriched.estimatedValueMax)} (${s(enriched.marketValueConfidence)} confidence)`);
-  layout.keyValue(locale === "nl" ? "APK kans / onderhoudsrisico" : "APK chance / maintenance risk", `${s(enriched.apkPassChance)}% / ${s(enriched.maintenanceRiskScore)}`);
-  layout.keyValue(
-    locale === "nl" ? "Wegenbelasting per kwartaal" : "Road tax per quarter",
-    `${currency(asRow(enriched.roadTaxEstQuarter).min)} - ${currency(asRow(enriched.roadTaxEstQuarter).max)} ${
-      locale === "nl"
-        ? "(schatting incl. gem. opcenten; exact via belastingdienst.nl)"
-        : "(estimate incl. avg. provincial surcharge; exact via belastingdienst.nl)"
-    }`
-  );
-  layout.keyValue(locale === "nl" ? "Brandstof per maand (schatting)" : "Fuel per month (estimate)", currency(enriched.fuelEstMonth));
-
-  layout.section(locale === "nl" ? "APK inspecties" : "APK Inspections");
-  layout.table(
-    [locale === "nl" ? "Datum" : "Date", locale === "nl" ? "Code" : "Code", locale === "nl" ? "Type" : "Type", locale === "nl" ? "Aantal" : "Count"],
-    inspections.map((it) => [
-      s(it.meld_datum_door_keuringsinstantie_dt ?? it.meld_datum_door_keuringsinstantie),
-      s(it.gebrek_identificatie),
-      s(it.soort_erkenning_omschrijving),
-      s(it.aantal_gebreken_geconstateerd)
-    ])
-  );
-
-  layout.section(locale === "nl" ? "Defecten" : "Defects");
-  layout.table(
-    [locale === "nl" ? "Code" : "Code", locale === "nl" ? "Omschrijving" : "Description", locale === "nl" ? "Bron" : "Source", locale === "nl" ? "Opmerking" : "Notes"],
-    derivedDefects.map((it) => {
-      const row = it as Row;
-      const code = s(row.gebrek_identificatie);
-      return [code, s(row.gebrek_omschrijving ?? defectDescriptions[code]), defects.length > 0 ? "defects" : "inspection", s(row.toelichting)];
-    })
-  );
-
-  layout.section(locale === "nl" ? "Terugroepacties" : "Recalls");
-  layout.table(
-    [locale === "nl" ? "Campagne" : "Campaign", locale === "nl" ? "Defect" : "Defect", locale === "nl" ? "Status" : "Status"],
-    recalls.map((it) => [s(it.campagnenummer), s(it.omschrijving_defect), s(it.status)])
-  );
-
-  layout.section(locale === "nl" ? "Brandstofrecords (RDW raw)" : "Fuel Records (RDW raw)");
-  layout.table(
-    [locale === "nl" ? "Brandstof" : "Fuel", "CO2", locale === "nl" ? "Verbruik combi" : "Combined usage", locale === "nl" ? "Emissie" : "Emission"],
-    fuel.map((it) => [s(it.brandstof_omschrijving), s(it.co2_uitstoot_gecombineerd), s(it.brandstofverbruik_gecombineerd), s(it.uitlaatemissieniveau)])
-  );
-
-  layout.section(locale === "nl" ? "Carrosserie en typegoedkeuring" : "Body and Type Approval");
-  layout.table(
-    [locale === "nl" ? "Carrosserie" : "Body", locale === "nl" ? "Europese omschrijving" : "EU description", locale === "nl" ? "Typegoedkeuring" : "Type approval"],
-    [
-      ...body.map((it) => [s(it.carrosserietype), s(it.type_carrosserie_europese_omschrijving), "-"]),
-      ...typeApprovals.map((it) => ["-", "-", s(it.typegoedkeuringsnummer ?? it.eu_typegoedkeuring ?? it.typegoedkeuringsnummer_voertuig)])
-    ]
-  );
-
-  layout.section(locale === "nl" ? "Aandachtspunten (uit recall en terugkerende defecten)" : "Known Issues (from recall and recurring defects)");
-  layout.table(
-    [locale === "nl" ? "Issue" : "Issue", locale === "nl" ? "Ernst" : "Severity", locale === "nl" ? "Doel" : "Target", locale === "nl" ? "Advies" : "Advice"],
-    knownIssues.map((it) => [s(it.title), s(it.severity), s(it.target), s(it.advice)])
-  );
-
-  if (aiValuation) {
-    layout.section(locale === "nl" ? "AI waardering" : "AI Valuation");
-    layout.keyValue(locale === "nl" ? "Waarde nu" : "Value now", `${aiValuation.currency} ${aiValuation.estimatedValueNow.toLocaleString("nl-NL")}`);
-    layout.keyValue(locale === "nl" ? "Bandbreedte" : "Range", `${aiValuation.currency} ${aiValuation.estimatedValueMin.toLocaleString("nl-NL")} - ${aiValuation.currency} ${aiValuation.estimatedValueMax.toLocaleString("nl-NL")}`);
-    layout.keyValue(locale === "nl" ? "Confidence" : "Confidence", aiValuation.confidence);
-    layout.keyValue(locale === "nl" ? "Factoren" : "Factors", aiValuation.factors.join(" | "));
-    layout.keyValue(locale === "nl" ? "Toelichting" : "Explanation", aiValuation.explanation);
-  }
-
-  if (aiInsights) {
-    layout.section(locale === "nl" ? "AI feedback en advies" : "AI Feedback and Opinion");
-    layout.keyValue(locale === "nl" ? "Aankoop verdict" : "Purchase verdict", `${aiInsights.purchaseVerdict} (${aiInsights.riskLevel})`);
-    layout.keyValue(locale === "nl" ? "Samenvatting" : "Summary", aiInsights.summary);
-    layout.keyValue(locale === "nl" ? "Sterke punten" : "Positives", aiInsights.positives.join(" | "));
-    layout.keyValue(locale === "nl" ? "Risico's" : "Risks", aiInsights.risks.join(" | "));
-    layout.keyValue(locale === "nl" ? "Aanbeveling" : "Recommendation", aiInsights.recommendation);
-    if (aiInsights.recommendations.length > 0) {
-      layout.keyValue(locale === "nl" ? "Concrete vervolgstappen" : "Concrete next steps", aiInsights.recommendations.join(" | "));
-    }
-  }
-
-  if (aiValuation || aiInsights) {
-    layout.keyValue(
-      locale === "nl" ? "Let op" : "Note",
-      args.aiSource === "fallback"
-        ? locale === "nl"
-          ? "Automatisch gegenereerd omdat de AI-analyse tijdelijk niet beschikbaar was. Indicatie op basis van RDW-data, geen taxatie of garantie."
-          : "Automatically generated because the AI analysis was temporarily unavailable. An indication based on RDW data, not an appraisal or guarantee."
-        : locale === "nl"
-        ? "AI-advies op basis van de RDW-data: een indicatie, geen taxatie of garantie. Combineer altijd met een fysieke inspectie en proefrit."
-        : "AI guidance based on the RDW data: an indication, not an appraisal or guarantee. Always combine it with a physical inspection and test drive."
+  // ---- Recalls ----
+  if (recalls.length) {
+    layout.section(locale === "nl" ? "Terugroepacties" : "Recalls");
+    layout.table(
+      [locale === "nl" ? "Campagne" : "Campaign", locale === "nl" ? "Omschrijving" : "Description", "Status"],
+      recalls.map((it) => [s(it.campagnenummer), s(it.omschrijving_defect), s(it.status)]),
+      [0.22, 0.56, 0.22]
     );
   }
 
-  layout.section(locale === "nl" ? "Brondata samenvatting" : "Source Data Summary");
-  layout.keyValue("raw.main", `${rawMain.length} ${locale === "nl" ? "records" : "records"}`);
-  layout.keyValue("raw.fuel", `${fuel.length} ${locale === "nl" ? "records" : "records"}`);
-  layout.keyValue("raw.apk", `${rawApk.length} ${locale === "nl" ? "records" : "records"}`);
-  layout.keyValue("raw.defects", `${rawDefects.length} ${locale === "nl" ? "records" : "records"}`);
-  layout.keyValue("raw.recalls", `${rawRecalls.length} ${locale === "nl" ? "records" : "records"}`);
-  layout.keyValue("raw.body", `${body.length} ${locale === "nl" ? "records" : "records"}`);
-  layout.keyValue("raw.typeApprovals", `${typeApprovals.length} ${locale === "nl" ? "records" : "records"}`);
+  // ---- AI advice ----
+  if (aiInsights) {
+    layout.section(locale === "nl" ? "AI-aankoopadvies" : "AI purchase advice");
+    layout.callout(
+      `${locale === "nl" ? "Advies" : "Verdict"}: ${verdictLabel(aiInsights.purchaseVerdict, locale)}  -  ${locale === "nl" ? "Risico" : "Risk"}: ${aiInsights.riskLevel}`,
+      aiInsights.summary,
+      verdictColor(aiInsights.purchaseVerdict)
+    );
+    if (aiInsights.positives.length) {
+      layout.paragraph(locale === "nl" ? "Sterke punten" : "Strengths", 9.5, NAVY);
+      layout.bullets(aiInsights.positives, GREEN);
+    }
+    if (aiInsights.risks.length) {
+      layout.paragraph(locale === "nl" ? "Aandachtspunten" : "Watch-outs", 9.5, NAVY);
+      layout.bullets(aiInsights.risks, AMBER);
+    }
+    if (aiInsights.recommendation) {
+      layout.pairs([{ label: locale === "nl" ? "Aanbeveling" : "Recommendation", value: aiInsights.recommendation }], 1);
+    }
+    layout.paragraph(
+      args.aiSource === "fallback"
+        ? locale === "nl"
+          ? "Automatisch gegenereerd (AI tijdelijk niet beschikbaar). Indicatie op basis van RDW-data, geen taxatie of garantie."
+          : "Automatically generated (AI temporarily unavailable). Indication based on RDW data, not an appraisal or guarantee."
+        : locale === "nl"
+        ? "AI-advies op basis van RDW-data: een indicatie, geen taxatie of garantie. Combineer met een fysieke inspectie en proefrit."
+        : "AI guidance based on RDW data: an indication, not an appraisal or guarantee. Combine with a physical inspection and test drive.",
+      7.5,
+      MUTED
+    );
+  } else if (aiValuation) {
+    layout.section(locale === "nl" ? "AI-waardering" : "AI valuation");
+    layout.pairs([
+      { label: locale === "nl" ? "Waarde nu" : "Value now", value: `${aiValuation.currency} ${aiValuation.estimatedValueNow.toLocaleString("nl-NL")}` },
+      { label: locale === "nl" ? "Bandbreedte" : "Range", value: `${aiValuation.currency} ${aiValuation.estimatedValueMin.toLocaleString("nl-NL")} - ${aiValuation.estimatedValueMax.toLocaleString("nl-NL")}` }
+    ]);
+  }
 
-  layout.section(locale === "nl" ? "Disclaimer" : "Disclaimer");
+  // ---- Disclaimer ----
+  layout.section("Disclaimer");
   layout.paragraph(
     locale === "nl"
-      ? "Feitelijke RDW-gegevens (identiteit, APK-historie, terugroepacties, brandstof, gewicht) komen rechtstreeks uit open RDW-data. Marktwaarde en maandlasten (wegenbelasting, brandstof) zijn data-gedreven schattingen en algemene indicaties, geen formele taxatie, geen garantie en geen voertuigspecifieke diagnose. Werkelijke waarden en kosten kunnen afwijken. Gebruik dit rapport als hulpmiddel en combineer het altijd met een fysieke inspectie en aankoopkeuring."
-      : "Factual RDW data (identity, inspection history, recalls, fuel, weight) comes directly from open RDW data. Market value and monthly costs (road tax, fuel) are data-driven estimates and general indications, not a formal appraisal, guarantee, or vehicle-specific diagnosis. Actual values and costs may differ. Use this report as guidance and always combine it with a physical inspection and pre-purchase check."
+      ? "Feitelijke RDW-gegevens (identiteit, APK-historie, terugroepacties, brandstof, gewicht) komen rechtstreeks uit open RDW-data. Marktwaarde, geschatte kilometerstand en maandlasten zijn data-gedreven schattingen en algemene indicaties, geen formele taxatie, geen garantie en geen voertuigspecifieke diagnose. Werkelijke waarden en kosten kunnen afwijken. Combineer dit rapport altijd met een fysieke inspectie en aankoopkeuring."
+      : "Factual RDW data (identity, inspection history, recalls, fuel, weight) comes directly from open RDW data. Market value, estimated mileage and monthly costs are data-driven estimates and general indications, not a formal appraisal, guarantee or vehicle-specific diagnosis. Actual values and costs may differ. Always combine this report with a physical inspection and a pre-purchase check.",
+    8,
+    MUTED
   );
 }
 
@@ -759,10 +666,9 @@ export async function generateVehicleReportPdf(args: ReportArgs): Promise<Buffer
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const layout = new PdfLayout(doc, regular, bold, args);
+
   const vehicle = asRow(args.data.vehicle);
   const vehicleColor = asRow(vehicle.color).primary;
-  // Only embed a real, brand-derived vehicle image. If it is unavailable we show
-  // a neutral placeholder rather than an unrelated stock photo of another car.
   const brand = typeof vehicle.brand === "string" && vehicle.brand.trim() ? vehicle.brand : null;
   const imageUrl = brand
     ? getVehicleImageUrl(brand, typeof vehicle.tradeName === "string" ? vehicle.tradeName : null, {
@@ -772,17 +678,11 @@ export async function generateVehicleReportPdf(args: ReportArgs): Promise<Buffer
       })
     : null;
   const vehicleImage = imageUrl ? await embedImageIfAvailable(doc, imageUrl) : null;
-  drawHeroVisuals({
-    page: layout.page,
-    regular,
-    bold,
-    data: args.data,
-    image: vehicleImage,
-    aiInsights: args.aiInsights,
-    aiValuation: args.aiValuation,
-    locale: args.locale
-  });
+
+  drawHero(layout, args, vehicleImage);
   buildReportSections(layout, args);
+  layout.finalize();
+
   const bytes = await doc.save();
   return Buffer.from(bytes);
 }
