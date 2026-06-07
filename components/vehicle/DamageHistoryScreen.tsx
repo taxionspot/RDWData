@@ -154,8 +154,8 @@ export function DamageHistoryScreen({ plate }: Props) {
                 </div>
                 <div className={styles.subhead}>
                   {isNl
-                    ? "RDW levert defectcodes uit de APK-keuringen — geen schadelocaties. Hieronder staan de daadwerkelijk gemelde defecten met datum en omschrijving."
-                    : "RDW provides defect codes from APK inspections — not body locations. Below are the actual reported defects with their date and description."}
+                    ? "RDW levert defectcodes uit de APK-keuringen, geen schadelocaties. Hieronder staan de daadwerkelijk gemelde defecten met datum en omschrijving."
+                    : "RDW provides defect codes from APK inspections, not body locations. Below are the actual reported defects with their date and description."}
                 </div>
               </div>
                 <div className={styles.heroStats}>

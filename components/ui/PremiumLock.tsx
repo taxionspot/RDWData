@@ -99,7 +99,7 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
           </div>
 
           <Button variant="primary" className={styles.unlockButton} onClick={openModal}>
-            {locale === "nl" ? `Ontgrendelen — ${priceLabel}` : `Unlock — ${priceLabel}`}
+            {locale === "nl" ? `Ontgrendelen voor ${priceLabel}` : `Unlock for ${priceLabel}`}
           </Button>
 
         </div>

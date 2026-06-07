@@ -210,7 +210,7 @@ export function InspectionTimelineScreen({ plate }: Props) {
     : 0;
 
   // Roadworthiness from the REAL APK pass-rate (non-fail inspections), minus a
-  // penalty if the current APK has lapsed. "—" when there is no inspection history.
+  // penalty if the current APK has lapsed. "-" when there is no inspection history.
   const apkExpiry = data?.vehicle?.apkExpiryDate ?? null;
   const apkExpired = !!apkExpiry && new Date(apkExpiry).getTime() < Date.now();
   const roadworthiness = events.length ? Math.max(0, passRate - (apkExpired ? 15 : 0)) : null;
@@ -292,7 +292,7 @@ export function InspectionTimelineScreen({ plate }: Props) {
                 </div>
                 <div className={styles.statusMeta}>
                   <span>{locale === "nl" ? "Verkeersveiligheidsvertrouwen (APK-slaagratio)" : "Roadworthiness (APK pass-rate)"}</span>
-                  <span>{roadworthiness != null ? `${roadworthiness}%` : "—"}</span>
+                  <span>{roadworthiness != null ? `${roadworthiness}%` : "-"}</span>
                 </div>
               </div>
               <div className={styles.badgeRow}>

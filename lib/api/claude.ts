@@ -1,4 +1,36 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { stripBannedDashes } from "@/lib/utils/text";
+
+/** Strip the banned long-dash characters from every string in an AI report. */
+function sanitizeReport(report: ClaudeVehicleReportResult): ClaudeVehicleReportResult {
+  const { insights, valuation } = report;
+  return {
+    insights: {
+      ...insights,
+      summary: stripBannedDashes(insights.summary),
+      positives: insights.positives.map(stripBannedDashes),
+      risks: insights.risks.map(stripBannedDashes),
+      recommendation: stripBannedDashes(insights.recommendation),
+      recommendations: insights.recommendations.map(stripBannedDashes)
+    },
+    valuation: {
+      ...valuation,
+      factors: valuation.factors.map(stripBannedDashes),
+      explanation: stripBannedDashes(valuation.explanation)
+    }
+  };
+}
+
+/** Strip the banned long-dash characters from every string in negotiation advice. */
+function sanitizeNegotiation(advice: ClaudeNegotiationCopilotResult): ClaudeNegotiationCopilotResult {
+  return {
+    script: stripBannedDashes(advice.script),
+    offerStrategy: stripBannedDashes(advice.offerStrategy),
+    walkAwayReason: stripBannedDashes(advice.walkAwayReason),
+    repairReserveAdvice: stripBannedDashes(advice.repairReserveAdvice),
+    talkingPoints: advice.talkingPoints.map(stripBannedDashes)
+  };
+}
 
 export type ClaudeInsightResult = {
   summary: string;
@@ -269,7 +301,7 @@ export async function generateVehicleAiReport(args: {
     console.info(`[anthropic] request_id=${response.requestId} model=${model} pass=1`);
   }
   const parsed = parseClaudeJson(extractTextContent(response.content));
-  if (parsed) return parsed;
+  if (parsed) return sanitizeReport(parsed);
 
   const retryResponse = await callAnthropic({
     apiKey,
@@ -283,7 +315,7 @@ export async function generateVehicleAiReport(args: {
   }
   const retryParsed = parseClaudeJson(extractTextContent(retryResponse.content));
   if (!retryParsed) throw new Error("Anthropic response was not valid JSON in expected format.");
-  return retryParsed;
+  return sanitizeReport(retryParsed);
 }
 
 export async function generateVehicleAiInsights(args: {
@@ -400,7 +432,7 @@ ${payload}`;
     console.info(`[anthropic] request_id=${response.requestId} model=${model} copilot=1`);
   }
   const parsed = parseNegotiationJson(extractTextContent(response.content));
-  if (parsed) return parsed;
+  if (parsed) return sanitizeNegotiation(parsed);
 
   const retry = await callAnthropic({
     apiKey,
@@ -414,7 +446,7 @@ ${payload}`;
   }
   const retryParsed = parseNegotiationJson(extractTextContent(retry.content));
   if (!retryParsed) throw new Error("Anthropic negotiation response was not valid JSON.");
-  return retryParsed;
+  return sanitizeNegotiation(retryParsed);
 }
 
 export function buildFallbackNegotiationCopilotAdvice(args: {

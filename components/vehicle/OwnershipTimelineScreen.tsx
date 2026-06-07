@@ -60,7 +60,7 @@ function buildRegistrationTimeline(
     entries.push({
       id: "nl",
       label: isImported
-        ? nl ? "Import — eerste registratie in Nederland" : "Import — first registration in the Netherlands"
+        ? nl ? "Import: eerste registratie in Nederland" : "Import: first registration in the Netherlands"
         : nl ? "Eerste registratie in Nederland" : "First registration in the Netherlands",
       detail: formatLongDate(vehicle.firstRegistrationNL, locale),
       icon: "nl",

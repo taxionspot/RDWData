@@ -275,8 +275,8 @@ export function TechnicalSpecsScreen({ plate }: Props) {
               : null,
             meta:
               locale === "nl"
-                ? "Schatting o.b.v. gewicht & brandstof. Werkelijke MRB verschilt per provincie — bereken exact op belastingdienst.nl."
-                : "Estimate from weight & fuel. Actual road tax varies by province — calculate the exact amount at belastingdienst.nl.",
+                ? "Schatting o.b.v. gewicht & brandstof. Werkelijke MRB verschilt per provincie. Bereken exact op belastingdienst.nl."
+                : "Estimate from weight & fuel. Actual road tax varies by province. Calculate the exact amount at belastingdienst.nl.",
             icon: ShieldCheck
           }
         ].filter((spec) => spec.value) as Array<{ id: string; label: string; value: string; meta?: string; icon: ElementType }>

@@ -63,7 +63,7 @@ export function FeatureGrid({ items }: Props) {
             </h2>
           </div>
           <p className="max-w-xs text-sm leading-relaxed text-slate-500">
-            Whether you&apos;re buying, selling, or inspecting — get the full picture instantly.
+            Whether you&apos;re buying, selling, or inspecting: get the full picture instantly.
           </p>
         </div>
 

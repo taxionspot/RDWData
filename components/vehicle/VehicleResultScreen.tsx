@@ -803,8 +803,8 @@ export function VehicleResultScreen({ plate }: Props) {
                         ? "Automatisch gegenereerd (AI tijdelijk niet beschikbaar). Indicatie op basis van RDW-data, geen garantie."
                         : "Automatically generated (AI temporarily unavailable). Indication based on RDW data, no guarantee."
                       : locale === "nl"
-                      ? "AI-advies op basis van RDW-data — een indicatie, geen taxatie of garantie. Combineer met een fysieke inspectie en proefrit."
-                      : "AI guidance based on RDW data — an indication, not an appraisal or guarantee. Combine with a physical inspection and test drive."}
+                      ? "AI-advies op basis van RDW-data: een indicatie, geen taxatie of garantie. Combineer met een fysieke inspectie en proefrit."
+                      : "AI guidance based on RDW data: an indication, not an appraisal or guarantee. Combine with a physical inspection and test drive."}
                   </p>
                 </div>
               </PremiumLock>

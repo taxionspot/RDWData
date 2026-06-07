@@ -220,8 +220,8 @@ export function generateVehicleReportHtml(args: {
   <h2>${escape(locale === "nl" ? "Disclaimer" : "Disclaimer")}</h2>
   <p style="color:#64748b;font-size:11px;line-height:1.5;">${escape(
     locale === "nl"
-      ? "Feitelijke RDW-gegevens (identiteit, APK-historie, terugroepacties) komen rechtstreeks uit open RDW-data. Marktwaarde, maandlasten (wegenbelasting, verzekering, brandstof), reparatiekansen en aandachtspunten zijn data-gedreven schattingen en algemene indicaties — geen formele taxatie, geen garantie en geen voertuigspecifieke diagnose. Werkelijke waarden en kosten kunnen afwijken. Combineer dit rapport altijd met een fysieke inspectie en aankoopkeuring."
-      : "Factual RDW data (identity, inspection history, recalls) comes directly from open RDW data. Market value, monthly costs (road tax, insurance, fuel), repair likelihoods and known issues are data-driven estimates and general indications — not a formal appraisal, guarantee, or vehicle-specific diagnosis. Actual values and costs may differ. Always combine this report with a physical inspection and pre-purchase check."
+      ? "Feitelijke RDW-gegevens (identiteit, APK-historie, terugroepacties) komen rechtstreeks uit open RDW-data. Marktwaarde en maandlasten (wegenbelasting, brandstof) zijn data-gedreven schattingen en algemene indicaties, geen formele taxatie, geen garantie en geen voertuigspecifieke diagnose. Werkelijke waarden en kosten kunnen afwijken. Combineer dit rapport altijd met een fysieke inspectie en aankoopkeuring."
+      : "Factual RDW data (identity, inspection history, recalls) comes directly from open RDW data. Market value and monthly costs (road tax, fuel) are data-driven estimates and general indications, not a formal appraisal, guarantee, or vehicle-specific diagnosis. Actual values and costs may differ. Always combine this report with a physical inspection and pre-purchase check."
   )}</p>
 </body>
 </html>`;

@@ -716,8 +716,8 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   layout.section(locale === "nl" ? "Disclaimer" : "Disclaimer");
   layout.paragraph(
     locale === "nl"
-      ? "Feitelijke RDW-gegevens (identiteit, APK-historie, terugroepacties, brandstof, gewicht) komen rechtstreeks uit open RDW-data. Marktwaarde, maandlasten (wegenbelasting, verzekering, brandstof), reparatiekansen en aandachtspunten zijn data-gedreven schattingen en algemene indicaties — geen formele taxatie, geen garantie en geen voertuigspecifieke diagnose. Werkelijke waarden en kosten kunnen afwijken. Gebruik dit rapport als hulpmiddel en combineer het altijd met een fysieke inspectie en aankoopkeuring."
-      : "Factual RDW data (identity, inspection history, recalls, fuel, weight) comes directly from open RDW data. Market value, monthly costs (road tax, insurance, fuel), repair likelihoods and known issues are data-driven estimates and general indications — not a formal appraisal, guarantee, or vehicle-specific diagnosis. Actual values and costs may differ. Use this report as guidance and always combine it with a physical inspection and pre-purchase check."
+      ? "Feitelijke RDW-gegevens (identiteit, APK-historie, terugroepacties, brandstof, gewicht) komen rechtstreeks uit open RDW-data. Marktwaarde en maandlasten (wegenbelasting, brandstof) zijn data-gedreven schattingen en algemene indicaties, geen formele taxatie, geen garantie en geen voertuigspecifieke diagnose. Werkelijke waarden en kosten kunnen afwijken. Gebruik dit rapport als hulpmiddel en combineer het altijd met een fysieke inspectie en aankoopkeuring."
+      : "Factual RDW data (identity, inspection history, recalls, fuel, weight) comes directly from open RDW data. Market value and monthly costs (road tax, fuel) are data-driven estimates and general indications, not a formal appraisal, guarantee, or vehicle-specific diagnosis. Actual values and costs may differ. Use this report as guidance and always combine it with a physical inspection and pre-purchase check."
   );
 }
 
