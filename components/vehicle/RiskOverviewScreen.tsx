@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   FileCheck2,
   Gauge,
-  LayoutGrid,
   ShieldCheck,
   Sparkles,
   Users
@@ -128,12 +127,6 @@ export function RiskOverviewScreen({ plate }: Props) {
 
   const v = data.vehicle;
 
-  const positiveChecks = [
-    v.napVerdict && v.napVerdict.toLowerCase().includes("logisch"),
-    !v.wok,
-    !v.hasOpenRecall
-  ].filter(Boolean).length;
-
   // Trust snapshot computed from the real RDW signals (no hardcoded verdict).
   const nl = locale === "nl";
   const napIllogical = !!v.napVerdict && v.napVerdict.toLowerCase().includes("onlogisch");
@@ -166,12 +159,6 @@ export function RiskOverviewScreen({ plate }: Props) {
       ? nl ? "Open de schadehistorie om de gemelde defecten te bekijken." : "Open damage history to review the reported defects."
       : nl ? "Open de eigendomshistorie om de registratiedatums te bekijken." : "Open ownership history to review the registration dates.";
 
-  const metrics = [
-    { label: locale === "nl" ? "Positieve controles" : "Positive checks", value: `${positiveChecks} / 3` },
-    { label: locale === "nl" ? "Nadere controle" : "Needs review", value: `${v.wok || v.hasOpenRecall ? 1 : 0} ${locale === "nl" ? "item" : "item"}` },
-    { label: locale === "nl" ? "Laatste update" : "Last update", value: data.fromCache ? (locale === "nl" ? "Cache" : "Cached") : "Live" }
-  ];
-
   const resolvedMileageVerdict =
     data.enriched?.mileageVerdict && data.enriched.mileageVerdict !== "UNKNOWN"
       ? data.enriched.mileageVerdict
@@ -189,8 +176,8 @@ export function RiskOverviewScreen({ plate }: Props) {
       status: resolvedMileageVerdict,
       description:
         locale === "nl"
-          ? "Kilometeroordeel op basis van APK-historie met trendanalyse."
-          : "Mileage verdict is derived from APK history with weighted trend detection.",
+          ? "Klopt de kilometerstand met de keuringshistorie? Belangrijk om een teruggedraaide teller te herkennen."
+          : "Does the odometer match the inspection history? Key to spotting a rolled-back meter.",
       badge: resolvedMileageVerdict !== "Unknown" ? (locale === "nl" ? "Geverifieerd" : "Verified") : (locale === "nl" ? "Onbekend" : "Unknown"),
       trend: resolvedMileageVerdict ?? (locale === "nl" ? "Geen oordeel" : "No verdict"),
       icon: Gauge,
@@ -203,8 +190,8 @@ export function RiskOverviewScreen({ plate }: Props) {
       status: data.defects.length === 0 ? (locale === "nl" ? "Geen defecten" : "No defects found") : `${data.defects.length} ${locale === "nl" ? "records" : "records"}`,
       description:
         locale === "nl"
-          ? "Defecten gemeld tijdens keuringen. Open voor details."
-          : "Defect records reported during inspections. Expand for details.",
+          ? "Welke gebreken zijn bij keuringen gemeld? Dit bepaalt mogelijke herstelkosten."
+          : "Which defects were reported at inspections? This drives potential repair costs.",
       badge: data.defects.length === 0 ? (locale === "nl" ? "Schoon" : "Clear") : (locale === "nl" ? "Controleren" : "Review"),
       trend: data.defects.length === 0 ? (locale === "nl" ? "Schoon dossier" : "Clean record") : (locale === "nl" ? "Controleer defecten" : "Check defects"),
       icon: ShieldCheck,
@@ -217,8 +204,8 @@ export function RiskOverviewScreen({ plate }: Props) {
       status: v.owners.count ? `${v.owners.count} ${locale === "nl" ? "tenaamstellingen" : "registrations"}` : (locale === "nl" ? "Zie registratiedatums" : "See registration dates"),
       description:
         locale === "nl"
-          ? "RDW-opendata toont registratiedatums (incl. huidige eigenaar sinds); het aantal houders is niet altijd beschikbaar."
-          : "RDW open data shows registration dates (incl. current owner since); keeper count isn't always available.",
+          ? "Hoe vaak is de auto op naam gezet? Veel wisselingen vragen om uitleg."
+          : "How often was the car re-registered? Many changes are worth questioning.",
       badge: v.owners.count && v.owners.count > 2 ? (locale === "nl" ? "Controleren" : "Review") : (locale === "nl" ? "Stabiel" : "Stable"),
       trend: v.owners.count ? (locale === "nl" ? "Overdrachtsdatums" : "Transfer dates") : (locale === "nl" ? "Geen data" : "No data"),
       icon: Users,
@@ -233,8 +220,8 @@ export function RiskOverviewScreen({ plate }: Props) {
         : (locale === "nl" ? "Onbekend" : "Unknown"),
       description:
         locale === "nl"
-          ? "Geldigheid en keuringsevents uit RDW APK-records."
-          : "Inspection validity and event history from RDW APK records.",
+          ? "Tot wanneer is de auto APK-gekeurd? Bepaalt of je binnenkort opnieuw moet keuren."
+          : "How long is the MOT valid? Tells you if a new inspection is due soon.",
       badge: v.apkExpiryDate ? (locale === "nl" ? "Actueel" : "Current") : (locale === "nl" ? "Onbekend" : "Unknown"),
       trend: v.apkExpiryDate ? (locale === "nl" ? "APK actief" : "Inspection active") : (locale === "nl" ? "Ontbreekt" : "Missing"),
       icon: FileCheck2,
@@ -266,14 +253,6 @@ export function RiskOverviewScreen({ plate }: Props) {
                     ? "Elke kaart toont een kerncontrole met status, context en een directe route naar detailhistorie."
                     : "Each card highlights a core checkpoint with status signals, supportive context, and a clear path into the detailed history."}
                 </div>
-                <div className={styles.heroMetrics}>
-                  {metrics.map((metric) => (
-                    <div key={metric.label} className={styles.metricChip}>
-                      <div className={styles.metricLabel}>{metric.label}</div>
-                      <div className={styles.metricValue}>{metric.value}</div>
-                    </div>
-                  ))}
-                </div>
               </div>
               <div className={styles.heroSide}>
                 <div className={styles.spotlightCard}>
@@ -289,20 +268,6 @@ export function RiskOverviewScreen({ plate }: Props) {
             </div>
 
             <div className={`${styles.riskSection} ${styles.glassPanel}`}>
-              <div className={styles.sectionHeader}>
-                <div className={styles.sectionCopy}>
-                  <div className={styles.sectionTitle}>{locale === "nl" ? "Risico-overzicht" : "Risk Overview"}</div>
-                  <div className={styles.sectionSubtitle}>
-                    {locale === "nl"
-                      ? "Een kaartgerichte weergave met sterke scanbaarheid, duidelijke signalen en snelle doorkliks naar details."
-                      : "A more modern, card-first overview with stronger emphasis on scanability, confidence signals, and click targets for deeper inspection."}
-                  </div>
-                </div>
-                <button className={styles.sectionAction} type="button">
-                  <LayoutGrid size={16} /> {locale === "nl" ? "Overzichtsmodus" : "Overview mode"}
-                </button>
-              </div>
-
               <div className={styles.riskGrid}>
                 {resolvedCards.map((card) => (
                   <RiskCard key={card.id} {...card} locale={locale} />
