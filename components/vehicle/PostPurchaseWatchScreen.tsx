@@ -161,6 +161,32 @@ export function PostPurchaseWatchScreen({ plate }: Props) {
           </div>
 
           <div className={styles.panel}>
+            <h3>{locale === "nl" ? "Hoe werkt Watch Mode?" : "How does Watch Mode work?"}</h3>
+            <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, color: "#475569", fontSize: 14 }}>
+              <li>
+                {locale === "nl"
+                  ? "Wij houden dit kenteken in de gaten en vergelijken periodiek de openbare RDW-data."
+                  : "We keep an eye on this plate and periodically compare the public RDW data."}
+              </li>
+              <li>
+                {locale === "nl"
+                  ? "Je krijgt een melding bij een nieuwe terugroepactie, een gewijzigde APK-vervaldatum of een verschuiving in het risicoprofiel."
+                  : "You get an alert on a new recall, a changed APK expiry date, or a shift in the risk profile."}
+              </li>
+              <li>
+                {locale === "nl"
+                  ? "Klik op 'Volgen' (inloggen nodig) om te starten, of op 'Nu controleren' voor een directe check."
+                  : "Click 'Follow' (login required) to start, or 'Check now' for an immediate check."}
+              </li>
+              <li>
+                {locale === "nl"
+                  ? "Let op: we gebruiken alleen openbare RDW-signalen. We kunnen geen privegegevens van eigenaren, kilometerstanden tussen keuringen door, of verkoopadvertenties volgen."
+                  : "Note: we use only public RDW signals. We cannot track private owner data, mileage between inspections, or sales listings."}
+              </li>
+            </ul>
+          </div>
+
+          <div className={styles.panel}>
             <h3>{locale === "nl" ? "Huidige watch status" : "Current watch status"}</h3>
             {!watchItem ? (
               <p className={styles.empty}>{locale === "nl" ? "Nog niet gevolgd." : "Not followed yet."}</p>
