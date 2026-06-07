@@ -110,7 +110,7 @@ export const defaultSiteSettings: PublicSiteSettings = {
       "Ontdek direct verborgen schade, kilometerfraude, marktwaarde en eigendomsgeschiedenis met alleen een kenteken.",
     landingCtaTitle: "Klaar om met vertrouwen te kopen?",
     landingCtaSubtitle:
-      "Sluit je aan bij meer dan 1.000.000 slimme kopers die hun auto checkten voor de deal.",
+      "Eén kenteken, een compleet en eerlijk beeld van de auto op basis van officiële RDW-data.",
     landingCtaButton: "Start je check nu",
     landingHeroImageUrl:
       "https://storage.googleapis.com/banani-generated-images/generated-images/ad953e96-ea70-4d4d-ab60-fc21c7b01fb4.jpg",

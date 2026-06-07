@@ -23,7 +23,8 @@ import {
   Twitter,
   Linkedin,
   Facebook,
-  ShieldCheck
+  ShieldCheck,
+  Zap
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import styles from "./page.module.css";
@@ -121,8 +122,12 @@ function PlateSearch() {
 }
 
 export default function LandingPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { settings } = useSiteSettings();
+  const priceLabel =
+    settings.payment.currency === "EUR"
+      ? `€${String(settings.payment.amount).replace(".", ",")}`
+      : `${settings.payment.currency} ${settings.payment.amount}`;
   const cmsPages = useCmsPages();
   const footerPages = cmsPages.filter(
     (page) => page.showInFooter && page.slug !== "privacy-policy" && page.slug !== "terms-and-conditions"
@@ -140,6 +145,17 @@ export default function LandingPage() {
           </h1>
           <p className={styles["hero-subtitle"]}>{settings.content.landingHeroSubtitle}</p>
           <PlateSearch />
+          <div className={styles["hero-trust"]}>
+            <span className={styles["hero-price"]}>
+              {priceLabel} <span>{locale === "nl" ? "per rapport" : "per report"}</span>
+            </span>
+            <span className={styles["hero-trust-item"]}>
+              <Zap size={15} /> {locale === "nl" ? "Direct online" : "Instant online"}
+            </span>
+            <span className={styles["hero-trust-item"]}>
+              <ShieldCheck size={15} /> {locale === "nl" ? "Officiële RDW-data" : "Official RDW data"}
+            </span>
+          </div>
           <div className={styles["trust-logos"]}>
             <span>{settings.landing.trustedSourcesLabel}</span>
             <Building2 size={20} />
@@ -205,6 +221,9 @@ export default function LandingPage() {
           <section id="pricing" className={styles.cta}>
             <h2 className={styles["cta-title"]}>{settings.content.landingCtaTitle}</h2>
             <p className={styles["cta-subtitle"]}>{settings.content.landingCtaSubtitle}</p>
+            <div className={styles["cta-price"]}>
+              <span>{locale === "nl" ? "Eenmalig" : "One-time"}</span> <strong>{priceLabel}</strong>
+            </div>
             <button className={styles["cta-btn"]} data-media-type="banani-button">
               {settings.content.landingCtaButton}
             </button>

@@ -18,12 +18,12 @@ const headingFont = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "PlateIntel - Nederlandse Kentekeninzichten",
+  title: "Kentekenrapport - Nederlandse Kentekeninzichten",
   description:
     "Directe Nederlandse kentekencheck. Krijg voertuigprofiel, APK-status, inspectiehistorie en terugroepmeldingen op basis van RDW open data.",
   keywords: ["kenteken", "RDW", "license plate", "Netherlands", "APK", "vehicle lookup"],
   openGraph: {
-    title: "PlateIntel - Nederlandse Voertuiginzichten",
+    title: "Kentekenrapport - Nederlandse Voertuiginzichten",
     description: "Directe Nederlandse voertuigchecks op basis van RDW open data.",
     type: "website"
   }
