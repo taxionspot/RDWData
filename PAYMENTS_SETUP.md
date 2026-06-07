@@ -13,6 +13,7 @@ Variables). Never commit secrets to the repository.
 | `PAYPAL_CLIENT_SECRET` | Server (secret) | Your PayPal app Secret. Keep private. |
 | `PAYPAL_BASE_URL` | Server | `https://api-m.paypal.com` for live, `https://api-m.sandbox.paypal.com` for sandbox. Defaults to sandbox if unset. |
 | `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | Client | Same Client ID as above; needed in the browser to load the PayPal SDK. |
+| `NEXT_PUBLIC_PAYPAL_ENV` | Client | `live` in production, otherwise treated as sandbox. Drives the Google Pay environment (PRODUCTION vs TEST). |
 
 > Security: the Client ID and Secret were shared in a document. Set them in
 > Vercel and, because the secret was shared, rotate it in the PayPal dashboard
@@ -58,10 +59,26 @@ issues a new one.
 
 ## 3. Payment methods status
 
-Currently enabled: **PayPal** and **iDEAL** (iDEAL runs as a PayPal funding
-source). Card, Apple Pay and Google Pay require enabling the corresponding
-funding sources / features on the PayPal business account and adding them to the
-PayPal SDK parameters. This is scoped as a separate, tested task.
+The checkout now renders a **method chooser**: separate buttons for **PayPal**,
+**iDEAL**, **credit/debit card** and **Bancontact** (each shown only when the
+PayPal account marks it eligible), plus **Google Pay** and **Apple Pay** via
+PayPal's wallet components. Each method uses the same create-order / capture-order
+flow, and any method that is not eligible is hidden automatically (it never
+breaks the others).
+
+To get every method live you must, on the **PayPal business account**:
+1. Enable iDEAL, Bancontact and advanced card processing (Alternative Payment
+   Methods) for your account/region.
+2. Enable **Google Pay** and **Apple Pay** (Pay with wallets). Apple Pay also
+   requires the domain verification in section 2.
+3. Set `NEXT_PUBLIC_PAYPAL_ENV=live` in production so Google Pay runs in
+   PRODUCTION mode.
+
+Notes:
+- Apple Pay only appears on Apple devices/browsers (Safari) that support it.
+- Google Pay only appears on supported browsers/devices and eligible accounts.
+- If a wallet is not yet approved on the account it simply will not render; the
+  PayPal / iDEAL / card buttons keep working.
 
 ## 4. Webhooks
 

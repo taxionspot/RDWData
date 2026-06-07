@@ -72,7 +72,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
         <div className={styles.plans}>
           <div className={`${styles.planCard} ${styles.planActive}`}>
             <div className={styles.planHeader}>
-              <div className={styles.planName}>{locale === "nl" ? "Betalen met iDEAL of PayPal" : "Pay with iDEAL or PayPal"}</div>
+              <div className={styles.planName}>{locale === "nl" ? "Kies je betaalmethode" : "Choose your payment method"}</div>
               <div className={styles.planPrice}>
                 {settings.payment.currency} {settings.payment.amount}
                 <span>/{locale === "nl" ? "zoekopdracht" : "search"}</span>
@@ -81,7 +81,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
             <ul className={styles.features}>
               <li><Check size={14} className={styles.checkIcon} /> {locale === "nl" ? "Ontgrendelt alle premium tabbladen voor dit kenteken" : "Unlocks all premium tabs for this plate"}</li>
               <li><Check size={14} className={styles.checkIcon} /> {locale === "nl" ? "Maakt rapportdownload beschikbaar voor dit kenteken" : "Enables report download for this plate"}</li>
-              <li><Check size={14} className={styles.checkIcon} /> {locale === "nl" ? "Per zoekopdracht betaling" : "Payment per search"}</li>
+              <li><Check size={14} className={styles.checkIcon} /> {locale === "nl" ? "iDEAL, creditcard, PayPal, Apple Pay en Google Pay" : "iDEAL, credit card, PayPal, Apple Pay and Google Pay"}</li>
             </ul>
             <label className={styles.emailLabel}>
               {locale === "nl" ? "E-mail voor rapportlevering" : "Email for report delivery"}
@@ -151,7 +151,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
             <ShieldCheck size={16} /> {locale === "nl" ? "Geverifieerde RDW-data" : "Verified RDW Data"}
           </div>
           <div className={styles.trustItem}>
-            <Lock size={16} /> {locale === "nl" ? "Veilig betalen via iDEAL & PayPal" : "Secure payment via iDEAL & PayPal"}
+            <Lock size={16} /> {locale === "nl" ? "Veilig betalen via iDEAL, creditcard, PayPal, Apple Pay & Google Pay" : "Secure payment via iDEAL, card, PayPal, Apple Pay & Google Pay"}
           </div>
         </div>
       </div>
