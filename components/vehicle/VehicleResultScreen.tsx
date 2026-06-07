@@ -17,6 +17,7 @@ import {
   Settings2,
   Share2,
   ShieldCheck,
+  Sparkles,
   TrendingUp,
   Wrench
 } from "lucide-react";
@@ -30,9 +31,33 @@ import { hasPaidAccessForPlate, grantPaidAccessForPlate } from "@/lib/payments/a
 import styles from "./VehicleResultScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
+import { PremiumLock } from "@/components/ui/PremiumLock";
 import { UserAuthModal } from "@/components/ui/UserAuthModal";
 
 type Props = { plate: string };
+
+type AiAdvice = {
+  summary: string;
+  positives: string[];
+  risks: string[];
+  recommendation: string;
+  purchaseVerdict: "BUY" | "CONSIDER" | "CAUTION" | "AVOID";
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+};
+
+function verdictMeta(verdict: AiAdvice["purchaseVerdict"], locale: "nl" | "en"): { label: string; color: string } {
+  const nl = locale === "nl";
+  switch (verdict) {
+    case "BUY":
+      return { label: nl ? "Kopen" : "Buy", color: "#16a34a" };
+    case "CONSIDER":
+      return { label: nl ? "Overwegen" : "Consider", color: "#0ea5e9" };
+    case "CAUTION":
+      return { label: nl ? "Voorzichtig" : "Caution", color: "#d97706" };
+    default:
+      return { label: nl ? "Afraden" : "Avoid", color: "#dc2626" };
+  }
+}
 
 type ScoreTone = "strong" | "steady" | "mixed" | "caution";
 
@@ -370,6 +395,8 @@ export function VehicleResultScreen({ plate }: Props) {
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [claudeValue, setClaudeValue] = useState<number | null>(null);
   const [isCalculatingClaude, setIsCalculatingClaude] = useState(false);
+  const [aiAdvice, setAiAdvice] = useState<AiAdvice | null>(null);
+  const [aiSource, setAiSource] = useState<"ai" | "fallback" | null>(null);
 
   useEffect(() => {
     if (!normalized || isError) return;
@@ -382,8 +409,13 @@ export function VehicleResultScreen({ plate }: Props) {
         }`, { cache: "no-store" });
         if (!response.ok || !active) return;
         const payload = await response.json();
-        if (active && payload.aiValuation?.estimatedValueNow) {
+        if (!active) return;
+        if (payload.aiValuation?.estimatedValueNow) {
           setClaudeValue(payload.aiValuation.estimatedValueNow);
+        }
+        if (payload.aiInsights && typeof payload.aiInsights === "object") {
+          setAiAdvice(payload.aiInsights as AiAdvice);
+          setAiSource(payload.aiSource === "fallback" ? "fallback" : "ai");
         }
       } catch {
         // silently fallback
@@ -726,6 +758,57 @@ export function VehicleResultScreen({ plate }: Props) {
                 value={formatDateTime(lastUpdated)}
               />
             </div>
+
+            {aiAdvice && (
+              <PremiumLock featureName={locale === "nl" ? "AI-aankoopadvies" : "AI purchase advice"} isLocked={true} plate={normalizedPlate}>
+                <div className={styles.aiCard}>
+                  <div className={styles.aiHeader}>
+                    <div className={styles.aiEyebrow}>
+                      <Sparkles size={14} /> {locale === "nl" ? "AI-aankoopadvies" : "AI purchase advice"}
+                    </div>
+                    <span
+                      className={styles.aiVerdict}
+                      style={{ color: verdictMeta(aiAdvice.purchaseVerdict, locale).color, borderColor: verdictMeta(aiAdvice.purchaseVerdict, locale).color }}
+                    >
+                      {verdictMeta(aiAdvice.purchaseVerdict, locale).label}
+                    </span>
+                  </div>
+                  {aiAdvice.summary ? <p className={styles.aiSummary}>{aiAdvice.summary}</p> : null}
+                  <div className={styles.aiCols}>
+                    {aiAdvice.positives.length > 0 && (
+                      <div className={styles.aiCol}>
+                        <div className={styles.aiColTitle}>{locale === "nl" ? "Sterke punten" : "Strengths"}</div>
+                        <ul className={styles.aiList}>
+                          {aiAdvice.positives.map((item, i) => (
+                            <li key={`p${i}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {aiAdvice.risks.length > 0 && (
+                      <div className={styles.aiCol}>
+                        <div className={styles.aiColTitle}>{locale === "nl" ? "Aandachtspunten" : "Watch-outs"}</div>
+                        <ul className={styles.aiList}>
+                          {aiAdvice.risks.map((item, i) => (
+                            <li key={`r${i}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  {aiAdvice.recommendation ? <p className={styles.aiRecommendation}>{aiAdvice.recommendation}</p> : null}
+                  <p className={styles.aiDisclaimer}>
+                    {aiSource === "fallback"
+                      ? locale === "nl"
+                        ? "Automatisch gegenereerd (AI tijdelijk niet beschikbaar). Indicatie op basis van RDW-data, geen garantie."
+                        : "Automatically generated (AI temporarily unavailable). Indication based on RDW data, no guarantee."
+                      : locale === "nl"
+                      ? "AI-advies op basis van RDW-data — een indicatie, geen taxatie of garantie. Combineer met een fysieke inspectie en proefrit."
+                      : "AI guidance based on RDW data — an indication, not an appraisal or guarantee. Combine with a physical inspection and test drive."}
+                  </p>
+                </div>
+              </PremiumLock>
+            )}
           </div>
         </div>
       </div>

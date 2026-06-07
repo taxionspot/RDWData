@@ -890,3 +890,102 @@
   }
 }
 
+/* ── AI purchase advice section ── */
+.aiCard {
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.aiHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.aiEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.aiVerdict {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border: 1.5px solid;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.aiSummary {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.aiCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.aiColTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-foreground);
+  margin-bottom: 6px;
+}
+
+.aiList {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aiList li {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+.aiRecommendation {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--foreground);
+  background: var(--secondary, #f1f5f9);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 0;
+}
+
+.aiDisclaimer {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .aiCols {
+    grid-template-columns: 1fr;
+  }
+}
+
