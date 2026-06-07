@@ -67,7 +67,7 @@ export type ClaudeNegotiationCopilotResult = {
 
 function getRequiredAnthropicEnv() {
   const apiKey = process.env.ANTHROPIC_API_KEY ?? "";
-  const model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+  const model = process.env.ANTHROPIC_MODEL ?? "claude-opus-4-8";
   const debugEnabled = process.env.NODE_ENV !== "production" && process.env.ANTHROPIC_DEBUG === "true";
   if (!apiKey) {
     throw new Error("Missing ANTHROPIC_API_KEY.");
@@ -206,12 +206,14 @@ Geef exact dit JSON-formaat terug:
   }
 }
 Regels:
-- Baseer analyse op alle data (identiteit, APK/defecten, recalls, onderhoudsrisico, kilometrage-signalen, markt/fuel/gewicht).
-- summary 120-220 woorden, concreet en overtuigend
+- Schrijf menselijk en concreet, alsof je het rustig uitlegt aan een vriend die geen verstand van auto's heeft. Vermijd jargon en marketingtaal.
+- Gebruik de ECHTE signalen uit de data en noem concrete getallen: gebruiksprofiel (bijv. ex-taxi of intensief gebruik), de afgelezen of geschatte kilometerstand, de leeftijd, de gemelde defecten en APK-historie, de marktwaarde met bandbreedte, en eventuele openstaande recalls.
+- Bij risks: leg uit wat de koper praktisch kan tegenkomen passend bij dit gebruik en deze kilometerstand (welke slijtage of kosten logisch zijn), zonder iets te verzinnen.
+- summary 120-220 woorden, concreet en menselijk
 - positives max 6, risks max 6, recommendations max 8, factors max 12
-- estimatedValueMin <= estimatedValueNow <= estimatedValueMax
-- waardes als gehele EUR getallen
-- recommendation moet expliciet advies geven: kopen/wachten/onderhandelen/extra inspectie
+- estimatedValueMin <= estimatedValueNow <= estimatedValueMax, gehele EUR getallen
+- recommendation moet expliciet advies geven: kopen, wachten, onderhandelen of extra inspectie
+- gebruik nooit een lang streepje (em-streepje of en-streepje); gebruik gewone leestekens
 - alleen JSON, geen markdown, geen extra tekst
 
 DATA:
@@ -239,12 +241,14 @@ Return exactly this JSON shape:
   }
 }
 Rules:
-- Use all available data (identity, inspections/defects, recalls, maintenance risk, mileage signals, market/fuel/weight indicators).
-- summary 120-220 words, concrete and convincing
+- Write in plain, human language, as if calmly explaining it to a friend who knows nothing about cars. Avoid jargon and marketing speak.
+- Use the REAL signals in the data and cite concrete numbers: usage profile (e.g. ex-taxi or intensive use), the recorded or estimated odometer reading, the age, the reported defects and APK history, the market value with its range, and any open recalls.
+- For risks: explain what the buyer may practically run into given this usage and mileage (what wear or costs are plausible), without inventing anything.
+- summary 120-220 words, concrete and human
 - positives max 6, risks max 6, recommendations max 8, factors max 12
-- estimatedValueMin <= estimatedValueNow <= estimatedValueMax
-- integer EUR values
-- recommendation must explicitly guide buy/wait/negotiate/inspect
+- estimatedValueMin <= estimatedValueNow <= estimatedValueMax, integer EUR values
+- recommendation must explicitly guide buy, wait, negotiate or inspect
+- never use a long dash (em-dash or en-dash); use ordinary punctuation
 - JSON only, no markdown, no extra text
 
 DATA:
@@ -292,8 +296,8 @@ export async function generateVehicleAiReport(args: {
   const dataJson = safeTruncate(JSON.stringify(args.vehicleData, null, 2), 16000);
   const isNl = args.locale === "nl";
   const systemPrompt = isNl
-    ? "Je bent een senior auto-inspectie analist en voertuigwaarderingsspecialist. Antwoord uitsluitend met geldige JSON."
-    : "You are a senior vehicle inspection analyst and valuation specialist. Respond strictly with valid JSON.";
+    ? "Je bent een nuchtere, ervaren Nederlandse auto-expert die een leek helpt bij het kopen van een tweedehands auto. Je schrijft warm, menselijk en in heldere spreektaal, alsof je naast de koper staat. Je verzint NOOIT gegevens en gebruikt alleen wat in de data staat (RDW-velden, onze schattingen met hun bandbreedte, de kilometer- en defecthistorie). Gebruik nooit een lang streepje (em-streepje of en-streepje). Antwoord uitsluitend met geldige JSON."
+    : "You are a level-headed, experienced car expert helping a layperson buy a used car. You write warmly and in plain, human language, as if standing next to the buyer. You NEVER invent data and use only what the provided data contains (RDW fields, our estimates with their ranges, the mileage and defect history). Never use a long dash (em-dash or en-dash). Respond strictly with valid JSON.";
   const userPrompt = buildAnthropicPrompt({ plate: args.plate, locale: args.locale, dataJson });
 
   const response = await callAnthropic({ apiKey, model, systemPrompt, userPrompt, debugEnabled });
@@ -391,8 +395,8 @@ export async function generateNegotiationCopilotAdvice(args: {
     120000
   );
   const systemPrompt = isNl
-    ? "Je bent een senior auto-inkooponderhandelaar. Antwoord alleen met geldige JSON."
-    : "You are a senior vehicle purchase negotiation advisor. Respond only with valid JSON.";
+    ? "Je bent een ervaren, eerlijke onderhandelcoach die een leek helpt een tweedehands auto te kopen. Je schrijft menselijk en praktisch en verzint nooit gegevens. Gebruik nooit een lang streepje (em-streepje of en-streepje). Antwoord alleen met geldige JSON."
+    : "You are an experienced, honest negotiation coach helping a layperson buy a used car. You write in human, practical language and never invent data. Never use a long dash (em-dash or en-dash). Respond only with valid JSON.";
   const userPrompt = isNl
     ? `Maak een koper-gerichte onderhandelstrategie voor dit voertuig.
 Geef exact dit JSON-formaat:
@@ -404,9 +408,10 @@ Geef exact dit JSON-formaat:
   "talkingPoints": ["..."]
 }
 Regels:
-- script: 120-180 woorden, overtuigend en praktisch
-- talkingPoints: 4-8 concrete punten met bewijs uit data
-- gebruik de context-ranges letterlijk als basis
+- script: 120-180 woorden, menselijk en praktisch, alsof je de koper coacht
+- talkingPoints: 4-8 concrete punten, elk onderbouwd met een echt signaal uit de data (kilometerstand, defecten, leeftijd, recall, gebruiksprofiel)
+- gebruik de context-ranges (bod, walk-away, reserve) letterlijk als basis
+- gebruik nooit een lang streepje (em-streepje of en-streepje)
 - geen markdown, alleen JSON
 DATA:
 ${payload}`
@@ -420,9 +425,10 @@ Return exactly this JSON shape:
   "talkingPoints": ["..."]
 }
 Rules:
-- script: 120-180 words, practical and convincing
-- talkingPoints: 4-8 concrete points tied to evidence
-- use provided context ranges explicitly
+- script: 120-180 words, human and practical, as if coaching the buyer
+- talkingPoints: 4-8 concrete points, each backed by a real signal from the data (mileage, defects, age, recall, usage profile)
+- use the provided context ranges (offer, walk-away, reserve) explicitly
+- never use a long dash (em-dash or en-dash)
 - no markdown, JSON only
 DATA:
 ${payload}`;
