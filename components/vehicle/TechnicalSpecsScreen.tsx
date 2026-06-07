@@ -181,6 +181,36 @@ export function TechnicalSpecsScreen({ plate }: Props) {
     const fuelKind = classifyFuel(v.fuelType);
     const consumptionUnit = fuelKind.isElectric && !fuelKind.isPetrol && !fuelKind.isDiesel ? "kWh/100km" : "L/100km";
 
+    // Low-emission-zone (milieuzone) guidance derived from the real Euro class +
+    // fuel. Dutch passenger-car milieuzones currently restrict mainly older diesels.
+    const euroMatch = (v.emissionStandard ?? "").match(/euro\s*([0-9])/i);
+    const euroClass = euroMatch ? Number(euroMatch[1]) : null;
+    const milieuzone: { value: string; meta: string } =
+      fuelKind.isElectric && !fuelKind.isPetrol && !fuelKind.isDiesel
+        ? {
+            value: locale === "nl" ? "Overal toegestaan (emissievrij)" : "Allowed everywhere (zero emission)",
+            meta: locale === "nl" ? "Elektrisch: geen beperking in milieuzones." : "Electric: no low-emission-zone restriction."
+          }
+        : fuelKind.isDiesel
+        ? euroClass != null && euroClass >= 4
+          ? {
+              value: locale === "nl" ? `Toegestaan (diesel Euro ${euroClass})` : `Allowed (diesel Euro ${euroClass})`,
+              meta: locale === "nl" ? "Voldoet aan de huidige milieuzones (diesel Euro 4 of hoger). Regels verschillen per gemeente." : "Meets current low-emission zones (diesel Euro 4 or higher). Rules vary per municipality."
+            }
+          : euroClass != null
+          ? {
+              value: locale === "nl" ? `Beperkt (diesel Euro ${euroClass})` : `Restricted (diesel Euro ${euroClass})`,
+              meta: locale === "nl" ? "Oudere diesel: kan geweerd worden uit milieuzones. Controleer per gemeente." : "Older diesel: may be banned from low-emission zones. Check per municipality."
+            }
+          : {
+              value: locale === "nl" ? "Mogelijk beperkt (diesel)" : "Possibly restricted (diesel)",
+              meta: locale === "nl" ? "Euro-klasse onbekend; oudere diesels worden soms geweerd. Controleer per gemeente." : "Euro class unknown; older diesels are sometimes banned. Check per municipality."
+            }
+        : {
+            value: locale === "nl" ? "Geen beperking verwacht" : "No restriction expected",
+            meta: locale === "nl" ? "Benzine/hybride: huidige milieuzones richten zich vooral op oude diesels. Controleer per gemeente." : "Petrol/hybrid: current zones mainly target older diesels. Check per municipality."
+          };
+
     const performanceSpecs = [
       { id: "power", label: locale === "nl" ? "Motorvermogen" : "Engine power", value: formatPower(v.engine?.powerKw), meta: locale === "nl" ? "Fabrieksopgave" : "Factory output", icon: Zap },
       { id: "displacement", label: locale === "nl" ? "Cilinderinhoud" : "Displacement", value: formatDisplacement(v.engine?.displacement), icon: Settings },
@@ -192,6 +222,7 @@ export function TechnicalSpecsScreen({ plate }: Props) {
       { id: "consumption", label: locale === "nl" ? "Verbruik" : "Fuel consumption", value: formatNumber(v.consumptionCombined, consumptionUnit), icon: Gauge },
       { id: "co2", label: locale === "nl" ? "CO2-uitstoot" : "CO2 emissions", value: formatNumber(v.co2, "g/km"), icon: Leaf },
       { id: "emission", label: locale === "nl" ? "Emissienorm" : "Emission standard", value: v.emissionStandard ?? null, icon: Leaf },
+      { id: "milieuzone", label: locale === "nl" ? "Milieuzone-toegang" : "Low-emission zone", value: milieuzone.value, meta: milieuzone.meta, icon: Leaf },
       { id: "energy", label: locale === "nl" ? "Energielabel" : "Energy label", value: v.energyLabel ?? null, icon: Leaf }
     ].filter((spec) => spec.value) as Array<{ id: string; label: string; value: string; meta?: string; icon: ElementType }>;
 
