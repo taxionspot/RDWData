@@ -66,7 +66,11 @@ export function DamageHistoryScreen({ plate }: Props) {
   );
 
   const damageEvents = useMemo(() => {
-    const source = defects.length > 0 ? defects : inspections;
+    // Only the actual RDW/APK defect records count as "damage". We deliberately do
+    // NOT fall back to the full inspection list, which would repeat every APK
+    // keuring (including clean passes) as a fake damage event and duplicate what
+    // the inspection timeline already shows.
+    const source = defects;
     return source
       .map((row, index) => {
         const code = String(row.gebrek_identificatie ?? row.gebrek_identificatienummer ?? "").trim();
@@ -93,7 +97,7 @@ export function DamageHistoryScreen({ plate }: Props) {
         if (Number.isNaN(ad) || Number.isNaN(bd)) return 0;
         return bd - ad;
       });
-  }, [defects, inspections, defectDescriptions, isNl]);
+  }, [defects, defectDescriptions, isNl]);
 
   const legendItems = [
     { id: "minor", label: isNl ? "Inspectierecords" : "Inspection records", count: String(inspections.length) },
