@@ -101,7 +101,10 @@ export function MarketAnalysisScreen({ plate }: Props) {
   }, [mileageValue, data?.vehicle]);
 
   const valuation = useMemo(() => {
-    if (!data?.vehicle) return null;
+    // With no user-entered mileage, defer to the server's canonical (mileage-aware)
+    // valuation below so the market screen matches the hero and PDF, instead of
+    // recomputing a higher value that ignores the car's mileage.
+    if (!data?.vehicle || appliedMileage == null) return null;
     const first = data.vehicle.firstRegistrationWorld ? new Date(data.vehicle.firstRegistrationWorld) : null;
     const ageYears =
       first && !Number.isNaN(first.getTime())
@@ -184,10 +187,13 @@ export function MarketAnalysisScreen({ plate }: Props) {
     const v = data.vehicle;
     const cond = data.enriched?.marketValueCondition ?? undefined;
     const slope = data.enriched?.mileageSlopeKmPerYear ?? 0;
+    // Default to the estimated current mileage so the trend is mileage-aware and
+    // its "today" point matches the canonical value; the user's input overrides it.
+    const baseMileage = appliedMileage ?? data.enriched?.estimatedMileageNow ?? null;
     return offsets.map((k) => {
       const age = ageNow - k;
       if (age < 0.4) return { label: labelFor(k), value: null };
-      const mileage = appliedMileage != null ? Math.max(0, Math.round(appliedMileage - slope * k)) : null;
+      const mileage = baseMileage != null ? Math.max(0, Math.round(baseMileage - slope * k)) : null;
       const res = computeMarketValueV3({
         catalogPrice: v.cataloguePrice,
         ageYears: age,

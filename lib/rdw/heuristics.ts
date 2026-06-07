@@ -748,7 +748,11 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     brand: v.brand,
     fuelType: v.fuelType,
     bodyType: v.bodyType,
-    mileage: mileageEst.latestMileage ?? mileageEst.estimatedMileageNow,
+    // Use the ESTIMATED current mileage (extrapolated to today by the mileage
+    // estimator) as the valuation input, per the market-value spec which keys off
+    // current km. Fall back to the last recorded APK reading only when we cannot
+    // extrapolate. This stops high-mileage cars (e.g. ex-taxis) being overvalued.
+    mileage: mileageEst.estimatedMileageNow ?? mileageEst.latestMileage,
     condition: valuationCondition
   });
 
