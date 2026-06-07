@@ -161,24 +161,32 @@ export function InspectionTimelineScreen({ plate }: Props) {
     }
 
     const mapped = Array.from(inspectionByDate.values()).map((entry, index) => {
-      const result: InspectionEvent["result"] = entry.results.has("fail")
-        ? "fail"
-        : entry.results.has("advisory")
-        ? "advisory"
-        : "pass";
-
       const defects = Array.from(defectsByDate.get(entry.date)?.entries() ?? []).map(([code]) => ({
         code,
         description: data.defectDescriptions[code] ?? (locale === "nl" ? "Defect vastgelegd" : "Defect recorded"),
         recurring: (defectCounts[code] ?? 0) > 1
       }));
 
+      // RDW rarely exposes a clean pass/fail flag per keuring, so derive the outcome
+      // from the real signals: an explicit rejection stays "fail", and any keuring
+      // with recorded defects is surfaced as "advisory" (findings noted) instead of
+      // a clean pass. Only a keuring with no defects at all is a clean pass.
+      const result: InspectionEvent["result"] = entry.results.has("fail")
+        ? "fail"
+        : defects.length > 0 || entry.results.has("advisory")
+        ? "advisory"
+        : "pass";
+
       const notes = result === "fail"
         ? locale === "nl"
           ? "Deze keuring is afgekeurd en vraagt om extra controle."
           : "This inspection failed and should be reviewed carefully."
         : result === "advisory"
-        ? locale === "nl"
+        ? defects.length > 0
+          ? locale === "nl"
+            ? "Bij deze keuring zijn defecten gemeld; controleer of ze inmiddels zijn verholpen."
+            : "Defects were reported at this inspection; check whether they have since been fixed."
+          : locale === "nl"
           ? "Goedgekeurd met adviespunten; controleer terugkerende issues."
           : "Passed with advisories; review recurring issues."
         : locale === "nl"
@@ -205,8 +213,10 @@ export function InspectionTimelineScreen({ plate }: Props) {
     .flatMap((event) => event.defects)
     .find((defect) => defect.recurring)?.description;
 
+  // Share of fully clean inspections (no defects, not failed). Defects lower it,
+  // so a car with reported defects never shows a misleading 100%.
   const passRate = events.length
-    ? Math.round((events.filter((event) => event.result !== "fail").length / events.length) * 100)
+    ? Math.round((events.filter((event) => event.result === "pass").length / events.length) * 100)
     : 0;
 
   // Roadworthiness from the REAL APK pass-rate (non-fail inspections), minus a
@@ -291,7 +301,7 @@ export function InspectionTimelineScreen({ plate }: Props) {
                   <div className={styles.progressFill} style={{ width: roadworthiness != null ? `${roadworthiness}%` : "0%" }} />
                 </div>
                 <div className={styles.statusMeta}>
-                  <span>{locale === "nl" ? "Verkeersveiligheidsvertrouwen (APK-slaagratio)" : "Roadworthiness (APK pass-rate)"}</span>
+                  <span>{locale === "nl" ? "Aandeel schone keuringen" : "Clean inspection rate"}</span>
                   <span>{roadworthiness != null ? `${roadworthiness}%` : "-"}</span>
                 </div>
               </div>
@@ -351,7 +361,7 @@ export function InspectionTimelineScreen({ plate }: Props) {
                 : "A quick risk summary based on outcomes, mileage consistency, and repeated defect themes across the visible record."}
             </div>
             <div className={styles.signalCard}>
-              <div className={styles.signalLabel}>{locale === "nl" ? "Slaagpercentage" : "Pass rate"}</div>
+              <div className={styles.signalLabel}>{locale === "nl" ? "Schone keuringen" : "Clean inspections"}</div>
               <div className={styles.signalValue}>{passRate}%</div>
             </div>
             <div className={styles.signalCard}>
@@ -361,11 +371,14 @@ export function InspectionTimelineScreen({ plate }: Props) {
             <div className={styles.signalCard}>
               <div className={styles.signalLabel}>{locale === "nl" ? "Meest zorgwekkend event" : "Highest concern event"}</div>
               <div className={styles.signalValue}>
-                {events.find((event) => event.result === "fail")?.date
-                  ? formatDate(events.find((event) => event.result === "fail")?.date ?? "", locale)
-                  : locale === "nl"
-                  ? "Geen afgekeurde inspecties"
-                  : "No failed inspections"}
+                {(() => {
+                  const concern = events.find((event) => event.result !== "pass");
+                  return concern
+                    ? formatDate(concern.date, locale)
+                    : locale === "nl"
+                    ? "Geen defecten gemeld"
+                    : "No defects reported";
+                })()}
               </div>
             </div>
           </div>
