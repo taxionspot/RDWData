@@ -51,6 +51,7 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
   }
   let aiInsights;
   let aiValuation;
+  let aiSource: "ai" | "fallback" = "ai";
   try {
     const aiReport = await getOrGenerateVehicleAiReport({
       plate,
@@ -67,6 +68,7 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
     const fallback = buildFallbackVehicleAiReport({ locale, vehicleData: localized });
     aiInsights = fallback.insights;
     aiValuation = fallback.valuation;
+    aiSource = "fallback";
   }
 
   // Consolidate to ONE canonical headline value. The model valuation (enriched)
@@ -88,7 +90,7 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
     localized.enriched = { ...enriched, marketValueSource: "model" };
   }
 
-  return { localized, aiInsights, aiValuation };
+  return { localized, aiInsights, aiValuation, aiSource };
 }
 
 async function trackReportIfUserLoggedIn(args: {
@@ -169,7 +171,7 @@ export async function GET(request: Request, { params }: Params) {
       return NextResponse.json(localized);
     }
 
-    const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
+    const { localized, aiInsights, aiValuation, aiSource } = await buildLocalizedWithAi(plate, locale, userMileage);
 
     if (downloadReport) {
       const hasAccess = await hasPaidPlateAccess(plate);
@@ -182,7 +184,8 @@ export async function GET(request: Request, { params }: Params) {
         generatedAt: new Date(),
         data: localized,
         aiInsights,
-        aiValuation
+        aiValuation,
+        aiSource
       });
       await trackReportIfUserLoggedIn({ plate, locale, channel: "download" });
       return new NextResponse(new Uint8Array(pdf), {
@@ -196,7 +199,8 @@ export async function GET(request: Request, { params }: Params) {
     return NextResponse.json({
       ...localized,
       aiInsights,
-      aiValuation
+      aiValuation,
+      aiSource
     });
   } catch (error) {
     return errorResponse(error, "Unknown lookup error.");
@@ -218,7 +222,7 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Payment required for report email.", code: "PAYMENT_REQUIRED" }, { status: 402 });
     }
 
-    const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, null);
+    const { localized, aiInsights, aiValuation, aiSource } = await buildLocalizedWithAi(plate, locale, null);
     const html = generateVehicleReportHtml({
       plate,
       locale,
@@ -229,7 +233,8 @@ export async function POST(request: Request, { params }: Params) {
       },
       data: localized,
       aiInsights,
-      aiValuation
+      aiValuation,
+      aiSource
     });
     const pdf = await generateVehicleReportPdf({
       plate,
@@ -237,7 +242,8 @@ export async function POST(request: Request, { params }: Params) {
       generatedAt: new Date(),
       data: localized,
       aiInsights,
-      aiValuation
+      aiValuation,
+      aiSource
     });
     const result = await sendReportEmail({
       to: email,

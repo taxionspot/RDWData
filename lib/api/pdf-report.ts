@@ -15,6 +15,7 @@ type ReportArgs = {
   data: Record<string, unknown>;
   aiInsights?: AiInsights | null;
   aiValuation?: AiValuation | null;
+  aiSource?: "ai" | "fallback";
 };
 
 type Row = Record<string, unknown>;
@@ -688,6 +689,19 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     if (aiInsights.recommendations.length > 0) {
       layout.keyValue(locale === "nl" ? "Concrete vervolgstappen" : "Concrete next steps", aiInsights.recommendations.join(" | "));
     }
+  }
+
+  if (aiValuation || aiInsights) {
+    layout.keyValue(
+      locale === "nl" ? "Let op" : "Note",
+      args.aiSource === "fallback"
+        ? locale === "nl"
+          ? "Automatisch gegenereerd omdat de AI-analyse tijdelijk niet beschikbaar was. Indicatie op basis van RDW-data, geen taxatie of garantie."
+          : "Automatically generated because the AI analysis was temporarily unavailable. An indication based on RDW data, not an appraisal or guarantee."
+        : locale === "nl"
+        ? "AI-advies op basis van de RDW-data: een indicatie, geen taxatie of garantie. Combineer altijd met een fysieke inspectie en proefrit."
+        : "AI guidance based on the RDW data: an indication, not an appraisal or guarantee. Always combine it with a physical inspection and test drive."
+    );
   }
 
   layout.section(locale === "nl" ? "Brondata samenvatting" : "Source Data Summary");

@@ -27,8 +27,9 @@ export function generateVehicleReportHtml(args: {
   data: unknown;
   aiInsights?: AiInsights | null;
   aiValuation?: AiValuation | null;
+  aiSource?: "ai" | "fallback";
 }): string {
-  const { plate, locale, generatedAt, score, data, aiInsights, aiValuation } = args;
+  const { plate, locale, generatedAt, score, data, aiInsights, aiValuation, aiSource } = args;
   const d = data as Record<string, unknown>;
   const vehicle = (d.vehicle ?? {}) as Record<string, unknown>;
   const enriched = (d.enriched ?? {}) as Record<string, unknown>;
@@ -203,6 +204,19 @@ export function generateVehicleReportHtml(args: {
   </table>
   ${aiValuationSection}
   ${aiSummarySection}
+  ${
+    aiInsights || aiValuation
+      ? `<p style="color:#64748b;font-size:11px;line-height:1.5;">${escape(
+          aiSource === "fallback"
+            ? locale === "nl"
+              ? "AI-secties zijn automatisch gegenereerd omdat de AI-analyse tijdelijk niet beschikbaar was. Indicatie op basis van RDW-data, geen taxatie of garantie."
+              : "AI sections were generated automatically because the AI analysis was temporarily unavailable. An indication based on RDW data, not an appraisal or guarantee."
+            : locale === "nl"
+            ? "AI-advies op basis van RDW-data: een indicatie, geen taxatie of garantie. Combineer altijd met een fysieke inspectie en proefrit."
+            : "AI guidance based on RDW data: an indication, not an appraisal or guarantee. Always combine it with a physical inspection and test drive."
+        )}</p>`
+      : ""
+  }
   <h2>${escape(locale === "nl" ? "Disclaimer" : "Disclaimer")}</h2>
   <p style="color:#64748b;font-size:11px;line-height:1.5;">${escape(
     locale === "nl"

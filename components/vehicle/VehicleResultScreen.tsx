@@ -467,6 +467,9 @@ export function VehicleResultScreen({ plate }: Props) {
   // Mobile-only sticky unlock bar: shown while the report is locked, hidden once
   // paid or while the checkout modal itself is open.
   const showStickyCta = settings.paymentEnabled && !isPaidForPlate && !showPayment;
+  // The headline value only falls back to the AI estimate when the data-model
+  // value is unavailable; label it as AI so it's never mistaken for a hard figure.
+  const valueIsAi = e.estimatedValueNow == null && claudeValue != null;
 
   const downloadReport = async (emailOverride?: string | null) => {
     if (isDownloading) return;
@@ -713,7 +716,7 @@ export function VehicleResultScreen({ plate }: Props) {
               />
               <InsightCard
                 icon={Coins}
-                title={locale === "nl" ? "Geschatte waarde" : "Estimated value"}
+                title={locale === "nl" ? `Geschatte waarde${valueIsAi ? " (AI)" : ""}` : `Estimated value${valueIsAi ? " (AI)" : ""}`}
                 value={formatCurrency(e.estimatedValueNow ?? claudeValue)}
                 isLoading={isCalculatingClaude && e.estimatedValueNow == null && claudeValue == null}
               />
