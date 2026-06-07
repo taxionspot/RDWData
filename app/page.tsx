@@ -108,7 +108,7 @@ function PlateSearch() {
               setError(null);
             }}
             onKeyDown={(event) => event.key === "Enter" && submit()}
-            placeholder={t("landing.example")}
+            placeholder="16-RSL-9"
             className={styles["plate-input"]}
           />
         </div>

@@ -63,23 +63,18 @@ export default function ContactPage() {
             <dd className="font-semibold text-slate-900 sm:mt-0.5">Kentekenrapport</dd>
           </div>
           <div className="flex justify-between gap-4 sm:block">
-            <dt className="text-slate-500">{nl ? "Onderneming" : "Legal entity"}</dt>
-            <dd className="font-semibold text-slate-900 sm:mt-0.5">Taxionspot</dd>
-          </div>
-          <div className="flex justify-between gap-4 sm:block">
             <dt className="text-slate-500">KVK</dt>
             <dd className="font-semibold text-slate-900 sm:mt-0.5">65752376</dd>
+          </div>
+          <div className="flex justify-between gap-4 sm:block">
+            <dt className="text-slate-500">{nl ? "Adres" : "Address"}</dt>
+            <dd className="font-semibold text-slate-900 sm:mt-0.5">Pastoor Petersstraat 170-46, 5612 LW Eindhoven</dd>
           </div>
           <div className="flex justify-between gap-4 sm:block">
             <dt className="text-slate-500">{nl ? "E-mail" : "Email"}</dt>
             <dd className="font-semibold text-slate-900 sm:mt-0.5">info@kentekenrapport.com</dd>
           </div>
         </dl>
-        <p className="mt-4 text-xs text-slate-400">
-          {nl
-            ? "Kentekenrapport is de handelsnaam van Taxionspot."
-            : "Kentekenrapport is the trade name of Taxionspot."}
-        </p>
       </div>
     </div>
   );
