@@ -4,6 +4,8 @@ import { CmsPageModel } from "@/models/CmsPage";
 import { ensureLegalPages } from "@/lib/cms/legal-pages";
 
 export const runtime = "nodejs";
+// Reads/seeds CMS content from the database, so it must run per request.
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   await connectMongo();

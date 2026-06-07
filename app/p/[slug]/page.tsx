@@ -3,6 +3,10 @@ import { connectMongo } from "@/lib/db/mongodb";
 import { CmsPageModel } from "@/models/CmsPage";
 import { ensureLegalPages } from "@/lib/cms/legal-pages";
 
+export const runtime = "nodejs";
+// Depends on the database (CMS content), so render at request time.
+export const dynamic = "force-dynamic";
+
 type Params = { params: { slug: string } };
 
 export default async function CmsPage({ params }: Params) {

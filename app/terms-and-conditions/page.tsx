@@ -4,6 +4,9 @@ import { CmsPageModel } from "@/models/CmsPage";
 import { ensureLegalPages } from "@/lib/cms/legal-pages";
 
 export const runtime = "nodejs";
+// Depends on the database (CMS content), so render at request time instead of
+// prerendering at build (which would otherwise need DB access during the build).
+export const dynamic = "force-dynamic";
 
 export default async function TermsAndConditionsPage() {
   await connectMongo();
