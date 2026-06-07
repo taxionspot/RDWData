@@ -640,11 +640,11 @@ export function VehicleResultScreen({ plate }: Props) {
       : "Needs review";
   const ownersLabel = v.owners.count
     ? locale === "nl"
-      ? `${v.owners.count} tenaamstellingen`
-      : `${v.owners.count} registrations`
+      ? `${v.owners.count} ${v.owners.count === 1 ? "eigenaar" : "eigenaren"}`
+      : `${v.owners.count} ${v.owners.count === 1 ? "owner" : "owners"}`
     : locale === "nl"
-    ? "Onbekend"
-    : "Unknown";
+    ? "Niet bij RDW bekend"
+    : "Not provided by RDW";
   const marketLabel = e.estimatedValueNow
     ? locale === "nl"
       ? "Stabiele vraag"
