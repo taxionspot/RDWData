@@ -63,7 +63,12 @@ function loadPaypalScript(clientId: string, currency: string): Promise<void> {
 
 export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR", onSuccess, onError }: Props) {
   const [ready, setReady] = useState(false);
-  const renderedRef = useRef(false);
+
+  // Keep the latest props in a ref so the buttons are rendered ONCE and never
+  // torn down when the user types their email (which changes `email`, and makes
+  // the parent pass freshly-created onSuccess/onError callbacks each keystroke).
+  const latest = useRef({ plate, email, amount, currency, onSuccess, onError });
+  latest.current = { plate, email, amount, currency, onSuccess, onError };
 
   const walletRef = useRef<HTMLDivElement | null>(null); // Apple Pay / Google Pay
   const paypalRef = useRef<HTMLDivElement | null>(null);
@@ -72,7 +77,9 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
   const bancontactRef = useRef<HTMLDivElement | null>(null);
 
   // Shared order lifecycle (same create/capture endpoints for every method).
+  // Always reads the latest props from the ref.
   const createOrder = async (): Promise<string> => {
+    const { plate, amount, currency } = latest.current;
     const response = await fetch("/api/payments/paypal/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -88,6 +95,7 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
   };
 
   const captureOrder = async (orderId: string): Promise<void> => {
+    const { plate, email } = latest.current;
     const response = await fetch("/api/payments/paypal/capture-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -99,28 +107,33 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
     }
   };
 
+  // Load the SDK once.
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? "";
     if (!clientId) {
-      onError("Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID.");
+      latest.current.onError("Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID.");
       return;
     }
     let active = true;
-    loadPaypalScript(clientId, currency)
+    loadPaypalScript(clientId, latest.current.currency)
       .then(() => {
         if (active) setReady(true);
       })
-      .catch((err) => onError(err instanceof Error ? err.message : "PayPal SDK failed to load."));
+      .catch((err) => latest.current.onError(err instanceof Error ? err.message : "PayPal SDK failed to load."));
     return () => {
       active = false;
     };
-  }, [currency, onError]);
+    // Run once; values are read from the ref so typing never reloads the SDK.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Render the buttons once the SDK is ready. Depends ONLY on `ready` so typing
+  // the email never re-runs this and never tears the buttons down.
   useEffect(() => {
-    if (!ready || !window.paypal || renderedRef.current) return;
-    renderedRef.current = true;
+    if (!ready || !window.paypal) return;
     const paypal = window.paypal;
     const instances: Array<{ close?: () => void }> = [];
+    const containers = [walletRef, paypalRef, idealRef, cardRef, bancontactRef];
 
     // --- Standard funding buttons (PayPal, iDEAL, card, Bancontact) ---
     const standard: Array<[string, HTMLDivElement | null]> = [
@@ -138,9 +151,10 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
           createOrder,
           onApprove: async ({ orderID }: { orderID: string }) => {
             await captureOrder(orderID);
-            onSuccess();
+            latest.current.onSuccess();
           },
-          onError: (err: unknown) => onError(err instanceof Error ? err.message : "PayPal checkout failed.")
+          onError: (err: unknown) =>
+            latest.current.onError(err instanceof Error ? err.message : "PayPal checkout failed.")
         });
         if (button.isEligible && button.isEligible()) {
           void button.render(container);
@@ -160,7 +174,9 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
         if (!cfg?.allowedPaymentMethods) return;
         await loadScript(GPAY_SCRIPT_ID, "https://pay.google.com/gp/p/js/pay.js");
         if (!window.google?.payments?.api) return;
-        const client = new window.google.payments.api.PaymentsClient({ environment: PAYPAL_ENV === "live" ? "PRODUCTION" : "TEST" });
+        const client = new window.google.payments.api.PaymentsClient({
+          environment: PAYPAL_ENV === "live" ? "PRODUCTION" : "TEST"
+        });
         const readyToPay = await client.isReadyToPay({
           apiVersion: cfg.apiVersion,
           apiVersionMinor: cfg.apiVersionMinor,
@@ -179,8 +195,8 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
                 merchantInfo: cfg.merchantInfo,
                 transactionInfo: {
                   totalPriceStatus: "FINAL",
-                  totalPrice: String(amount),
-                  currencyCode: currency,
+                  totalPrice: String(latest.current.amount),
+                  currencyCode: latest.current.currency,
                   countryCode: cfg.countryCode ?? "NL"
                 }
               });
@@ -188,12 +204,12 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
               const confirm = await gp.confirmOrder({ orderId, paymentMethodData: paymentData.paymentMethodData });
               if (confirm?.status === "APPROVED" || confirm?.status === "PAYER_ACTION_REQUIRED") {
                 await captureOrder(orderId);
-                onSuccess();
+                latest.current.onSuccess();
               } else {
-                onError("Google Pay payment was not approved.");
+                latest.current.onError("Google Pay payment was not approved.");
               }
             } catch (err) {
-              onError(err instanceof Error ? err.message : "Google Pay checkout failed.");
+              latest.current.onError(err instanceof Error ? err.message : "Google Pay checkout failed.");
             }
           }
         });
@@ -226,10 +242,10 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
           try {
             const session = new window.ApplePaySession(4, {
               countryCode: cfg.countryCode ?? "NL",
-              currencyCode: currency,
+              currencyCode: latest.current.currency,
               merchantCapabilities: cfg.merchantCapabilities ?? ["supports3DS"],
               supportedNetworks: cfg.supportedNetworks ?? ["visa", "masterCard", "amex"],
-              total: { label: "Kentekenrapport", amount: String(amount) }
+              total: { label: "Kentekenrapport", amount: String(latest.current.amount) }
             });
             session.onvalidatemerchant = async (event: any) => {
               try {
@@ -237,24 +253,28 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
                 session.completeMerchantValidation(validation.merchantSession);
               } catch (err) {
                 session.abort();
-                onError(err instanceof Error ? err.message : "Apple Pay validation failed.");
+                latest.current.onError(err instanceof Error ? err.message : "Apple Pay validation failed.");
               }
             };
             session.onpaymentauthorized = async (event: any) => {
               try {
                 const orderId = await createOrder();
-                await ap.confirmOrder({ orderId, token: event.payment.token, billingContact: event.payment.billingContact });
+                await ap.confirmOrder({
+                  orderId,
+                  token: event.payment.token,
+                  billingContact: event.payment.billingContact
+                });
                 await captureOrder(orderId);
                 session.completePayment(window.ApplePaySession.STATUS_SUCCESS);
-                onSuccess();
+                latest.current.onSuccess();
               } catch (err) {
                 session.completePayment(window.ApplePaySession.STATUS_FAILURE);
-                onError(err instanceof Error ? err.message : "Apple Pay checkout failed.");
+                latest.current.onError(err instanceof Error ? err.message : "Apple Pay checkout failed.");
               }
             };
             session.begin();
           } catch (err) {
-            onError(err instanceof Error ? err.message : "Apple Pay could not start.");
+            latest.current.onError(err instanceof Error ? err.message : "Apple Pay could not start.");
           }
         };
         walletRef.current.appendChild(btn);
@@ -271,8 +291,13 @@ export function PayPalCheckout({ plate, email, amount = "6.95", currency = "EUR"
           // no-op
         }
       });
+      // Clear any wallet DOM we appended so a remount renders cleanly.
+      containers.forEach((ref) => {
+        if (ref.current) ref.current.innerHTML = "";
+      });
     };
-  }, [ready, plate, email, amount, currency, onSuccess, onError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0px" }}>
