@@ -139,7 +139,6 @@ export async function generateVehicleComparisonAi(args: {
     const response = await client.messages.create({
       model,
       max_tokens: 1200,
-      temperature: 0.1,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }]
     });

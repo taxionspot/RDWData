@@ -5,7 +5,7 @@ import { errorResponse } from "@/lib/api/errors";
 import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
 import { buildFallbackVehicleAiReport } from "@/lib/api/claude";
-import { getOrGenerateVehicleAiReport } from "@/lib/api/ai-report-cache";
+import { getOrGenerateVehicleReport, reportToLegacy, type VehicleReport } from "@/lib/agents";
 import { connectMongo } from "@/lib/db/mongodb";
 import { hasPaidPlateAccess } from "@/lib/payments/server-access";
 import { generateVehicleReportHtml } from "@/lib/api/report-template";
@@ -52,18 +52,13 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
   let aiInsights;
   let aiValuation;
   let aiSource: "ai" | "fallback" = "ai";
+  let report: VehicleReport | undefined;
   try {
-    const aiReport = await getOrGenerateVehicleAiReport({
-      plate,
-      locale,
-      mileage: userMileage,
-      vehicleData: {
-        ...localized,
-        userContext: userMileage !== null ? { mileageInput: userMileage } : undefined
-      }
-    });
-    aiInsights = aiReport.insights;
-    aiValuation = aiReport.valuation;
+    report = await getOrGenerateVehicleReport({ plate, locale, mileage: userMileage, vehicleData: localized });
+    const legacy = reportToLegacy(report, plate, locale, localized);
+    aiInsights = legacy.insights;
+    aiValuation = legacy.valuation;
+    aiSource = report.aiSource === "fallback" ? "fallback" : "ai";
   } catch {
     const fallback = buildFallbackVehicleAiReport({ locale, vehicleData: localized });
     aiInsights = fallback.insights;
@@ -90,7 +85,7 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
     localized.enriched = { ...enriched, marketValueSource: "model" };
   }
 
-  return { localized, aiInsights, aiValuation, aiSource };
+  return { localized, aiInsights, aiValuation, aiSource, report };
 }
 
 async function trackReportIfUserLoggedIn(args: {
@@ -171,7 +166,7 @@ export async function GET(request: Request, { params }: Params) {
       return NextResponse.json(localized);
     }
 
-    const { localized, aiInsights, aiValuation, aiSource } = await buildLocalizedWithAi(plate, locale, userMileage);
+    const { localized, aiInsights, aiValuation, aiSource, report } = await buildLocalizedWithAi(plate, locale, userMileage);
 
     if (downloadReport) {
       const hasAccess = await hasPaidPlateAccess(plate);
@@ -200,7 +195,8 @@ export async function GET(request: Request, { params }: Params) {
       ...localized,
       aiInsights,
       aiValuation,
-      aiSource
+      aiSource,
+      report
     });
   } catch (error) {
     return errorResponse(error, "Unknown lookup error.");
