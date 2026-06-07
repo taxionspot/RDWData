@@ -241,7 +241,6 @@ export function MarketAnalysisScreen({ plate }: Props) {
           : "-"
     },
     { label: locale === "nl" ? "Brandstofschatting / maand" : "Fuel est. / month", value: formatCurrency(enriched.fuelEstMonth) },
-    { label: locale === "nl" ? "Verzekering schatting / maand" : "Insurance est. / month", value: formatCurrency(enriched.insuranceEstMonth) },
     { label: locale === "nl" ? "Onderhoudsrisico" : "Maintenance risk", value: `${enriched.maintenanceRiskScore.toFixed(1)} / 10` }
   ];
   const displayPlate = formatDisplayPlate(normalized);

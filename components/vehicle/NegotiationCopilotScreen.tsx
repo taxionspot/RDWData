@@ -210,6 +210,12 @@ export function NegotiationCopilotScreen({ plate }: Props) {
             </div>
           </div>
 
+          <p style={{ margin: "0 0 4px", fontSize: 13, lineHeight: 1.5, color: "#64748b" }}>
+            {locale === "nl"
+              ? "Hoe berekend: de biedrange komt uit onze marktwaarde (onder- en bovengrens), bijgesteld voor risicosignalen zoals defecten, recalls, onderhoudsrisico en een afwijkende kilometerstand. De reparatiereserve schaalt mee met die signalen."
+              : "How this is calculated: the offer range comes from our market value (lower and upper bound), adjusted for risk signals such as defects, recalls, maintenance risk, and any mileage mismatch. The repair reserve scales with those signals."}
+          </p>
+
           <div className={styles.interactiveChartCard}>
             <h3>{locale === "nl" ? "Visuele biedstrategie" : "Visual offer strategy"}</h3>
             <div className={styles.chartWrapper}>
