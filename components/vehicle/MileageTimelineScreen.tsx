@@ -1,12 +1,12 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   FileCheck2,
-  UserPlus,
-  Wrench
+  Gauge,
+  UserPlus
 } from "lucide-react";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 import styles from "./MileageTimelineScreen.module.css";
@@ -28,14 +28,14 @@ const USAGE_LABELS: Record<string, { nl: string; en: string }> = {
 };
 
 // Plain-language explanation of the mileage/NAP verdict, driven by the REAL
-// RDW verdict (and our APK-based verdict) — never a fixed optimistic message.
+// RDW verdict — never a fixed optimistic message.
 function mileageVerdictCopy(
   napVerdict: string | null,
   mileageVerdict: string | null | undefined,
   locale: "nl" | "en"
 ): { label: string; explanation: string; ok: boolean } {
   const nap = (napVerdict ?? "").toLowerCase();
-  const illogical = nap.includes("onlogisch") || mileageVerdict === "ONLOGISCH";
+  const illogical = nap.includes("onlogisch") || nap.includes("implausible") || mileageVerdict === "ONLOGISCH";
   const doubtful = nap.includes("twijfel") || mileageVerdict === "TWIJFELACHTIG";
   if (illogical) {
     return {
@@ -57,13 +57,13 @@ function mileageVerdictCopy(
       ok: false
     };
   }
-  if (nap.includes("logisch")) {
+  if (nap.includes("logisch") || nap.includes("plausible")) {
     return {
-      label: locale === "nl" ? "Logisch" : "Logical",
+      label: locale === "nl" ? "Logisch" : "Plausible",
       explanation:
         locale === "nl"
-          ? "De geregistreerde kilometerstanden lopen logisch op; geen aanwijzing voor terugdraaien (RDW NAP-controle)."
-          : "Recorded odometer readings increase logically; no sign of a rollback (RDW NAP check).",
+          ? "Het RDW NAP-oordeel is 'Logisch': de bij keuringen geregistreerde standen lopen logisch op, geen aanwijzing voor terugdraaien."
+          : "The RDW NAP verdict is 'Plausible': the readings recorded at inspections increase logically, with no sign of a rollback.",
       ok: true
     };
   }
@@ -71,24 +71,24 @@ function mileageVerdictCopy(
     label: locale === "nl" ? "Geen oordeel" : "No verdict",
     explanation:
       locale === "nl"
-        ? "Er is (nog) geen NAP-oordeel beschikbaar voor dit voertuig. Beoordeel de kilometerstanden hieronder zelf."
-        : "No NAP verdict is available (yet) for this vehicle. Review the odometer readings below yourself.",
+        ? "Er is (nog) geen NAP-oordeel beschikbaar voor dit voertuig. Beoordeel de werkelijke kilometerstand zelf bij bezichtiging."
+        : "No NAP verdict is available (yet) for this vehicle. Check the actual odometer yourself when viewing the car.",
     ok: true
   };
 }
 
 type TimelineEvent = {
   id: string;
-  type: "apk" | "workshop" | "owner";
+  type: "apk" | "owner";
   title: string;
   date: string;
-  mileage: number | null;
+  modeledKm: number | null;
   description: string;
 };
 
 function formatNumber(value: number | null) {
   if (value === null || Number.isNaN(value)) return "-";
-  return value.toLocaleString("nl-NL");
+  return Math.round(value).toLocaleString("nl-NL");
 }
 
 function formatDate(value: string | null, locale: "nl" | "en") {
@@ -98,32 +98,19 @@ function formatDate(value: string | null, locale: "nl" | "en") {
   return new Intl.DateTimeFormat("nl-NL", { dateStyle: "medium" }).format(parsed);
 }
 
-function parseMileage(record: Record<string, unknown>): number | null {
-  const candidates = [
-    record.tellerstand,
-    record.km_stand,
-    record.kilometerstand,
-    record.mileage,
-    record.odo_reading
-  ];
-  for (const value of candidates) {
-    const num = Number(value);
-    if (Number.isFinite(num)) return num;
-  }
-  return null;
-}
-
-function parseDate(record: Record<string, unknown>): string | null {
+function parseEventDate(record: Record<string, unknown>): string | null {
   const candidates = [
     record.datum_keuring,
     record.datum_keuring_dt,
     record.meld_datum_door_keuringsinstantie,
+    record.meld_datum_door_keuringsinstantie_dt,
+    record.vervaldatum_keuring_dt,
     record.datum,
-    record.datum_dt,
-    record.datum_eerste_toelating
+    record.datum_dt
   ];
   for (const value of candidates) {
     if (typeof value === "string" && value) return value;
+    if (typeof value === "number" && value) return String(value);
   }
   return null;
 }
@@ -136,16 +123,10 @@ function normalizeDate(value: string | null): string | null {
   return value;
 }
 
-function parseEventType(record: Record<string, unknown>): "apk" | "workshop" | "owner" {
-  const raw = String(record.soort_keuring ?? record.soort_keuring_omschrijving ?? "").toLowerCase();
-  if (raw.includes("apk") || raw.includes("keuring")) return "apk";
-  if (raw.includes("werkplaats") || raw.includes("workshop")) return "workshop";
-  return "apk";
-}
+const YEAR_MS = 1000 * 60 * 60 * 24 * 365.25;
 
 function EventIcon({ type }: { type: TimelineEvent["type"] }) {
   if (type === "owner") return <UserPlus size={14} />;
-  if (type === "workshop") return <Wrench size={14} />;
   return <FileCheck2 size={14} />;
 }
 
@@ -164,171 +145,123 @@ export function MileageTimelineScreen({ plate }: Props) {
   const [actualKm, setActualKm] = useState("");
   const nl = locale === "nl";
 
+  // Our formula estimate (RDW publishes no odometer history, so this is modelled
+  // from age x usage; see lib/rdw/heuristics.ts).
+  const est = data?.enriched?.estimatedMileageNow ?? null;
+  const estMin = data?.enriched?.estimatedMileageMin ?? null;
+  const estMax = data?.enriched?.estimatedMileageMax ?? null;
+  const annual = data?.enriched?.mileageSlopeKmPerYear ?? null;
+  const usageProfile = data?.enriched?.mileageUsageProfile ?? null;
+  const usageLabel = usageProfile ? USAGE_LABELS[usageProfile]?.[locale] ?? usageProfile : null;
+
+  const actualKmValue = useMemo(() => {
+    const n = Number(actualKm.replace(/[^\d]/g, ""));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [actualKm]);
+
+  // The figure the trend is anchored to today: the buyer's reading wins over our
+  // estimate, so entering a value visibly changes the graph.
+  const anchorKm = actualKmValue ?? est;
+
+  const regDate = useMemo(() => {
+    const raw = data?.vehicle.firstRegistrationWorld;
+    if (!raw) return null;
+    const d = new Date(normalizeDate(raw) ?? raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }, [data?.vehicle.firstRegistrationWorld]);
+
+  const ageNow = useMemo(() => {
+    if (!regDate) return null;
+    return Math.max((Date.now() - regDate.getTime()) / YEAR_MS, 0.25);
+  }, [regDate]);
+
+  // RDW inspection events (dates only — RDW open data has no per-inspection km).
   const events = useMemo(() => {
-    if (!data?.inspections) return [] as TimelineEvent[];
+    const list: TimelineEvent[] = [];
+    const modeledAt = (date: Date) => {
+      if (!regDate || !ageNow || anchorKm == null) return null;
+      const t = Math.max((date.getTime() - regDate.getTime()) / YEAR_MS, 0);
+      return Math.max(0, Math.round(anchorKm * Math.min(t / ageNow, 1)));
+    };
 
-    const grouped = new Map<string, { date: string; mileage: number | null; type: TimelineEvent["type"] }>();
-
-    for (const record of data.inspections) {
-      const rawDate = parseDate(record);
-      const dateValue = normalizeDate(rawDate);
-      if (!dateValue) continue;
-      const mileage = parseMileage(record);
-      const type = parseEventType(record);
-
-      if (!grouped.has(dateValue)) {
-        grouped.set(dateValue, { date: dateValue, mileage, type });
-      } else if (grouped.get(dateValue)!.mileage === null && mileage !== null) {
-        grouped.get(dateValue)!.mileage = mileage;
-      }
-    }
-
-    const list: TimelineEvent[] = Array.from(grouped.values()).map((entry, index) => ({
-      id: `${entry.date}-${index}`,
-      type: entry.type,
-      title: entry.type === "workshop" ? (locale === "nl" ? "Werkplaatsrecord" : "Workshop Record") : locale === "nl" ? "APK-keuring" : "APK Inspection",
-      date: entry.date,
-      mileage: entry.mileage,
-      description: entry.type === "workshop"
-        ? locale === "nl"
-          ? "Onderhouds- en service-interval."
-          : "Maintenance and service interval."
-        : locale === "nl"
-        ? "Kilometerstand geregistreerd tijdens keuring."
-        : "Mileage recorded during inspection."
-    }));
-
-    if (data.vehicle.firstRegistrationWorld) {
+    if (regDate) {
       list.push({
         id: "first-registration",
         type: "owner",
-        title: locale === "nl" ? "Eerste registratie" : "First Registration",
-        date: data.vehicle.firstRegistrationWorld,
-        mileage: null,
-        description: locale === "nl" ? "Eerste toelating en registratie." : "Initial delivery and registration."
+        title: nl ? "Eerste registratie" : "First registration",
+        date: regDate.toISOString().slice(0, 10),
+        modeledKm: 0,
+        description: nl ? "Eerste toelating en registratie." : "Initial delivery and registration."
       });
     }
 
-    return list
-      .filter((event) => event.date)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [data, locale]);
-
-  const latestMileage = events.length ? events[events.length - 1].mileage : null;
-  const firstDate = events.length ? new Date(events[0].date).getTime() : null;
-  const lastDate = events.length ? new Date(events[events.length - 1].date).getTime() : null;
-  const avgAnnual = useMemo(() => {
-    if (!firstDate || !lastDate || !latestMileage) return null;
-    const years = Math.max((lastDate - firstDate) / (1000 * 60 * 60 * 24 * 365.25), 1);
-    return Math.round(latestMileage / years);
-  }, [firstDate, lastDate, latestMileage]);
-
-  const chartPoints = useMemo(() => {
-    if (!events.length) return [];
-    return events.map((event) => ({
-      date: event.date,
-      mileage: event.mileage ?? 0,
-      type: event.type
-    }));
-  }, [events]);
-
-  if (!isValid || isError) {
-    return (
-      <div className={styles.loadingScreen}>
-        <div className={styles.loadingCard}>{locale === "nl" ? "Voertuig niet gevonden." : "Vehicle not found."}</div>
-      </div>
-    );
-  }
-
-  if (isLoading || !data) {
-    return (
-      <div className={styles.loadingScreen}>
-        <div className={styles.loadingCard}>{locale === "nl" ? "Kilometertijdlijn laden..." : "Loading mileage timeline..."}</div>
-      </div>
-    );
-  }
-
-
-  const width = 800;
-  const height = 300;
-  const paddingLeft = 60;
-  const paddingBottom = 60;
-  const paddingTop = 20;
-  const paddingRight = 20;
-
-  const chartMileageMax = Math.max(...chartPoints.map((p) => p.mileage), 1);
-
-  const points = chartPoints.map((point, index) => {
-    const x =
-      paddingLeft +
-      (index / Math.max(chartPoints.length - 1, 1)) * (width - paddingLeft - paddingRight);
-    const y =
-      paddingTop +
-      (1 - point.mileage / chartMileageMax) * (height - paddingTop - paddingBottom);
-    return { ...point, x, y };
-  });
-
-  const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ");
-
-  const areaPath = points.length
-    ? `M ${points[0].x} ${height - paddingBottom} ${points
-        .map((point) => `L ${point.x} ${point.y}`)
-        .join(" ")} L ${points[points.length - 1].x} ${height - paddingBottom} Z`
-    : "";
-
-  const yLabels = [chartMileageMax, chartMileageMax * 0.66, chartMileageMax * 0.33, 0];
-
-  const verdict = mileageVerdictCopy(data.vehicle.napVerdict, data.enriched?.mileageVerdict, locale);
-
-  // Our extrapolated current-mileage estimate (from the weighted-regression model)
-  // plus an optional comparison against the reading the buyer enters.
-  const est = data.enriched?.estimatedMileageNow ?? null;
-  const estMin = data.enriched?.estimatedMileageMin ?? null;
-  const estMax = data.enriched?.estimatedMileageMax ?? null;
-  const usageProfile = data.enriched?.mileageUsageProfile ?? null;
-  const usageLabel = usageProfile ? USAGE_LABELS[usageProfile]?.[locale] ?? usageProfile : null;
-
-  const actualKmValue = (() => {
-    const n = Number(actualKm.replace(/[^\d]/g, ""));
-    return Number.isFinite(n) && n > 0 ? n : null;
-  })();
-
-  const comparison: { tone: "good" | "warn" | "bad" | "neutral"; message: string } | null = (() => {
-    if (actualKmValue == null) return null;
-    if (latestMileage != null && actualKmValue < latestMileage) {
-      return {
-        tone: "bad",
-        message: nl
-          ? `Let op: ${formatNumber(actualKmValue)} km is lager dan de laatst geregistreerde stand (${formatNumber(latestMileage)} km). Dit kan wijzen op een teruggedraaide teller.`
-          : `Warning: ${formatNumber(actualKmValue)} km is lower than the last recorded reading (${formatNumber(latestMileage)} km). This may indicate a rolled-back odometer.`
-      };
+    const seen = new Set<string>();
+    for (const record of data?.inspections ?? []) {
+      const dateValue = normalizeDate(parseEventDate(record as Record<string, unknown>));
+      if (!dateValue || seen.has(dateValue)) continue;
+      seen.add(dateValue);
+      const d = new Date(dateValue);
+      if (Number.isNaN(d.getTime())) continue;
+      list.push({
+        id: `apk-${dateValue}`,
+        type: "apk",
+        title: nl ? "APK-keuring" : "APK inspection",
+        date: dateValue,
+        modeledKm: modeledAt(d),
+        description: nl
+          ? "Keuringsmoment uit de RDW-historie."
+          : "Inspection event from the RDW history."
+      });
     }
-    if (est == null) {
-      return {
-        tone: "neutral",
-        message: nl
-          ? "We hebben te weinig keuringsdata om je opgave betrouwbaar te vergelijken."
-          : "We have too little inspection data to compare your reading reliably."
-      };
+
+    return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [data?.inspections, regDate, ageNow, anchorKm, nl]);
+
+  const apkCount = events.filter((e) => e.type === "apk").length;
+
+  // Model-based km trajectory: a straight line from 0 at registration to the
+  // anchor (our estimate, or the buyer's reading) today, sampled per year.
+  const trajectory = useMemo(() => {
+    if (!regDate || !ageNow || anchorKm == null) return [] as Array<{ year: number; km: number }>;
+    const startYear = regDate.getFullYear();
+    const endYear = new Date().getFullYear();
+    const pts: Array<{ year: number; km: number }> = [];
+    for (let y = startYear; y <= endYear; y += 1) {
+      const t = Math.max((new Date(y, regDate.getMonth(), regDate.getDate()).getTime() - regDate.getTime()) / YEAR_MS, 0);
+      pts.push({ year: y, km: Math.max(0, Math.round(anchorKm * Math.min(t / ageNow, 1))) });
     }
+    // Ensure the final sample is exactly "today = anchor".
+    if (pts.length) pts[pts.length - 1] = { year: endYear, km: Math.round(anchorKm) };
+    return pts;
+  }, [regDate, ageNow, anchorKm]);
+
+  const comparison: { tone: "good" | "warn" | "bad" | "neutral"; message: string } | null = useMemo(() => {
+    if (actualKmValue == null || est == null) return null;
     if (estMin != null && estMax != null && actualKmValue >= estMin && actualKmValue <= estMax) {
       return {
         tone: "good",
         message: nl
-          ? `Dit komt overeen met onze schatting (~${formatNumber(est)} km). Geen opvallende afwijking.`
-          : `This matches our estimate (~${formatNumber(est)} km). No notable deviation.`
+          ? `Dit valt binnen onze schatting (${formatNumber(estMin)} - ${formatNumber(estMax)} km). Het kilometrage is in lijn met de leeftijd en het gebruik.`
+          : `This falls within our estimate (${formatNumber(estMin)} - ${formatNumber(estMax)} km). The mileage is in line with the age and usage.`
       };
     }
     const delta = actualKmValue - est;
+    const higher = delta > 0;
     return {
-      tone: "warn",
+      tone: higher ? "warn" : "good",
       message: nl
-        ? `Dit ligt ${formatNumber(Math.abs(delta))} km ${delta > 0 ? "hoger" : "lager"} dan onze schatting (~${formatNumber(est)} km). Vraag de verkoper om uitleg en facturen.`
-        : `This is ${formatNumber(Math.abs(delta))} km ${delta > 0 ? "above" : "below"} our estimate (~${formatNumber(est)} km). Ask the seller for an explanation and invoices.`
+        ? `Dit ligt ${formatNumber(Math.abs(delta))} km ${higher ? "boven" : "onder"} onze schatting (~${formatNumber(est)} km). ${
+            higher
+              ? "Meer kilometers betekent doorgaans een lagere marktwaarde; vraag de verkoper om onderhoudsfacturen."
+              : "Minder kilometers kan de waarde verhogen, maar controleer de stand en facturen op echtheid."
+          }`
+        : `This is ${formatNumber(Math.abs(delta))} km ${higher ? "above" : "below"} our estimate (~${formatNumber(est)} km). ${
+            higher
+              ? "Higher mileage usually means a lower market value; ask the seller for service invoices."
+              : "Lower mileage can raise the value, but verify the reading and invoices are genuine."
+          }`
     };
-  })();
+  }, [actualKmValue, est, estMin, estMax, nl]);
 
   const comparisonStyles: Record<string, { bg: string; color: string; border: string }> = {
     good: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
@@ -337,48 +270,98 @@ export function MileageTimelineScreen({ plate }: Props) {
     neutral: { bg: "#f1f5f9", color: "#334155", border: "#e2e8f0" }
   };
 
+  if (!isValid || isError) {
+    return (
+      <div className={styles.loadingScreen}>
+        <div className={styles.loadingCard}>{nl ? "Voertuig niet gevonden." : "Vehicle not found."}</div>
+      </div>
+    );
+  }
+
+  if (isLoading || !data) {
+    return (
+      <div className={styles.loadingScreen}>
+        <div className={styles.loadingCard}>{nl ? "Kilometerhistorie laden..." : "Loading mileage history..."}</div>
+      </div>
+    );
+  }
+
+  const verdict = mileageVerdictCopy(data.vehicle.napVerdict, data.enriched?.mileageVerdict, locale);
+  const ageLabel = ageNow != null ? `${Math.floor(ageNow)} ${nl ? "jaar" : "yr"}` : "-";
+
+  // Chart geometry
+  const width = 800;
+  const height = 300;
+  const paddingLeft = 60;
+  const paddingBottom = 60;
+  const paddingTop = 20;
+  const paddingRight = 20;
+  const chartMax = Math.max(...trajectory.map((p) => p.km), estMax ?? 0, 1);
+  const points = trajectory.map((point, index) => {
+    const x = paddingLeft + (index / Math.max(trajectory.length - 1, 1)) * (width - paddingLeft - paddingRight);
+    const y = paddingTop + (1 - point.km / chartMax) * (height - paddingTop - paddingBottom);
+    return { ...point, x, y };
+  });
+  const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+  const areaPath = points.length
+    ? `M ${points[0].x} ${height - paddingBottom} ${points.map((p) => `L ${p.x} ${p.y}`).join(" ")} L ${points[points.length - 1].x} ${height - paddingBottom} Z`
+    : "";
+  const yLabels = [chartMax, chartMax * 0.66, chartMax * 0.33, 0];
+
   return (
     <div className={styles.pageContainer}>
       <div className={styles.contentContainer}>
-        <VehicleNavBar plate={normalized} subtitle={locale === "nl" ? "Kilometerhistorie" : "Mileage history"} />
+        <VehicleNavBar plate={normalized} subtitle={nl ? "Kilometerhistorie" : "Mileage history"} />
 
-        <PremiumLock featureName={locale === "nl" ? "Kilometerhistorie" : "Mileage History"} isLocked={true} plate={normalized} sectionKey="mileageHistory">
+        <PremiumLock featureName={nl ? "Kilometerhistorie" : "Mileage History"} isLocked={true} plate={normalized} sectionKey="mileageHistory">
+          {/* RDW facts: NAP verdict + inspection history */}
           <div className={`${styles.heroPanel} ${styles.glassPanel}`}>
             <div className={styles.heroCopy}>
-              <div className={styles.eyebrow}>
+              <div className={styles.eyebrow} style={verdict.ok ? undefined : { color: "#b45309" }}>
                 {verdict.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                {locale === "nl" ? "Status" : "Status"}: {verdict.label}
+                {nl ? "RDW NAP-oordeel" : "RDW NAP verdict"}: {verdict.label}
               </div>
-              <div className={styles.heroTitle}>{locale === "nl" ? "Kilometerhistorie" : "Mileage History"}</div>
+              <div className={styles.heroTitle}>{nl ? "Kilometerhistorie" : "Mileage History"}</div>
               <div className={styles.heroSubtitle}>{verdict.explanation}</div>
               <div className={styles.heroMetrics}>
-                <HeroMetric label={locale === "nl" ? "Laatste meting" : "Latest Reading"} value={latestMileage ? `${formatNumber(latestMileage)} km` : "-"} />
-                <HeroMetric label={locale === "nl" ? "Gem. per jaar" : "Avg. Annual"} value={avgAnnual ? `~${formatNumber(avgAnnual)} km` : "-"} />
-                <HeroMetric label={locale === "nl" ? "Datapunten" : "Data Points"} value={`${events.length} ${locale === "nl" ? "records" : "records"}`} />
+                <HeroMetric label={nl ? "NAP-oordeel" : "NAP verdict"} value={verdict.label} />
+                <HeroMetric label={nl ? "Leeftijd" : "Age"} value={ageLabel} />
+                <HeroMetric label={nl ? "APK-keuringen" : "APK inspections"} value={`${apkCount}`} />
               </div>
             </div>
           </div>
 
+          {/* OUR estimate — its own clearly labelled section */}
           <div className={`${styles.heroPanel} ${styles.glassPanel}`}>
             <div className={styles.heroCopy}>
-              <div className={styles.heroTitle} style={{ fontSize: "20px" }}>
-                {nl ? "Geschatte stand nu + jouw controle" : "Estimated mileage now + your check"}
+              <div className={styles.eyebrow}>
+                <Gauge size={14} />
+                {nl ? "Onze kilometerschatting" : "Our mileage estimate"}
+              </div>
+              <div className={styles.heroTitle} style={{ fontSize: "22px" }}>
+                {est != null ? `~ ${formatNumber(est)} km` : nl ? "Niet te schatten" : "Cannot estimate"}
               </div>
               <div className={styles.heroSubtitle}>
                 {est != null
                   ? nl
-                    ? `Op basis van onze formule (gewogen trend op de APK-historie) schatten we de huidige stand op ongeveer ${formatNumber(est)} km. De RDW-historie blijft leidend; vul hieronder de werkelijke stand in om te vergelijken.`
-                    : `Based on our formula (weighted trend on the APK history) we estimate the current reading at about ${formatNumber(est)} km. The RDW history stays leading; enter the actual reading below to compare.`
+                    ? `RDW publiceert geen kilometerhistorie. Wij schatten de huidige stand met onze formule: leeftijd x gemiddeld jaarkilometrage voor dit gebruiksprofiel${
+                        data.vehicle.isTaxi ? " (dit voertuig staat als taxi geregistreerd, dus een hoog jaarkilometrage)" : ""
+                      }. Vul hieronder de werkelijke stand in om te vergelijken.`
+                    : `RDW publishes no odometer history. We estimate the current reading with our formula: age x the average annual mileage for this usage profile${
+                        data.vehicle.isTaxi ? " (this vehicle is registered as a taxi, so a high annual mileage)" : ""
+                      }. Enter the actual reading below to compare.`
                   : nl
-                  ? "Er is te weinig keuringsdata voor een betrouwbare schatting van de huidige stand. Vul hieronder zelf de werkelijke stand in."
-                  : "There is too little inspection data for a reliable current-mileage estimate. Enter the actual reading below."}
+                  ? "We kunnen de stand niet schatten (registratiedatum of catalogusgegevens ontbreken)."
+                  : "We cannot estimate the reading (registration date or catalogue data missing)."}
               </div>
               <div className={styles.heroMetrics}>
-                <HeroMetric label={nl ? "Onze schatting nu" : "Our estimate now"} value={est != null ? `~${formatNumber(est)} km` : "-"} />
-                <HeroMetric label={nl ? "Bandbreedte" : "Range"} value={estMin != null && estMax != null ? `${formatNumber(estMin)} - ${formatNumber(estMax)}` : "-"} />
+                <HeroMetric label={nl ? "Schatting nu" : "Estimate now"} value={est != null ? `~${formatNumber(est)} km` : "-"} />
+                <HeroMetric label={nl ? "Bandbreedte" : "Range"} value={estMin != null && estMax != null ? `${formatNumber(estMin)} - ${formatNumber(estMax)} km` : "-"} />
+                <HeroMetric label={nl ? "Gem. per jaar" : "Avg. per year"} value={annual != null ? `~${formatNumber(annual)} km` : "-"} />
                 <HeroMetric label={nl ? "Gebruiksprofiel" : "Usage profile"} value={usageLabel ?? "-"} />
               </div>
-              <div style={{ marginTop: "16px", maxWidth: "440px" }}>
+
+              <div style={{ marginTop: "16px", maxWidth: "460px" }}>
                 <label htmlFor="actual-km" style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "6px" }}>
                   {nl ? "Werkelijke kilometerstand (van de teller of advertentie)" : "Actual odometer reading (from the dashboard or listing)"}
                 </label>
@@ -414,99 +397,81 @@ export function MileageTimelineScreen({ plate }: Props) {
             <div className={styles.chartPanel}>
               <div className={styles.chartHeader}>
                 <div className={styles.chartTitleArea}>
-                  <div className={styles.chartTitle}>{locale === "nl" ? "Kilometertrend" : "Mileage Growth Trend"}</div>
-                  <div className={styles.chartSubtitle}>{locale === "nl" ? "Visuele controle van consistentie door de tijd" : "Visual verification of reading consistency over time"}</div>
+                  <div className={styles.chartTitle}>{nl ? "Modelmatige kilometertrend" : "Model-based mileage trend"}</div>
+                  <div className={styles.chartSubtitle}>
+                    {actualKmValue != null
+                      ? nl
+                        ? "Aangepast op jouw opgegeven kilometerstand."
+                        : "Adjusted to the reading you entered."
+                      : nl
+                      ? "Schatting o.b.v. onze formule (leeftijd x jaarkilometrage). Vul je stand in om de grafiek aan te passen."
+                      : "Estimated from our formula (age x annual mileage). Enter your reading to adjust the graph."}
+                  </div>
                 </div>
                 <div className={styles.chartLegend}>
                   <div className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.legendApk}`} /> {locale === "nl" ? "APK-keuring" : "APK Inspection"}
-                  </div>
-                  <div className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.legendWorkshop}`} /> {locale === "nl" ? "Werkplaats" : "Workshop"}
-                  </div>
-                  <div className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.legendOwner}`} /> {locale === "nl" ? "Overdracht" : "Transfer"}
+                    <span className={`${styles.legendDot} ${styles.legendApk}`} /> {actualKmValue != null ? (nl ? "Jouw stand" : "Your reading") : nl ? "Schatting" : "Estimate"}
                   </div>
                 </div>
               </div>
 
               <div className={styles.chartContainer}>
-                <svg className={styles.chartSvg} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-                  {yLabels.map((label, index) => {
-                    const y = paddingTop + (index / (yLabels.length - 1)) * (height - paddingTop - paddingBottom);
-                    return (
-                      <g key={String(label)}>
-                        <text x={paddingLeft - 10} y={y + 4} className={styles.chartLabelY}>
-                          {Math.round(label / 1000)}k
-                        </text>
-                        <line x1={paddingLeft} y1={y} x2={width - paddingRight} y2={y} className={styles.chartGridLine} />
-                      </g>
-                    );
-                  })}
-                  <line
-                    x1={paddingLeft}
-                    y1={paddingTop}
-                    x2={paddingLeft}
-                    y2={height - paddingBottom}
-                    className={styles.chartAxisLine}
-                  />
-                  <line
-                    x1={paddingLeft}
-                    y1={height - paddingBottom}
-                    x2={width - paddingRight}
-                    y2={height - paddingBottom}
-                    className={styles.chartAxisLine}
-                  />
+                {points.length ? (
+                  <svg className={styles.chartSvg} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+                    {yLabels.map((label, index) => {
+                      const y = paddingTop + (index / (yLabels.length - 1)) * (height - paddingTop - paddingBottom);
+                      return (
+                        <g key={String(label)}>
+                          <text x={paddingLeft - 10} y={y + 4} className={styles.chartLabelY}>
+                            {Math.round(label / 1000)}k
+                          </text>
+                          <line x1={paddingLeft} y1={y} x2={width - paddingRight} y2={y} className={styles.chartGridLine} />
+                        </g>
+                      );
+                    })}
+                    <line x1={paddingLeft} y1={paddingTop} x2={paddingLeft} y2={height - paddingBottom} className={styles.chartAxisLine} />
+                    <line x1={paddingLeft} y1={height - paddingBottom} x2={width - paddingRight} y2={height - paddingBottom} className={styles.chartAxisLine} />
 
-                  {areaPath ? <path d={areaPath} className={styles.chartArea} /> : null}
-                  {linePath ? <path d={linePath} className={styles.chartDataLine} /> : null}
+                    {areaPath ? <path d={areaPath} className={styles.chartArea} /> : null}
+                    {linePath ? <path d={linePath} className={styles.chartDataLine} /> : null}
 
-                  {points.map((point, index) => {
-                    const dotClass =
-                      point.type === "workshop"
-                        ? styles.pointWorkshop
-                        : point.type === "owner"
-                        ? styles.pointOwner
-                        : styles.pointApk;
-                    return (
-                      <g key={`${point.date}-${index}`}>
+                    {points.map((point, index) => (
+                      <g key={`${point.year}-${index}`}>
                         <circle cx={point.x} cy={point.y} r={6} className={styles.chartPoint} />
-                        <circle cx={point.x} cy={point.y} r={3} className={`${styles.chartPointInner} ${dotClass}`} />
+                        <circle cx={point.x} cy={point.y} r={3} className={`${styles.chartPointInner} ${styles.pointApk}`} />
                       </g>
-                    );
-                  })}
+                    ))}
 
-                  {points.map((point, index) => (
-                    <text key={`${point.date}-x-${index}`} x={point.x} y={height - paddingBottom + 25} className={styles.chartLabelX}>
-                      {new Date(point.date).getFullYear()}
-                    </text>
-                  ))}
-                </svg>
+                    {points.map((point, index) =>
+                      index % Math.ceil(points.length / 8 || 1) === 0 || index === points.length - 1 ? (
+                        <text key={`${point.year}-x-${index}`} x={point.x} y={height - paddingBottom + 25} className={styles.chartLabelX}>
+                          {point.year}
+                        </text>
+                      ) : null
+                    )}
+                  </svg>
+                ) : (
+                  <div className={styles.loadingCard} style={{ margin: "40px auto", maxWidth: "320px", textAlign: "center" }}>
+                    {nl ? "Geen registratiedatum om een trend te tekenen." : "No registration date to draw a trend."}
+                  </div>
+                )}
               </div>
             </div>
 
             <div className={styles.timelinePanel}>
-              <div className={styles.timelineHeader}>{locale === "nl" ? "Geregistreerde events" : "Recorded Events"}</div>
+              <div className={styles.timelineHeader}>{nl ? "RDW keuringsmomenten" : "RDW inspection events"}</div>
               <div className={styles.timelineList}>
                 <div className={styles.timelineLine} />
                 {events.map((event) => (
                   <div key={event.id} className={styles.timelineItem}>
-                    <div
-                      className={`${styles.timelineMarker} ${
-                        event.type === "owner"
-                          ? styles.markerOwner
-                          : event.type === "workshop"
-                          ? styles.markerWorkshop
-                          : styles.markerApk
-                      }`}
-                    >
+                    <div className={`${styles.timelineMarker} ${event.type === "owner" ? styles.markerOwner : styles.markerApk}`}>
                       <EventIcon type={event.type} />
                     </div>
                     <div className={styles.timelineContent}>
                       <div className={styles.timelineTop}>
                         <div className={styles.timelineTitle}>{event.title}</div>
                         <div className={styles.timelineMileage}>
-                          {event.mileage ? `${formatNumber(event.mileage)} km` : "-"}
+                          {event.modeledKm != null ? `~${formatNumber(event.modeledKm)} km` : "-"}
                         </div>
                       </div>
                       <div className={styles.timelineDate}>{formatDate(event.date, locale)}</div>
@@ -515,12 +480,15 @@ export function MileageTimelineScreen({ plate }: Props) {
                   </div>
                 ))}
               </div>
+              <div style={{ fontSize: "12px", color: "#94a3b8", lineHeight: 1.5 }}>
+                {nl
+                  ? "Bedragen met ~ zijn modelmatige schattingen; RDW registreert wel keuringsdata, maar geen kilometerstanden per keuring."
+                  : "Figures with ~ are model estimates; RDW records inspection dates but not the odometer at each inspection."}
+              </div>
             </div>
           </div>
         </PremiumLock>
       </div>
     </div>
-
   );
 }
-

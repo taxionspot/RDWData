@@ -4,7 +4,8 @@ import {
   classifyFuel,
   estimateRoadTaxQuarter,
   computeConditionAdjustment,
-  computeMarketValueV3
+  computeMarketValueV3,
+  estimateAnnualKm
 } from "../lib/rdw/heuristics";
 
 test("classifyFuel detects single fuels", () => {
@@ -85,6 +86,49 @@ test("computeConditionAdjustment: stacked negatives are floored at 0.40", () => 
   });
   assert.equal(worst.factor, 0.4);
   assert.equal(worst.forceLowConfidence, true);
+});
+
+test("estimateAnnualKm: taxi dominates, diesel > petrol, sane band", () => {
+  const taxi = estimateAnnualKm({ fuelType: "Diesel", bodyType: "stationwagen", isTaxi: true });
+  assert.equal(taxi, 45000); // taxi overrides everything
+
+  const petrol = estimateAnnualKm({ fuelType: "Benzine", bodyType: null, isTaxi: false });
+  const diesel = estimateAnnualKm({ fuelType: "Diesel", bodyType: null, isTaxi: false });
+  assert.equal(petrol, 13500); // base NL average
+  assert.ok(diesel > petrol); // diesels are driven more
+
+  const van = estimateAnnualKm({ fuelType: "Diesel", bodyType: "bestelauto", isTaxi: false });
+  assert.ok(van > diesel); // vans more again
+});
+
+test("computeMarketValueV3: an ex-taxi (high estimated km) is worth far less than a low-km car", () => {
+  const base = {
+    catalogPrice: 35000,
+    ageYears: 8.5,
+    brand: "Kia",
+    fuelType: "Diesel",
+    bodyType: "stationwagen" as string | null
+  };
+  // ~382k km estimated for an 8.5y diesel taxi vs a modest 100k km car.
+  const exTaxi = computeMarketValueV3({ ...base, mileage: 382000, mileageEstimated: true });
+  const lowKm = computeMarketValueV3({ ...base, mileage: 100000, mileageEstimated: true });
+  assert.ok(exTaxi.value && lowKm.value && exTaxi.value < lowKm.value * 0.7);
+  // A value built on an estimated mileage is never HIGH confidence.
+  assert.notEqual(exTaxi.confidence, "HIGH");
+});
+
+test("computeMarketValueV3: estimated mileage widens uncertainty vs a measured one", () => {
+  const params = {
+    catalogPrice: 30000,
+    ageYears: 5,
+    brand: "Volkswagen",
+    fuelType: "Benzine",
+    bodyType: null as string | null,
+    mileage: 80000
+  };
+  const measured = computeMarketValueV3({ ...params, mileageEstimated: false });
+  const estimated = computeMarketValueV3({ ...params, mileageEstimated: true });
+  assert.ok(measured.se != null && estimated.se != null && estimated.se > measured.se);
 });
 
 test("computeMarketValueV3: condition discount lowers value vs baseline", () => {

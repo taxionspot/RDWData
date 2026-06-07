@@ -31,6 +31,10 @@ export type EnrichedData = {
   mileageUsageProfile: string | null;
   mileageSlopeKmPerYear: number | null;
   mileageAnomalies: MileageAnomaly[];
+  // How estimatedMileageNow was produced: "readings" = weighted regression on
+  // real APK odometer readings; "formula" = age x usage-based model because RDW
+  // open data publishes no odometer history for this vehicle.
+  mileageEstimateSource: "readings" | "formula" | null;
 
   apkPassChance: number; // Percentage 0-100
   repairChances: { name: string; chance: number; estMin: number; estMax: number }[];
@@ -230,6 +234,103 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+// --- Mileage estimation formula -------------------------------------------
+// RDW open data does NOT publish historical odometer readings (only the NAP
+// "tellerstandoordeel"), so for almost every plate we cannot plot real km. We
+// therefore ESTIMATE the current mileage from age x a usage-based annual rate.
+// The base rate (13,500 km/yr) is the same benchmark the value model uses
+// (mu = 13,500 * age), so an "average" car gets a neutral value adjustment.
+// These constants are deliberately simple and tunable.
+const BASE_ANNUAL_KM = 13500;     // NL average passenger car
+const TAXI_ANNUAL_KM = 45000;     // taxi / professional, very intensive use
+const MIN_ANNUAL_KM = 5000;
+const MAX_ANNUAL_KM = 90000;
+
+/**
+ * Expected annual mileage (km/year) derived from the vehicle's usage signals:
+ * fuel type (diesels/LPG are driven more), body type (vans/MPVs more) and the
+ * RDW taxi indicator (taxis far more). Returned figure is clamped to a sane band.
+ */
+export function estimateAnnualKm(input: {
+  fuelType: string | null;
+  bodyType: string | null;
+  isTaxi: boolean;
+}): number {
+  // Taxis dominate any other signal: heavy, professional use.
+  if (input.isTaxi) return TAXI_ANNUAL_KM;
+
+  const fuel = classifyFuel(input.fuelType);
+  let fuelFactor = 1; // petrol / EV baseline
+  if (fuel.isDiesel) fuelFactor = 1.45;
+  else if (fuel.isLpg) fuelFactor = 1.55;
+  else if (fuel.isCng) fuelFactor = 1.35;
+  else if (fuel.isHybrid) fuelFactor = 1.1;
+
+  const body = (input.bodyType ?? "").toLowerCase();
+  let bodyFactor = 1;
+  if (body.includes("bestel") || body.includes("van")) bodyFactor = 1.3;
+  else if (body.includes("mpv")) bodyFactor = 1.15;
+
+  return clamp(Math.round(BASE_ANNUAL_KM * fuelFactor * bodyFactor), MIN_ANNUAL_KM, MAX_ANNUAL_KM);
+}
+
+function usageProfileFromAnnual(annual: number): string {
+  if (annual < 8000) return "Recreational";
+  if (annual < 15000) return "Average";
+  if (annual < 25000) return "Above average";
+  if (annual < 45000) return "Intensive";
+  return "Very intensive";
+}
+
+type MileageEstimate = {
+  estimatedMileageNow: number | null;
+  estimatedMileageMin: number | null;
+  estimatedMileageMax: number | null;
+  mileageVerdict: MileageVerdict;
+  mileageUsageProfile: string | null;
+  mileageSlopeKmPerYear: number | null;
+  mileageAnomalies: MileageAnomaly[];
+  latestMileage: number | null;
+  mileageEstimateSource: "readings" | "formula" | null;
+};
+
+/**
+ * Fallback estimate when there are no real odometer readings: project the
+ * usage-based annual rate over the vehicle's age. Always produces a value (so
+ * the value model and the mileage screen are never blank), clearly flagged as a
+ * formula estimate with a wide band.
+ */
+function formulaMileageEstimate(profile: VehicleProfile, registrationDate: Date | null): MileageEstimate {
+  const v = profile.vehicle;
+  if (!registrationDate) {
+    return {
+      estimatedMileageNow: null,
+      estimatedMileageMin: null,
+      estimatedMileageMax: null,
+      mileageVerdict: "UNKNOWN",
+      mileageUsageProfile: null,
+      mileageSlopeKmPerYear: null,
+      mileageAnomalies: [],
+      latestMileage: null,
+      mileageEstimateSource: null
+    };
+  }
+  const ageYears = Math.max(toYears(new Date(), registrationDate), 0.25);
+  const annual = estimateAnnualKm({ fuelType: v.fuelType, bodyType: v.bodyType, isTaxi: v.isTaxi });
+  const est = Math.max(0, roundTo(annual * ageYears, 500));
+  return {
+    estimatedMileageNow: est,
+    estimatedMileageMin: Math.max(0, roundTo(est * 0.72, 500)),
+    estimatedMileageMax: roundTo(est * 1.32, 500),
+    mileageVerdict: "UNKNOWN", // no readings to judge; the RDW NAP verdict is shown separately
+    mileageUsageProfile: usageProfileFromAnnual(annual),
+    mileageSlopeKmPerYear: annual,
+    mileageAnomalies: [],
+    latestMileage: null,
+    mileageEstimateSource: "formula"
+  };
+}
+
 function getMileagePoints(profile: VehicleProfile, registrationDate: Date | null): MileagePoint[] {
   const points: MileagePoint[] = [];
   if (!registrationDate) return points;
@@ -247,25 +348,17 @@ function getMileagePoints(profile: VehicleProfile, registrationDate: Date | null
   return points;
 }
 
-function estimateMileage(profile: VehicleProfile, registrationDate: Date | null) {
+function estimateMileage(profile: VehicleProfile, registrationDate: Date | null): MileageEstimate {
   const anomalies: MileageAnomaly[] = [];
   const points = getMileagePoints(profile, registrationDate);
 
   const basePoints = registrationDate ? [{ date: registrationDate, t: 0, km: 0 }] : [];
   const dataPoints = [...basePoints, ...points];
 
+  // No real odometer readings (the usual case for RDW open data): fall back to
+  // the usage-based formula so we always show an estimate instead of blanks.
   if (dataPoints.length < 2) {
-    const latest = points.length ? points[points.length - 1].km : null;
-    return {
-      estimatedMileageNow: latest,
-      estimatedMileageMin: null,
-      estimatedMileageMax: null,
-      mileageVerdict: "UNKNOWN" as MileageVerdict,
-      mileageUsageProfile: null,
-      mileageSlopeKmPerYear: null,
-      mileageAnomalies: [] as MileageAnomaly[],
-      latestMileage: latest
-    };
+    return formulaMileageEstimate(profile, registrationDate);
   }
 
   const tmax = Math.max(...dataPoints.map((p) => p.t));
@@ -288,17 +381,7 @@ function estimateMileage(profile: VehicleProfile, registrationDate: Date | null)
 
   const denominator = Sw * Swt2 - Swt * Swt;
   if (!Number.isFinite(denominator) || Math.abs(denominator) < 1e-6) {
-    const latest = points.length ? points[points.length - 1].km : null;
-    return {
-      estimatedMileageNow: latest,
-      estimatedMileageMin: null,
-      estimatedMileageMax: null,
-      mileageVerdict: "UNKNOWN" as MileageVerdict,
-      mileageUsageProfile: null,
-      mileageSlopeKmPerYear: null,
-      mileageAnomalies: [] as MileageAnomaly[],
-      latestMileage: latest
-    };
+    return formulaMileageEstimate(profile, registrationDate);
   }
 
   const b = (Sw * Swtk - Swt * Swk) / denominator;
@@ -421,7 +504,8 @@ function estimateMileage(profile: VehicleProfile, registrationDate: Date | null)
     mileageUsageProfile,
     mileageSlopeKmPerYear: Number.isFinite(b) ? Math.round(b) : null,
     mileageAnomalies: anomalies,
-    latestMileage
+    latestMileage,
+    mileageEstimateSource: "readings"
   };
 }
 
@@ -613,8 +697,12 @@ export function computeMarketValueV3(params: {
   bodyType: string | null;
   mileage: number | null;
   condition?: MarketValueCondition;
+  // True when `mileage` is our own formula estimate (no real reading / no user
+  // input). Widens the band and caps confidence at LOW, since the km is itself
+  // an estimate rather than a measured value.
+  mileageEstimated?: boolean;
 }): MarketValueResult {
-  const { catalogPrice, ageYears, brand, fuelType, bodyType, mileage, condition } = params;
+  const { catalogPrice, ageYears, brand, fuelType, bodyType, mileage, condition, mileageEstimated } = params;
   if (!catalogPrice || ageYears == null || ageYears < 0) {
     return { value: null, min: null, max: null, se: null, confidence: null };
   }
@@ -647,6 +735,7 @@ export function computeMarketValueV3(params: {
 
   let se = 0.14;
   if (!hasMileage) se += 0.10;
+  if (hasMileage && mileageEstimated) se += 0.08; // mileage is a formula estimate, not measured
   if (t > 15) se += 0.06;
   if (hasMileage && Math.abs(r) > 1.0) se += 0.04;
   const brandKnown = getBrandOffset(brand).known;
@@ -682,6 +771,8 @@ export function computeMarketValueV3(params: {
   if (se <= 0.16) confidence = "HIGH";
   else if (se <= 0.22) confidence = "MEDIUM";
   if (condition?.forceLowConfidence) confidence = "LOW";
+  // A value built on an estimated (not measured) mileage is never "HIGH".
+  if (mileageEstimated && confidence === "HIGH") confidence = "MEDIUM";
 
   return {
     value: estimated,
@@ -742,6 +833,7 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     hasOpenRecall: v.hasOpenRecall
   });
 
+  const mileageIsEstimated = mileageEst.mileageEstimateSource === "formula";
   const marketValue = computeMarketValueV3({
     catalogPrice: v.cataloguePrice,
     ageYears,
@@ -753,7 +845,8 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     // current km. Fall back to the last recorded APK reading only when we cannot
     // extrapolate. This stops high-mileage cars (e.g. ex-taxis) being overvalued.
     mileage: mileageEst.estimatedMileageNow ?? mileageEst.latestMileage,
-    condition: valuationCondition
+    condition: valuationCondition,
+    mileageEstimated: mileageIsEstimated
   });
 
   let estimatedValueNextYear: number | null = null;
@@ -770,7 +863,8 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
       fuelType: v.fuelType,
       bodyType: v.bodyType,
       mileage: projectedMileage ?? null,
-      condition: valuationCondition
+      condition: valuationCondition,
+      mileageEstimated: mileageIsEstimated
     });
     estimatedValueNextYear = nextValue.value;
   }
@@ -874,6 +968,7 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     mileageUsageProfile: mileageEst.mileageUsageProfile,
     mileageSlopeKmPerYear: mileageEst.mileageSlopeKmPerYear,
     mileageAnomalies: mileageEst.mileageAnomalies,
+    mileageEstimateSource: mileageEst.mileageEstimateSource,
 
     apkPassChance: passChance,
     repairChances,

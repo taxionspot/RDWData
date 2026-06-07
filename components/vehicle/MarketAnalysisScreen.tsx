@@ -293,6 +293,21 @@ export function MarketAnalysisScreen({ plate }: Props) {
                     <span className={styles.valueConfidence}>{locale === "nl" ? "Betrouwbaarheid" : "Confidence"}: {marketConfidence}</span>
                   ) : null}
                 </div>
+                {(() => {
+                  const kmUsed = appliedMileage ?? data?.enriched?.estimatedMileageNow ?? null;
+                  if (kmUsed == null) return null;
+                  return (
+                    <div className={styles.valueRange} style={{ marginTop: "4px" }}>
+                      {appliedMileage != null
+                        ? locale === "nl"
+                          ? `Gebaseerd op jouw opgave: ${formatNumber(kmUsed)} km`
+                          : `Based on your input: ${formatNumber(kmUsed)} km`
+                        : locale === "nl"
+                        ? `Gebaseerd op onze geschatte stand: ~${formatNumber(kmUsed)} km (vul links de werkelijke km in voor een preciezere waarde)`
+                        : `Based on our estimated reading: ~${formatNumber(kmUsed)} km (enter the actual km on the left for a more precise value)`}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className={styles.chartContainer}>
