@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -17,6 +17,14 @@ import { useI18n } from "@/lib/i18n/context";
 
 type Props = {
   plate: string;
+};
+
+const USAGE_LABELS: Record<string, { nl: string; en: string }> = {
+  Recreational: { nl: "Weinig gebruikt", en: "Recreational" },
+  Average: { nl: "Gemiddeld gebruik", en: "Average" },
+  "Above average": { nl: "Bovengemiddeld", en: "Above average" },
+  Intensive: { nl: "Intensief (zakelijk)", en: "Intensive" },
+  "Very intensive": { nl: "Zeer intensief (taxi/koerier)", en: "Very intensive (taxi/courier)" }
 };
 
 // Plain-language explanation of the mileage/NAP verdict, driven by the REAL
@@ -153,6 +161,8 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
 export function MileageTimelineScreen({ plate }: Props) {
   const { locale } = useI18n();
   const { normalized, isValid, data, isLoading, isError } = useVehicleLookup(plate);
+  const [actualKm, setActualKm] = useState("");
+  const nl = locale === "nl";
 
   const events = useMemo(() => {
     if (!data?.inspections) return [] as TimelineEvent[];
@@ -272,6 +282,61 @@ export function MileageTimelineScreen({ plate }: Props) {
 
   const verdict = mileageVerdictCopy(data.vehicle.napVerdict, data.enriched?.mileageVerdict, locale);
 
+  // Our extrapolated current-mileage estimate (from the weighted-regression model)
+  // plus an optional comparison against the reading the buyer enters.
+  const est = data.enriched?.estimatedMileageNow ?? null;
+  const estMin = data.enriched?.estimatedMileageMin ?? null;
+  const estMax = data.enriched?.estimatedMileageMax ?? null;
+  const usageProfile = data.enriched?.mileageUsageProfile ?? null;
+  const usageLabel = usageProfile ? USAGE_LABELS[usageProfile]?.[locale] ?? usageProfile : null;
+
+  const actualKmValue = (() => {
+    const n = Number(actualKm.replace(/[^\d]/g, ""));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+
+  const comparison: { tone: "good" | "warn" | "bad" | "neutral"; message: string } | null = (() => {
+    if (actualKmValue == null) return null;
+    if (latestMileage != null && actualKmValue < latestMileage) {
+      return {
+        tone: "bad",
+        message: nl
+          ? `Let op: ${formatNumber(actualKmValue)} km is lager dan de laatst geregistreerde stand (${formatNumber(latestMileage)} km). Dit kan wijzen op een teruggedraaide teller.`
+          : `Warning: ${formatNumber(actualKmValue)} km is lower than the last recorded reading (${formatNumber(latestMileage)} km). This may indicate a rolled-back odometer.`
+      };
+    }
+    if (est == null) {
+      return {
+        tone: "neutral",
+        message: nl
+          ? "We hebben te weinig keuringsdata om je opgave betrouwbaar te vergelijken."
+          : "We have too little inspection data to compare your reading reliably."
+      };
+    }
+    if (estMin != null && estMax != null && actualKmValue >= estMin && actualKmValue <= estMax) {
+      return {
+        tone: "good",
+        message: nl
+          ? `Dit komt overeen met onze schatting (~${formatNumber(est)} km). Geen opvallende afwijking.`
+          : `This matches our estimate (~${formatNumber(est)} km). No notable deviation.`
+      };
+    }
+    const delta = actualKmValue - est;
+    return {
+      tone: "warn",
+      message: nl
+        ? `Dit ligt ${formatNumber(Math.abs(delta))} km ${delta > 0 ? "hoger" : "lager"} dan onze schatting (~${formatNumber(est)} km). Vraag de verkoper om uitleg en facturen.`
+        : `This is ${formatNumber(Math.abs(delta))} km ${delta > 0 ? "above" : "below"} our estimate (~${formatNumber(est)} km). Ask the seller for an explanation and invoices.`
+    };
+  })();
+
+  const comparisonStyles: Record<string, { bg: string; color: string; border: string }> = {
+    good: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+    warn: { bg: "#fffbeb", color: "#92400e", border: "#fde68a" },
+    bad: { bg: "#fef2f2", color: "#991b1b", border: "#fecaca" },
+    neutral: { bg: "#f1f5f9", color: "#334155", border: "#e2e8f0" }
+  };
+
   return (
     <div className={styles.pageContainer}>
       <div className={styles.contentContainer}>
@@ -290,6 +355,57 @@ export function MileageTimelineScreen({ plate }: Props) {
                 <HeroMetric label={locale === "nl" ? "Laatste meting" : "Latest Reading"} value={latestMileage ? `${formatNumber(latestMileage)} km` : "-"} />
                 <HeroMetric label={locale === "nl" ? "Gem. per jaar" : "Avg. Annual"} value={avgAnnual ? `~${formatNumber(avgAnnual)} km` : "-"} />
                 <HeroMetric label={locale === "nl" ? "Datapunten" : "Data Points"} value={`${events.length} ${locale === "nl" ? "records" : "records"}`} />
+              </div>
+            </div>
+          </div>
+
+          <div className={`${styles.heroPanel} ${styles.glassPanel}`}>
+            <div className={styles.heroCopy}>
+              <div className={styles.heroTitle} style={{ fontSize: "20px" }}>
+                {nl ? "Geschatte stand nu + jouw controle" : "Estimated mileage now + your check"}
+              </div>
+              <div className={styles.heroSubtitle}>
+                {est != null
+                  ? nl
+                    ? `Op basis van onze formule (gewogen trend op de APK-historie) schatten we de huidige stand op ongeveer ${formatNumber(est)} km. De RDW-historie blijft leidend; vul hieronder de werkelijke stand in om te vergelijken.`
+                    : `Based on our formula (weighted trend on the APK history) we estimate the current reading at about ${formatNumber(est)} km. The RDW history stays leading; enter the actual reading below to compare.`
+                  : nl
+                  ? "Er is te weinig keuringsdata voor een betrouwbare schatting van de huidige stand. Vul hieronder zelf de werkelijke stand in."
+                  : "There is too little inspection data for a reliable current-mileage estimate. Enter the actual reading below."}
+              </div>
+              <div className={styles.heroMetrics}>
+                <HeroMetric label={nl ? "Onze schatting nu" : "Our estimate now"} value={est != null ? `~${formatNumber(est)} km` : "-"} />
+                <HeroMetric label={nl ? "Bandbreedte" : "Range"} value={estMin != null && estMax != null ? `${formatNumber(estMin)} - ${formatNumber(estMax)}` : "-"} />
+                <HeroMetric label={nl ? "Gebruiksprofiel" : "Usage profile"} value={usageLabel ?? "-"} />
+              </div>
+              <div style={{ marginTop: "16px", maxWidth: "440px" }}>
+                <label htmlFor="actual-km" style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "6px" }}>
+                  {nl ? "Werkelijke kilometerstand (van de teller of advertentie)" : "Actual odometer reading (from the dashboard or listing)"}
+                </label>
+                <input
+                  id="actual-km"
+                  value={actualKm}
+                  onChange={(event) => setActualKm(event.target.value.replace(/[^\d]/g, ""))}
+                  inputMode="numeric"
+                  placeholder={nl ? "bijv. 142000" : "e.g. 142000"}
+                  style={{ width: "100%", height: "46px", borderRadius: "10px", border: "1px solid #cbd5e1", padding: "0 14px", fontSize: "16px", fontWeight: 600, outline: "none" }}
+                />
+                {comparison ? (
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      borderRadius: "10px",
+                      padding: "12px 14px",
+                      fontSize: "14px",
+                      lineHeight: 1.5,
+                      background: comparisonStyles[comparison.tone].bg,
+                      color: comparisonStyles[comparison.tone].color,
+                      border: `1px solid ${comparisonStyles[comparison.tone].border}`
+                    }}
+                  >
+                    {comparison.message}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
