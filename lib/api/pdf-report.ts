@@ -555,7 +555,6 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   const rawRecalls = asRows(raw.recalls);
   const defectDescriptions = asRow(data.defectDescriptions);
   const knownIssues = asRows(enriched.knownIssues);
-  const repairChances = asRows(enriched.repairChances);
 
   const derivedDefects =
     defects.length > 0
@@ -614,7 +613,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
         : "(estimate incl. avg. provincial surcharge; exact via belastingdienst.nl)"
     }`
   );
-  layout.keyValue(locale === "nl" ? "Verzekering / brandstof per maand" : "Insurance / fuel per month", `${currency(enriched.insuranceEstMonth)} / ${currency(enriched.fuelEstMonth)}`);
+  layout.keyValue(locale === "nl" ? "Brandstof per maand (schatting)" : "Fuel per month (estimate)", currency(enriched.fuelEstMonth));
 
   layout.section(locale === "nl" ? "APK inspecties" : "APK Inspections");
   layout.table(
@@ -658,13 +657,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     ]
   );
 
-  layout.section(locale === "nl" ? "Reparatiekansen (indicatie)" : "Repair Chances (indicative)");
-  layout.table(
-    [locale === "nl" ? "Onderdeel" : "Part", locale === "nl" ? "Kans" : "Chance", locale === "nl" ? "Kosten min" : "Cost min", locale === "nl" ? "Kosten max" : "Cost max"],
-    repairChances.map((it) => [s(it.name), `${s(it.chance)}%`, currency(it.estMin), currency(it.estMax)])
-  );
-
-  layout.section(locale === "nl" ? "Aandachtspunten (algemeen, niet voertuigspecifiek)" : "Known Issues (general, not vehicle-specific)");
+  layout.section(locale === "nl" ? "Aandachtspunten (uit recall en terugkerende defecten)" : "Known Issues (from recall and recurring defects)");
   layout.table(
     [locale === "nl" ? "Issue" : "Issue", locale === "nl" ? "Ernst" : "Severity", locale === "nl" ? "Doel" : "Target", locale === "nl" ? "Advies" : "Advice"],
     knownIssues.map((it) => [s(it.title), s(it.severity), s(it.target), s(it.advice)])

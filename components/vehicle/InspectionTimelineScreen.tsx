@@ -225,7 +225,6 @@ export function InspectionTimelineScreen({ plate }: Props) {
   const apkExpired = !!apkExpiry && new Date(apkExpiry).getTime() < Date.now();
   const roadworthiness = events.length ? Math.max(0, passRate - (apkExpired ? 15 : 0)) : null;
 
-  const repairChances = data?.enriched?.repairChances ?? [];
   const knownIssues = data?.enriched?.knownIssues ?? [];
 
   if (!isValid || isError) {
@@ -490,25 +489,6 @@ export function InspectionTimelineScreen({ plate }: Props) {
         </div>
 
         <div className={styles.repairDeck}>
-          <div className={styles.repairCard}>
-            <div className={styles.repairHeader}>{locale === "nl" ? "Reparatiekansen" : "Repair chances"}</div>
-            {repairChances.length ? (
-              <div className={styles.repairList}>
-                {repairChances.map((item) => (
-                  <div key={item.name} className={styles.repairRow}>
-                    <div>
-                      <div className={styles.repairTitle}>{item.name}</div>
-                      <div className={styles.repairMeta}>{locale === "nl" ? "Kans" : "Chance"}: {item.chance}%</div>
-                    </div>
-                    <div className={styles.repairRange}>EUR {item.estMin.toLocaleString()} - EUR {item.estMax.toLocaleString()}</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.repairEmpty}>{locale === "nl" ? "Geen reparatiekansen gerapporteerd." : "No repair chances reported."}</div>
-            )}
-          </div>
-
           <div className={styles.repairCard}>
             <div className={styles.repairHeader}>{locale === "nl" ? "Bekende issues" : "Known issues"}</div>
             {knownIssues.length ? (
