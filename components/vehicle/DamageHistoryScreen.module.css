@@ -286,7 +286,7 @@
 
 .contentGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) 360px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -548,10 +548,15 @@
 }
 
 .detailColumn {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
   min-width: 0;
+}
+
+/* The summary banner spans the full width above the grouped defect cards. */
+.detailColumn > .cleanCard {
+  grid-column: 1 / -1;
 }
 
 .cleanCard {

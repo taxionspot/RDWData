@@ -111,8 +111,11 @@ function nodeIcon(result: InspectionEvent["result"]) {
 
 function statusBadge(result: InspectionEvent["result"], locale: "nl" | "en") {
   if (result === "fail") return { label: locale === "nl" ? "Afgekeurd" : "Fail", className: "badgeFail" };
-  if (result === "advisory") return { label: locale === "nl" ? "Goed met advies" : "Pass with advisory", className: "badgeAdvisory" };
-  return { label: locale === "nl" ? "Goedgekeurd" : "Pass", className: "badgePass" };
+  // RDW's open data lists the defects found at a keuring, not a clean pass/fail
+  // outcome, so we label these factually as "defect(s) found" rather than implying
+  // the car passed.
+  if (result === "advisory") return { label: locale === "nl" ? "Gebrek geconstateerd" : "Defect noted", className: "badgeAdvisory" };
+  return { label: locale === "nl" ? "Geen gebreken" : "No defects", className: "badgePass" };
 }
 
 export function InspectionTimelineScreen({ plate }: Props) {
@@ -141,7 +144,10 @@ export function InspectionTimelineScreen({ plate }: Props) {
     }
 
     const defectsByDate = new Map<string, Map<string, number>>();
-    const defectSources = [...(data.defects ?? []), ...(data.inspections ?? [])];
+    // Defects now derive from the APK rows (data.defects is a subset of
+    // data.inspections), so use the inspection rows directly to avoid double
+    // counting the same defect.
+    const defectSources = data.inspections ?? [];
     for (const record of defectSources) {
       const rawDate = parseDate(record);
       const date = normalizeDate(rawDate);
@@ -213,17 +219,10 @@ export function InspectionTimelineScreen({ plate }: Props) {
     .flatMap((event) => event.defects)
     .find((defect) => defect.recurring)?.description;
 
-  // Share of fully clean inspections (no defects, not failed). Defects lower it,
-  // so a car with reported defects never shows a misleading 100%.
-  const passRate = events.length
-    ? Math.round((events.filter((event) => event.result === "pass").length / events.length) * 100)
-    : 0;
-
-  // Roadworthiness from the REAL APK pass-rate (non-fail inspections), minus a
-  // penalty if the current APK has lapsed. "-" when there is no inspection history.
+  // APK validity drives the status card (this dataset only contains keuringen
+  // where defects were found, so a "clean pass rate" would be structurally ~0).
   const apkExpiry = data?.vehicle?.apkExpiryDate ?? null;
   const apkExpired = !!apkExpiry && new Date(apkExpiry).getTime() < Date.now();
-  const roadworthiness = events.length ? Math.max(0, passRate - (apkExpired ? 15 : 0)) : null;
 
   const knownIssues = data?.enriched?.knownIssues ?? [];
 
@@ -263,8 +262,8 @@ export function InspectionTimelineScreen({ plate }: Props) {
               <div className={styles.heroTitle}>{locale === "nl" ? "APK-historie met terugkerende defecten" : "APK inspection history with recurring defect tracking"}</div>
               <div className={styles.heroSubtitle}>
                 {locale === "nl"
-                  ? "Bekijk inspecties, vergelijk geregistreerde kilometerstand en zie welke defecten terugkomen."
-                  : "Review each inspection event, compare recorded mileage, and quickly scan which defects appeared once versus which issues returned across multiple inspections."}
+                  ? "De keuringen waarbij de RDW gebreken heeft vastgelegd, met datum en omschrijving. Zo zie je welke gebreken eenmalig waren en welke terugkeren. RDW publiceert wel de geconstateerde gebreken, maar geen aparte geslaagd/afgekeurd-uitslag."
+                  : "The inspections where RDW recorded defects, with date and description, so you can see which were one-off and which keep coming back. RDW publishes the observed defects but not a separate pass/fail outcome."}
               </div>
               <div className={styles.heroStatRow}>
                 <div className={styles.heroStat}>
@@ -272,14 +271,12 @@ export function InspectionTimelineScreen({ plate }: Props) {
                   <div className={styles.heroStatValue}>{latestEvent ? formatDate(latestEvent.date, locale) : "-"}</div>
                 </div>
                 <div className={styles.heroStat}>
-                  <div className={styles.heroStatLabel}>{locale === "nl" ? "Geregistreerde km-stand" : "Recorded mileage"}</div>
-                  <div className={styles.heroStatValue}>
-                    {latestEvent?.mileage ? `${formatNumber(latestEvent.mileage)} km` : "-"}
-                  </div>
+                  <div className={styles.heroStatLabel}>{locale === "nl" ? "Gemelde gebreken" : "Reported defects"}</div>
+                  <div className={styles.heroStatValue}>{data.defects.length}</div>
                 </div>
                 <div className={styles.heroStat}>
-                  <div className={styles.heroStatLabel}>{locale === "nl" ? "Tijdlijnstatus" : "Timeline health"}</div>
-                  <div className={styles.heroStatValue}>{data.vehicle.napVerdict ?? (locale === "nl" ? "Stabiel patroon" : "Stable pattern")}</div>
+                  <div className={styles.heroStatLabel}>{locale === "nl" ? "NAP-oordeel" : "NAP verdict"}</div>
+                  <div className={styles.heroStatValue}>{data.vehicle.napVerdict ?? (locale === "nl" ? "Geen oordeel" : "No verdict")}</div>
                 </div>
               </div>
             </div>
@@ -297,15 +294,15 @@ export function InspectionTimelineScreen({ plate }: Props) {
               </div>
               <div className={styles.statusProgress}>
                 <div className={styles.progressTrack}>
-                  <div className={styles.progressFill} style={{ width: roadworthiness != null ? `${roadworthiness}%` : "0%" }} />
+                  <div className={styles.progressFill} style={{ width: apkExpired ? "30%" : "100%" }} />
                 </div>
                 <div className={styles.statusMeta}>
-                  <span>{locale === "nl" ? "Aandeel schone keuringen" : "Clean inspection rate"}</span>
-                  <span>{roadworthiness != null ? `${roadworthiness}%` : "-"}</span>
+                  <span>{locale === "nl" ? "APK-status" : "MOT status"}</span>
+                  <span>{apkExpired ? (locale === "nl" ? "Verlopen" : "Expired") : (locale === "nl" ? "Geldig" : "Valid")}</span>
                 </div>
               </div>
               <div className={styles.badgeRow}>
-                <div className={styles.miniChip}>{events.length} {locale === "nl" ? "inspecties bekeken" : "inspections reviewed"}</div>
+                <div className={styles.miniChip}>{events.length} {locale === "nl" ? "keuringen met gebreken" : "inspections with defects"}</div>
                 <div className={styles.miniChip}>
                   {recurringDefect ? (locale === "nl" ? "1 terugkerend issue" : "1 recurring issue") : locale === "nl" ? "Geen terugkerende issues" : "No recurring issues"}
                 </div>
@@ -360,8 +357,8 @@ export function InspectionTimelineScreen({ plate }: Props) {
                 : "A quick risk summary based on outcomes, mileage consistency, and repeated defect themes across the visible record."}
             </div>
             <div className={styles.signalCard}>
-              <div className={styles.signalLabel}>{locale === "nl" ? "Schone keuringen" : "Clean inspections"}</div>
-              <div className={styles.signalValue}>{passRate}%</div>
+              <div className={styles.signalLabel}>{locale === "nl" ? "Keuringen met gebreken" : "Inspections with defects"}</div>
+              <div className={styles.signalValue}>{events.length}</div>
             </div>
             <div className={styles.signalCard}>
               <div className={styles.signalLabel}>{locale === "nl" ? "Terugkerende defecten" : "Recurring defects"}</div>

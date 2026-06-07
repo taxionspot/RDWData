@@ -57,7 +57,6 @@ export function DamageHistoryScreen({ plate }: Props) {
   const backHref = buildPlateHref(plate);
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate ?? "");
 
-  const inspections = useMemo(() => (data?.inspections ?? []) as Array<Record<string, unknown>>, [data]);
   const defects = useMemo(() => (data?.defects ?? []) as Array<Record<string, unknown>>, [data]);
   const recalls = useMemo(() => (data?.recalls ?? []) as Array<Record<string, unknown>>, [data]);
   const defectDescriptions = useMemo(
@@ -65,43 +64,64 @@ export function DamageHistoryScreen({ plate }: Props) {
     [data]
   );
 
+  // Group the real APK defect records by defect code so this screen shows WHICH
+  // problems the car has and how often they recur — a synthesis, deliberately
+  // different from the chronological per-keuring list on the inspection tab (so
+  // it is "extra", not a duplicate). Each a34c-vvps row is one observed defect.
   const damageEvents = useMemo(() => {
-    // Only the actual RDW/APK defect records count as "damage". We deliberately do
-    // NOT fall back to the full inspection list, which would repeat every APK
-    // keuring (including clean passes) as a fake damage event and duplicate what
-    // the inspection timeline already shows.
-    const source = defects;
-    return source
-      .map((row, index) => {
-        const code = String(row.gebrek_identificatie ?? row.gebrek_identificatienummer ?? "").trim();
-        const title = defectDescriptions[code] || code || (isNl ? "Schade-event" : "Damage event");
-        const dateRaw =
-          row.meld_datum_door_keuringsinstantie_dt ??
-          row.meld_datum_door_keuringsinstantie ??
-          row.datum ??
-          row.date ??
-          "";
-        const dateLabel = formatDateLabel(dateRaw);
-        return {
-          id: `${code || "event"}-${index}`,
-          code: code || "-",
+    const byCode = new Map<
+      string,
+      { code: string; title: string; occurrences: number; lastDateValue: number; lastDate: string; recognition: string }
+    >();
+    for (const row of defects) {
+      const code = String(row.gebrek_identificatie ?? row.gebrek_identificatienummer ?? "").trim();
+      if (!code) continue;
+      const title = defectDescriptions[code] || code || (isNl ? "Gebrek" : "Defect");
+      const dateRaw =
+        row.meld_datum_door_keuringsinstantie_dt ??
+        row.meld_datum_door_keuringsinstantie ??
+        row.datum ??
+        row.date ??
+        "";
+      const dateLabel = formatDateLabel(dateRaw);
+      const dateValue = new Date(formatDateLabel(dateRaw).split("-").reverse().join("-")).getTime();
+      const recognition = String(row.soort_erkenning_omschrijving ?? row.soort_erkenning_keuringsinstantie ?? "-");
+      const existing = byCode.get(code);
+      if (existing) {
+        existing.occurrences += 1;
+        if (Number.isFinite(dateValue) && dateValue > existing.lastDateValue) {
+          existing.lastDateValue = dateValue;
+          existing.lastDate = dateLabel;
+        }
+      } else {
+        byCode.set(code, {
+          code,
           title,
-          date: dateLabel,
-          recognition: String(row.soort_erkenning_omschrijving ?? row.soort_erkenning_keuringsinstantie ?? "-"),
-          count: Number(row.aantal_gebreken_geconstateerd ?? 1)
-        };
-      })
-      .sort((a, b) => {
-        const ad = new Date(a.date).getTime();
-        const bd = new Date(b.date).getTime();
-        if (Number.isNaN(ad) || Number.isNaN(bd)) return 0;
-        return bd - ad;
-      });
+          occurrences: 1,
+          lastDateValue: Number.isFinite(dateValue) ? dateValue : 0,
+          lastDate: dateLabel,
+          recognition
+        });
+      }
+    }
+    return Array.from(byCode.values())
+      .map((entry, index) => ({ id: `${entry.code}-${index}`, ...entry }))
+      .sort((a, b) => b.occurrences - a.occurrences || b.lastDateValue - a.lastDateValue);
   }, [defects, defectDescriptions, isNl]);
 
+  // Number of distinct keuringen on which defects were recorded.
+  const keuringDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of defects) {
+      const d = row.meld_datum_door_keuringsinstantie_dt ?? row.meld_datum_door_keuringsinstantie ?? "";
+      if (d) set.add(String(d));
+    }
+    return set.size;
+  }, [defects]);
+
   const legendItems = [
-    { id: "minor", label: isNl ? "Inspectierecords" : "Inspection records", count: String(inspections.length) },
-    { id: "panel", label: isNl ? "Defectrecords" : "Defect records", count: String(defects.length) },
+    { id: "unique", label: isNl ? "Unieke gebreken" : "Unique defects", count: String(damageEvents.length) },
+    { id: "panel", label: isNl ? "Keuringen met gebreken" : "Inspections with defects", count: String(keuringDates) },
     { id: "paint", label: isNl ? "Recalls" : "Recalls", count: String(recalls.length) }
   ];
 
@@ -158,22 +178,22 @@ export function DamageHistoryScreen({ plate }: Props) {
                 </div>
                 <div className={styles.subhead}>
                   {isNl
-                    ? "RDW levert defectcodes uit de APK-keuringen, geen schadelocaties. Hieronder staan de daadwerkelijk gemelde defecten met datum en omschrijving."
-                    : "RDW provides defect codes from APK inspections, not body locations. Below are the actual reported defects with their date and description."}
+                    ? "RDW kent geen apart schaderegister of schadelocaties. Dit zijn de bij de APK geconstateerde gebreken, gegroepeerd per gebrek met hoe vaak ze voorkwamen. Het volledige verloop per keuring staat op het tabblad Inspectie."
+                    : "RDW has no separate damage register or body locations. These are the defects observed at the APK, grouped per defect with how often they occurred. The full per-inspection history is on the Inspection tab."}
                 </div>
               </div>
                 <div className={styles.heroStats}>
                   <div className={styles.statCard}>
-                    <div className={styles.statLabel}>{isNl ? "Schade-events" : "Damage events"}</div>
+                    <div className={styles.statLabel}>{isNl ? "Unieke gebreken" : "Unique defects"}</div>
                     <div className={styles.statValue}>{damageEvents.length}</div>
                   </div>
                   <div className={styles.statCard}>
-                    <div className={styles.statLabel}>{isNl ? "Defectrecords" : "Defect records"}</div>
-                    <div className={styles.statValue}>{defects.length}</div>
+                    <div className={styles.statLabel}>{isNl ? "Keuringen met gebreken" : "Inspections with defects"}</div>
+                    <div className={styles.statValue}>{keuringDates}</div>
                   </div>
                   <div className={styles.statCard}>
-                    <div className={styles.statLabel}>{isNl ? "Laatste event" : "Latest event"}</div>
-                    <div className={styles.statValue}>{latestEvent?.date ?? "-"}</div>
+                    <div className={styles.statLabel}>{isNl ? "Laatst gemeld" : "Last reported"}</div>
+                    <div className={styles.statValue}>{latestEvent?.lastDate ?? "-"}</div>
                   </div>
                 </div>
               </div>
@@ -200,10 +220,10 @@ export function DamageHistoryScreen({ plate }: Props) {
                 </div>
                 <div className={styles.summaryCopy}>
                   {latestEvent
-                    ? `${latestEvent.date} · ${latestEvent.title}`
+                    ? `${latestEvent.lastDate} · ${latestEvent.title}`
                     : isNl
-                    ? "Geen events beschikbaar in de dataset."
-                    : "No events available in the dataset."}
+                    ? "Geen gebreken beschikbaar in de dataset."
+                    : "No defects available in the dataset."}
                 </div>
               </div>
             </div>
@@ -269,15 +289,15 @@ export function DamageHistoryScreen({ plate }: Props) {
                 <div className={styles.detailCard} key={card.id}>
                   <div className={styles.detailHead}>
                     <div className={styles.detailTitleWrap}>
-                      <div className={styles.detailKicker}>{isNl ? "Event" : "Event"} {index + 1}</div>
+                      <div className={styles.detailKicker}>{isNl ? "Gebrek" : "Defect"} {index + 1}</div>
                       <div className={styles.detailTitle}>{card.title}</div>
                     </div>
-                    <SeverityChip tone={card.count > 1 ? "warning" : "low"} label={card.count > 1 ? (isNl ? "Middel" : "Moderate") : (isNl ? "Laag" : "Low")} />
+                    <SeverityChip tone={card.occurrences > 1 ? "warning" : "low"} label={card.occurrences > 1 ? (isNl ? "Terugkerend" : "Recurring") : (isNl ? "Eenmalig" : "One-off")} />
                   </div>
                   <div className={styles.detailGrid}>
                     <div className={styles.infoBox}>
-                      <div className={styles.infoLabel}>{isNl ? "Meldingsdatum" : "Reported date"}</div>
-                      <div className={styles.infoValue}>{card.date}</div>
+                      <div className={styles.infoLabel}>{isNl ? "Laatst gemeld" : "Last reported"}</div>
+                      <div className={styles.infoValue}>{card.lastDate}</div>
                     </div>
                     <div className={styles.infoBox}>
                       <div className={styles.infoLabel}>{isNl ? "Defectcode" : "Defect code"}</div>
@@ -288,8 +308,8 @@ export function DamageHistoryScreen({ plate }: Props) {
                       <div className={styles.infoValue}>{card.recognition}</div>
                     </div>
                     <div className={styles.infoBox}>
-                      <div className={styles.infoLabel}>{isNl ? "Aantal gebreken" : "Defect count"}</div>
-                      <div className={styles.infoValue}>{card.count}</div>
+                      <div className={styles.infoLabel}>{isNl ? "Aantal keuringen" : "Times seen"}</div>
+                      <div className={styles.infoValue}>{card.occurrences}×</div>
                     </div>
                   </div>
                   <div className={styles.detailCopy}>

@@ -53,6 +53,17 @@ export function toVehicleProfile(input: {
   const yearRaw = str(m.datum_eerste_toelating ?? m.datum_eerste_toelating_dt);
   const year = yearRaw ? Number(String(yearRaw).replace(/\D/g, "").slice(0, 4)) : null;
 
+  // The real per-inspection defect records live in the APK dataset (a34c-vvps,
+  // "Geconstateerde Gebreken") as rows that carry a gebrek_identificatie. The
+  // separate `defects` dataset (hx2c-gt7k) is not plate-filterable and always
+  // comes back empty, so derive the defect list from the APK rows instead. This
+  // keeps the whole app (risk overview, score, damage screen) consistent with
+  // the inspection timeline instead of some screens claiming "no defects".
+  const apkDefectRows = input.apk.filter(
+    (r) => r.gebrek_identificatie != null && String(r.gebrek_identificatie).trim() !== ""
+  );
+  const defectRecords = input.defects.length ? input.defects : apkDefectRows;
+
   const profile: VehicleProfile = {
     plate: input.plate,
     displayPlate: formatDisplayPlate(input.plate),
@@ -133,7 +144,7 @@ export function toVehicleProfile(input: {
     },
 
     inspections: input.apk,
-    defects: input.defects,
+    defects: defectRecords,
     defectDescriptions: input.defectDescriptions ?? {},
     recalls: input.recalls,
     typeApprovals: input.typeApprovals,
