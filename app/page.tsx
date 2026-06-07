@@ -89,16 +89,22 @@ function PlateSearch() {
     <div className={styles["search-wrapper"]}>
       <small>{t("landing.example")}</small>
       <div className={styles["search-row"]}>
-        <input
-          value={value}
-          onChange={(event) => {
-            setValue(event.target.value.toUpperCase());
-            setError(null);
-          }}
-          onKeyDown={(event) => event.key === "Enter" && submit()}
-          placeholder={t("landing.example")}
-          className={`${styles["input-mock"]} ${styles["plate-input"]}`}
-        />
+        <div className={styles["plate-field"]}>
+          <span className={styles["plate-band"]} aria-hidden="true">
+            <span className={styles["plate-star"]}>★</span>
+            <span className={styles["plate-nl"]}>NL</span>
+          </span>
+          <input
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value.toUpperCase());
+              setError(null);
+            }}
+            onKeyDown={(event) => event.key === "Enter" && submit()}
+            placeholder={t("landing.example")}
+            className={styles["plate-input"]}
+          />
+        </div>
         <button onClick={submit} className={styles["search-btn"]}>
           {t("landing.getReport")}
         </button>

@@ -34,6 +34,7 @@ import { VehicleNavBar } from "./VehicleNavBar";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
 import { PremiumLock } from "@/components/ui/PremiumLock";
 import { UserAuthModal } from "@/components/ui/UserAuthModal";
+import { PlateBadge } from "@/components/ui/PlateBadge";
 
 type Props = { plate: string };
 
@@ -186,10 +187,6 @@ function ScoreBadgeIcon() {
       <TrendingUp size={12} />
     </span>
   );
-}
-
-function LicensePlate({ plate }: { plate: string }) {
-  return <div className={styles.licensePlate}>{plate}</div>;
 }
 
 function MetaCard({ label, value }: { label: string; value: string }) {
@@ -729,7 +726,7 @@ export function VehicleResultScreen({ plate }: Props) {
                   </div>
                 </div>
 
-                <LicensePlate plate={displayPlate} />
+                <PlateBadge plate={displayPlate} size="xl" />
 
                 <div className={styles.vehicleTitleBlock}>
                   <div className={styles.carTitle}>
