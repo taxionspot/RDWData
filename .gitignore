@@ -12,3 +12,6 @@ coverage
 
 .npm-cache
 .test-dist
+
+# TypeScript incremental build cache (generated)
+tsconfig.tsbuildinfo
