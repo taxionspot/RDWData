@@ -726,7 +726,7 @@ export function VehicleResultScreen({ plate }: Props) {
                   </div>
                 </div>
 
-                <PlateBadge plate={displayPlate} size="lg" />
+                <PlateBadge plate={displayPlate} size="md" />
 
                 <div className={styles.vehicleTitleBlock}>
                   <div className={styles.carTitle}>

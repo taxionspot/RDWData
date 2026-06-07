@@ -589,15 +589,18 @@ export function estimateRoadTaxQuarter(
   }
 
   // Petrol baseline per kg/quarter incl. average provincial opcenten, plus a
-  // fuel surcharge for diesel / LPG / CNG.
-  let point = w * 0.135 - 25;
-  if (fuel.isDiesel) point += w * 0.085;
-  else if (fuel.isLpg) point += w * 0.04;
-  else if (fuel.isCng) point += w * 0.02;
+  // fuel surcharge for diesel / LPG / CNG. Calibrated down from an earlier
+  // version that ran high: a ~1200 kg petrol now lands around EUR 90-120/quarter
+  // and a similar diesel around EUR 180-230/quarter, in line with public MRB
+  // reference points. The exact amount still depends on the province (opcenten).
+  let point = w * 0.115 - 28;
+  if (fuel.isDiesel) point += w * 0.075;
+  else if (fuel.isLpg) point += w * 0.035;
+  else if (fuel.isCng) point += w * 0.018;
   point = Math.max(0, point);
 
-  const min = Math.max(0, Math.round((point * 0.85) / 5) * 5);
-  const max = Math.round((point * 1.18) / 5) * 5;
+  const min = Math.max(0, Math.round((point * 0.9) / 5) * 5);
+  const max = Math.round((point * 1.12) / 5) * 5;
   return max > 0 ? { min, max } : null;
 }
 
@@ -743,8 +746,15 @@ export function computeMarketValueV3(params: {
   if (condition) se += condition.extraSe;
 
   let estimated = roundTo(Math.exp(lnP), 50);
-  let minimum = roundTo(Math.exp(lnP - 1.28 * se), 50);
-  let maximum = roundTo(Math.exp(lnP + 1.28 * se), 50);
+  // Shown band: a deliberately tighter "expected price range" rather than a full
+  // 80% confidence interval. The raw `se` can pile up for data-poor plates (no
+  // real odometer history, old car, unknown brand) and produced implausibly wide
+  // ranges (~+/-40%). Cap the band's se and use a ~1 sigma multiplier so the
+  // range stays credible to buyers (about +/-18%). `se` itself is left untouched
+  // below so the confidence label still reflects the true uncertainty.
+  const seBand = Math.min(se, 0.18);
+  let minimum = roundTo(Math.exp(lnP - seBand), 50);
+  let maximum = roundTo(Math.exp(lnP + seBand), 50);
 
   // A used car can't be worth more than its original catalogue price (except
   // >25y classics, which can appreciate); cap before applying any condition discount.

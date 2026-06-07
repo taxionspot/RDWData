@@ -231,6 +231,37 @@ export function RiskOverviewScreen({ plate }: Props) {
       ? "success"
       : "warning";
 
+  // One-line plain-language recap of the four core checks (the cards below), so
+  // a buyer grasps the essentials before scanning the detail.
+  const kmPart = `${nl ? "kilometerstand" : "odometer"} ${String(resolvedMileageVerdict).toLowerCase()}`;
+  const damagePart =
+    data.defects.length === 0
+      ? nl ? "geen gemelde schade" : "no reported damage"
+      : nl ? `${data.defects.length} schaderecords` : `${data.defects.length} damage records`;
+  const apkPart = apkExpired
+    ? nl ? "APK verlopen" : "MOT expired"
+    : v.apkExpiryDate
+    ? nl ? `APK geldig tot ${formatDate(v.apkExpiryDate)}` : `MOT valid until ${formatDate(v.apkExpiryDate)}`
+    : nl ? "APK onbekend" : "MOT unknown";
+  const ownerPart = v.owners.count
+    ? nl
+      ? `${v.owners.count} ${v.owners.count === 1 ? "tenaamstelling" : "tenaamstellingen"}`
+      : `${v.owners.count} ${v.owners.count === 1 ? "owner" : "owners"}`
+    : nl ? "eigendom onbekend" : "ownership unknown";
+  const quickSummary = nl
+    ? `In het kort: ${kmPart}, ${damagePart}, ${apkPart}, ${ownerPart}.`
+    : `In short: ${kmPart}, ${damagePart}, ${apkPart}, ${ownerPart}.`;
+
+  // Severity recap for the full-analysis section, so the long findings list opens
+  // with a clear, scannable summary instead of dropping straight into detail.
+  const highCount = findings.filter((f) => f.severity === "high").length;
+  const medCount = findings.filter((f) => f.severity === "medium").length;
+  const lowInfoCount = findings.length - highCount - medCount;
+  const topFinding = findings.find((f) => f.severity === "high") ?? findings.find((f) => f.severity === "medium");
+  const analysisSummary = nl
+    ? `${highCount > 0 ? `${highCount} hoog risico, ` : ""}${medCount} aandachtspunt${medCount === 1 ? "" : "en"} en ${lowInfoCount} informatieve punt${lowInfoCount === 1 ? "" : "en"}.${topFinding ? ` Belangrijkste: ${topFinding.title}.` : " Geen grote rode vlaggen gevonden."}`
+    : `${highCount > 0 ? `${highCount} high risk, ` : ""}${medCount} attention point${medCount === 1 ? "" : "s"} and ${lowInfoCount} informational point${lowInfoCount === 1 ? "" : "s"}.${topFinding ? ` Most important: ${topFinding.title}.` : " No major red flags found."}`;
+
   const riskCards: RiskCardDef[] = [
     {
       id: "mileage",
@@ -315,6 +346,21 @@ export function RiskOverviewScreen({ plate }: Props) {
                     ? "Elke kaart toont een kerncontrole met status, context en een directe route naar detailhistorie."
                     : "Each card highlights a core checkpoint with status signals, supportive context, and a clear path into the detailed history."}
                 </div>
+                <div
+                  style={{
+                    marginTop: "12px",
+                    padding: "10px 14px",
+                    borderRadius: "12px",
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "#0f172a",
+                    lineHeight: 1.5
+                  }}
+                >
+                  {quickSummary}
+                </div>
               </div>
               <div className={styles.heroSide}>
                 <div className={styles.spotlightCard}>
@@ -339,6 +385,23 @@ export function RiskOverviewScreen({ plate }: Props) {
                     ? "Elke relevante RDW-bron beoordeeld en vertaald naar wat het voor jou als koper betekent."
                     : "Every relevant RDW source assessed and translated into what it means for you as a buyer."}
                 </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  alignItems: "flex-start",
+                  marginBottom: "16px",
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  background: riskColor ? `${riskColor}10` : "#f0fdf4",
+                  border: `1px solid ${riskColor ?? "#16a34a"}33`
+                }}
+              >
+                <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 800, color: riskColor ?? "#16a34a" }}>
+                  {nl ? "Samenvatting" : "Summary"}
+                </span>
+                <span style={{ fontSize: "13px", color: "#334155", lineHeight: 1.5 }}>{analysisSummary}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {findings.map((f) => {

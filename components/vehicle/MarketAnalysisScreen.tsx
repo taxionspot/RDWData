@@ -285,10 +285,10 @@ export function MarketAnalysisScreen({ plate }: Props) {
                 </div>
                 <div className={styles.valueRange}>
                   {marketValueMin != null && marketValueMax != null
-                    ? `80% ${locale === "nl" ? "bandbreedte" : "range"}: ${formatCurrency(marketValueMin)} - ${formatCurrency(marketValueMax)}`
+                    ? `${locale === "nl" ? "Verwachte prijsrange" : "Expected price range"}: ${formatCurrency(marketValueMin)} - ${formatCurrency(marketValueMax)}`
                     : locale === "nl"
-                    ? "80% bandbreedte niet beschikbaar"
-                    : "80% range unavailable"}
+                    ? "Prijsrange niet beschikbaar"
+                    : "Price range unavailable"}
                   {marketConfidence ? (
                     <span className={styles.valueConfidence}>{locale === "nl" ? "Betrouwbaarheid" : "Confidence"}: {marketConfidence}</span>
                   ) : null}

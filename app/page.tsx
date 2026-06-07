@@ -20,6 +20,7 @@ import {
   Users,
   FileCheck,
   FileSpreadsheet,
+  FileText,
   Sparkles,
   Twitter,
   Linkedin,
@@ -158,6 +159,23 @@ export default function LandingPage() {
           </h1>
           <p className={styles["hero-subtitle"]}>{settings.content.landingHeroSubtitle}</p>
           <PlateSearch />
+          <div className={styles["sample-cta"]}>
+            <span className={styles["sample-cta-label"]}>
+              {locale === "nl" ? "Benieuwd wat je krijgt?" : "Curious what you get?"}
+            </span>
+            <a
+              className={styles["sample-cta-btn"]}
+              href={`/api/sample-report?lang=${locale}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <FileText size={16} />
+              {locale === "nl" ? "Bekijk voorbeeldrapport (PDF)" : "View sample report (PDF)"}
+            </a>
+            <Link className={styles["sample-cta-link"]} href={`/search/${SAMPLE_PLATE}`}>
+              {locale === "nl" ? "Of bekijk het online voorbeeld" : "Or view the online sample"}
+            </Link>
+          </div>
           <div className={styles["hero-trust"]}>
             <span className={styles["hero-price"]}>
               {priceLabel} <span>{locale === "nl" ? "per rapport" : "per report"}</span>
