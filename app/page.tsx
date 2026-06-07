@@ -8,6 +8,7 @@ import { normalizePlate, validateDutchPlate } from "@/lib/rdw/normalize";
 import { useI18n } from "@/lib/i18n/context";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useCmsPages } from "@/hooks/useCmsPages";
+import { SAMPLE_PLATE } from "@/lib/content/sample";
 import {
   Building2,
   Briefcase,
@@ -68,12 +69,23 @@ function resolveLegalHref(label: string): string | null {
   if (normalized === "terms of service" || normalized === "terms and conditions" || normalized === "algemene voorwaarden") {
     return "/terms-and-conditions";
   }
+  if (normalized === "cookie policy" || normalized === "cookiebeleid" || normalized === "cookies") {
+    return "/p/cookie-policy";
+  }
   return null;
 }
 
 function resolveCompanyHref(label: string): string | null {
   const normalized = label.trim().toLowerCase();
   if (normalized === "contact") return "/contact";
+  return null;
+}
+
+function resolveProductHref(label: string): string | null {
+  const normalized = label.trim().toLowerCase();
+  if (normalized === "sample report" || normalized === "voorbeeldrapport") return `/search/${SAMPLE_PLATE}`;
+  if (normalized === "pricing" || normalized === "prijzen") return "/pricing";
+  if (normalized === "features" || normalized === "functies") return "/#features";
   return null;
 }
 
@@ -245,55 +257,47 @@ export default function LandingPage() {
           <div>
             <div className={styles["footer-title"]}>{settings.landing.footer.productTitle}</div>
             <div className={styles["footer-links"]}>
-              {toLinkLabels(settings.landing.footer.productLinks).map((item) => (
-                <div key={item} className={styles["footer-link"]}>
-                  {item}
-                </div>
-              ))}
+              {toLinkLabels(settings.landing.footer.productLinks)
+                .map((item) => ({ item, href: resolveProductHref(item) }))
+                .filter((entry) => entry.href)
+                .map(({ item, href }) => (
+                  <Link key={item} href={href as string} className={styles["footer-link"]}>
+                    {item}
+                  </Link>
+                ))}
             </div>
           </div>
           <div>
             <div className={styles["footer-title"]}>{settings.landing.footer.companyTitle}</div>
             <div className={styles["footer-links"]}>
-              {toLinkLabels(settings.landing.footer.companyLinks).map((item) => {
-                const href = resolveCompanyHref(item);
-                return href ? (
-                  <Link key={item} href={href} className={styles["footer-link"]}>
+              {toLinkLabels(settings.landing.footer.companyLinks)
+                .map((item) => ({ item, href: resolveCompanyHref(item) }))
+                .filter((entry) => entry.href)
+                .map(({ item, href }) => (
+                  <Link key={item} href={href as string} className={styles["footer-link"]}>
                     {item}
                   </Link>
-                ) : (
-                  <div key={item} className={styles["footer-link"]}>
-                    {item}
-                  </div>
-                );
-              })}
+                ))}
             </div>
           </div>
           <div>
             <div className={styles["footer-title"]}>{settings.landing.footer.legalTitle}</div>
             <div className={styles["footer-links"]}>
-              {toLinkLabels(settings.landing.footer.legalLinks).map((item) => (
-                (() => {
-                  const href = resolveLegalHref(item);
-                  if (href) {
-                    return (
-                      <Link key={item} href={href} className={styles["footer-link"]}>
-                        {item}
-                      </Link>
-                    );
-                  }
-                  return (
-                    <div key={item} className={styles["footer-link"]}>
-                      {item}
-                    </div>
-                  );
-                })()
-              ))}
-              {footerPages.map((page) => (
-                <Link key={page._id} href={`/p/${page.slug}`} className={styles["footer-link"]}>
-                  {page.title}
-                </Link>
-              ))}
+              {toLinkLabels(settings.landing.footer.legalLinks)
+                .map((item) => ({ item, href: resolveLegalHref(item) }))
+                .filter((entry) => entry.href)
+                .map(({ item, href }) => (
+                  <Link key={item} href={href as string} className={styles["footer-link"]}>
+                    {item}
+                  </Link>
+                ))}
+              {footerPages
+                .filter((page) => page.slug !== "cookie-policy")
+                .map((page) => (
+                  <Link key={page._id} href={`/p/${page.slug}`} className={styles["footer-link"]}>
+                    {page.title}
+                  </Link>
+                ))}
             </div>
           </div>
         </div>

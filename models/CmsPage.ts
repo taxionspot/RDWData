@@ -7,6 +7,10 @@ export type CmsPageDoc = {
   published: boolean;
   showInHeader: boolean;
   showInFooter: boolean;
+  // Version of the code-managed legal copy this page was last seeded from. Lets
+  // ensureLegalPages refresh outdated legal text without clobbering admin edits
+  // made at the current version. Absent on non-legal pages.
+  legalVersion?: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -18,7 +22,8 @@ const cmsPageSchema = new Schema<CmsPageDoc>(
     content: { type: String, required: true, default: "" },
     published: { type: Boolean, required: true, default: false },
     showInHeader: { type: Boolean, required: true, default: false },
-    showInFooter: { type: Boolean, required: true, default: false }
+    showInFooter: { type: Boolean, required: true, default: false },
+    legalVersion: { type: Number, required: false }
   },
   { timestamps: true, versionKey: false }
 );
