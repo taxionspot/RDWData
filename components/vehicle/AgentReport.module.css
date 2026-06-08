@@ -6,76 +6,34 @@
 
 /* ---- Analyst cover ---- */
 .cover {
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 24px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   border-radius: 20px;
-  padding: 26px;
+  padding: 24px 26px;
   color: #e2e8f0;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
 }
 
-.scoreBlock {
+.coverTop {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 14px;
-}
-
-.ring {
-  position: relative;
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-
-.ringInner {
-  position: absolute;
-  inset: 12px;
-  border-radius: 50%;
-  background: #0f172a;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-}
-
-.scoreValue {
-  font-size: 44px;
-  font-weight: 900;
-  line-height: 1;
-  color: #ffffff;
-}
-
-.scoreMax {
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
-  letter-spacing: 0.04em;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .verdictChip {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 7px 16px;
+  padding: 8px 18px;
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.02em;
   color: #ffffff;
-}
-
-.coverBody {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
 }
 
 .eyebrow {
@@ -312,21 +270,10 @@
 
 @media (max-width: 720px) {
   .cover {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
-    padding: 22px;
-  }
-  .coverBody {
-    align-items: center;
+    padding: 20px;
   }
   .cols {
     grid-template-columns: 1fr;
-    text-align: left;
-    width: 100%;
-  }
-  .recommendation {
-    text-align: left;
   }
   .sections {
     grid-template-columns: 1fr;

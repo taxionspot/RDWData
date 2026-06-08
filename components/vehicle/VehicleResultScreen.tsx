@@ -484,6 +484,30 @@ export function VehicleResultScreen({ plate }: Props) {
     });
   }, [data, locale]);
 
+  // Single source of truth for the headline score: once the multi-agent report
+  // is in, the hero gauge reflects the analyst's score + verdict (so there is one
+  // score on the page, not two). Falls back to the deterministic score until then.
+  const displayScore = useMemo<ScoreResult>(() => {
+    if (!report?.analyst) return score;
+    const a = report.analyst;
+    const tone: ScoreTone = a.verdict === "BUY" ? "strong" : a.verdict === "CONSIDER" ? "steady" : a.verdict === "CAUTION" ? "mixed" : "caution";
+    return {
+      ...score,
+      score: a.score,
+      tone,
+      label:
+        a.verdict === "BUY"
+          ? locale === "nl" ? "Kopen" : "Buy"
+          : a.verdict === "CONSIDER"
+          ? locale === "nl" ? "Overwegen" : "Consider"
+          : a.verdict === "CAUTION"
+          ? locale === "nl" ? "Voorzichtig" : "Caution"
+          : locale === "nl" ? "Afraden" : "Avoid",
+      confidence: a.riskLevel === "LOW" ? (locale === "nl" ? "Hoog" : "High") : a.riskLevel === "MEDIUM" ? (locale === "nl" ? "Middel" : "Medium") : (locale === "nl" ? "Laag" : "Low"),
+      riskFlag: a.riskLevel === "HIGH" ? (locale === "nl" ? "Verhoogd" : "Elevated") : a.riskLevel === "MEDIUM" ? (locale === "nl" ? "Aandacht" : "Attention") : (locale === "nl" ? "Laag" : "Low")
+    };
+  }, [report, score, locale]);
+
   const normalizedPlate = normalized;
   useEffect(() => {
     if (!normalizedPlate) {
@@ -763,7 +787,7 @@ export function VehicleResultScreen({ plate }: Props) {
 
               <div className={styles.heroActions}>
                 <ScoreModule
-                  score={score}
+                  score={displayScore}
                   locale={locale}
                   locked={settings.paymentEnabled && !isPaidForPlate}
                   onUnlock={() => setShowPayment(true)}

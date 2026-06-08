@@ -12,8 +12,10 @@ import {
 } from "lucide-react";
 import styles from "./RiskOverviewScreen.module.css";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
+import { useVehicleReport } from "@/hooks/useVehicleReport";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { PremiumLock } from "../ui/PremiumLock";
+import { AnalystCover } from "./AgentReport";
 import { useI18n } from "@/lib/i18n/context";
 
 
@@ -100,6 +102,7 @@ function RiskCard({
 export function RiskOverviewScreen({ plate }: Props) {
   const { locale } = useI18n();
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate ?? "");
+  const { report } = useVehicleReport(plate);
 
   if (!plate || !isValid || isError) {
     return (
@@ -374,6 +377,12 @@ export function RiskOverviewScreen({ plate }: Props) {
                 </div>
               </div>
             </div>
+
+            {report?.analyst ? (
+              <div style={{ marginBottom: "16px" }}>
+                <AnalystCover analyst={report.analyst} locale={locale} />
+              </div>
+            ) : null}
 
             <div className={`${styles.riskSection} ${styles.glassPanel}`}>
               <div style={{ marginBottom: "16px" }}>

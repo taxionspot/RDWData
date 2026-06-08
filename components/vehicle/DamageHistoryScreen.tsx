@@ -14,8 +14,10 @@ import {
 import styles from "./DamageHistoryScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { PremiumLock } from "../ui/PremiumLock";
+import { AgentSection } from "./AgentReport";
 import { useI18n } from "@/lib/i18n/context";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
+import { pickSection, useVehicleReport } from "@/hooks/useVehicleReport";
 
 
 type Props = {
@@ -56,6 +58,8 @@ export function DamageHistoryScreen({ plate }: Props) {
   const isNl = locale === "nl";
   const backHref = buildPlateHref(plate);
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate ?? "");
+  const { report } = useVehicleReport(plate);
+  const defectsSection = pickSection(report, "defects");
 
   const defects = useMemo(() => (data?.defects ?? []) as Array<Record<string, unknown>>, [data]);
   const recalls = useMemo(() => (data?.recalls ?? []) as Array<Record<string, unknown>>, [data]);
@@ -165,6 +169,11 @@ export function DamageHistoryScreen({ plate }: Props) {
         )}
 
         <PremiumLock featureName={isNl ? "Schadehistorie" : "Damage History"} isLocked={true} plate={plate} sectionKey="damageHistory">
+          {defectsSection ? (
+            <div style={{ marginBottom: "16px" }}>
+              <AgentSection section={defectsSection} />
+            </div>
+          ) : null}
           <div className={styles.hero}>
             <div className={`${styles.heroMain} ${styles.surface}`}>
               <div className={styles.eyebrow}>

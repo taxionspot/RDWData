@@ -1,6 +1,6 @@
 import type { ElementType } from "react";
 import { Coins, Gauge, Leaf, ShieldCheck, Sparkles, Wrench } from "lucide-react";
-import type { AnalystVerdict, ReportSection, SectionId, SectionTone, Severity, VehicleReport } from "@/lib/agents/types";
+import type { AnalystResult, AnalystVerdict, ReportSection, SectionId, SectionTone, Severity, VehicleReport } from "@/lib/agents/types";
 import styles from "./AgentReport.module.css";
 
 type Locale = "nl" | "en";
@@ -52,7 +52,60 @@ function severityColor(severity: Severity): string {
   }
 }
 
-function SectionCard({ section }: { section: ReportSection }) {
+/** The analyst synthesis banner (verdict + narrative). No numeric score — the
+ *  page's main score gauge is the single source of truth for the number. */
+export function AnalystCover({ analyst, locale }: { analyst: AnalystResult; locale: Locale }) {
+  const v = verdictMeta(analyst.verdict, locale);
+  return (
+    <div className={styles.cover}>
+      <div className={styles.coverTop}>
+        <span className={styles.eyebrow}>
+          <Sparkles size={14} /> {locale === "nl" ? "AI-aankoopoordeel" : "AI purchase verdict"}
+        </span>
+        <span className={styles.verdictChip} style={{ background: v.color }}>
+          {v.label}
+        </span>
+      </div>
+      {analyst.headline ? <div className={styles.headline}>{analyst.headline}</div> : null}
+      {analyst.summary ? <p className={styles.summary}>{analyst.summary}</p> : null}
+
+      {(analyst.positives.length > 0 || analyst.risks.length > 0) && (
+        <div className={styles.cols}>
+          {analyst.positives.length > 0 && (
+            <div className={styles.col}>
+              <div className={`${styles.colTitle} ${styles.colTitlePos}`}>{locale === "nl" ? "Sterke punten" : "Strengths"}</div>
+              <ul className={`${styles.list} ${styles.colPos}`}>
+                {analyst.positives.map((p, i) => (
+                  <li key={`p${i}`}>{p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {analyst.risks.length > 0 && (
+            <div className={styles.col}>
+              <div className={`${styles.colTitle} ${styles.colTitleNeg}`}>{locale === "nl" ? "Aandachtspunten" : "Watch-outs"}</div>
+              <ul className={`${styles.list} ${styles.colNeg}`}>
+                {analyst.risks.map((r, i) => (
+                  <li key={`r${i}`}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {analyst.recommendation ? (
+        <div className={styles.recommendation}>
+          <strong>{locale === "nl" ? "Advies: " : "Recommendation: "}</strong>
+          {analyst.recommendation}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** One specialist agent's analysis as a card. */
+export function AgentSection({ section }: { section: ReportSection }) {
   const Icon = SECTION_ICONS[section.id] ?? ShieldCheck;
   const tone = toneColors(section.tone);
   return (
@@ -101,82 +154,30 @@ function SectionCard({ section }: { section: ReportSection }) {
   );
 }
 
-export function AgentReport({ report, locale }: { report: VehicleReport; locale: Locale }) {
-  const a = report.analyst;
-  const v = verdictMeta(a.verdict, locale);
-  const degrees = Math.round((a.score / 100) * 360);
+function Disclaimer({ aiSource, locale }: { aiSource: VehicleReport["aiSource"]; locale: Locale }) {
+  return (
+    <p className={styles.disclaimer}>
+      {aiSource === "fallback"
+        ? locale === "nl"
+          ? "Automatisch gegenereerd (AI tijdelijk niet beschikbaar). Indicatie op basis van RDW-data, geen garantie."
+          : "Automatically generated (AI temporarily unavailable). Indication based on RDW data, no guarantee."
+        : locale === "nl"
+        ? "Analyse door gespecialiseerde AI-agents op basis van officiele RDW-data. Een indicatie, geen taxatie of garantie. Combineer altijd met een fysieke inspectie."
+        : "Analysis by specialised AI agents based on official RDW data. An indication, not an appraisal or guarantee. Always combine with a physical inspection."}
+    </p>
+  );
+}
 
+export function AgentReport({ report, locale }: { report: VehicleReport; locale: Locale }) {
   return (
     <div className={styles.wrap}>
-      <div className={styles.cover}>
-        <div className={styles.scoreBlock}>
-          <div className={styles.ring} style={{ background: `conic-gradient(${v.color} 0 ${degrees}deg, rgba(148,163,184,0.25) ${degrees}deg 360deg)` }}>
-            <div className={styles.ringInner}>
-              <div className={styles.scoreValue}>{a.score}</div>
-              <div className={styles.scoreMax}>{locale === "nl" ? "van 100" : "out of 100"}</div>
-            </div>
-          </div>
-          <span className={styles.verdictChip} style={{ background: v.color }}>
-            {v.label}
-          </span>
-        </div>
-
-        <div className={styles.coverBody}>
-          <span className={styles.eyebrow}>
-            <Sparkles size={14} /> {locale === "nl" ? "AI-aankoopoordeel" : "AI purchase verdict"}
-          </span>
-          {a.headline ? <div className={styles.headline}>{a.headline}</div> : null}
-          {a.summary ? <p className={styles.summary}>{a.summary}</p> : null}
-
-          {(a.positives.length > 0 || a.risks.length > 0) && (
-            <div className={styles.cols}>
-              {a.positives.length > 0 && (
-                <div className={styles.col}>
-                  <div className={`${styles.colTitle} ${styles.colTitlePos}`}>{locale === "nl" ? "Sterke punten" : "Strengths"}</div>
-                  <ul className={`${styles.list} ${styles.colPos}`}>
-                    {a.positives.map((p, i) => (
-                      <li key={`p${i}`}>{p}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {a.risks.length > 0 && (
-                <div className={styles.col}>
-                  <div className={`${styles.colTitle} ${styles.colTitleNeg}`}>{locale === "nl" ? "Aandachtspunten" : "Watch-outs"}</div>
-                  <ul className={`${styles.list} ${styles.colNeg}`}>
-                    {a.risks.map((r, i) => (
-                      <li key={`r${i}`}>{r}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {a.recommendation ? (
-            <div className={styles.recommendation}>
-              <strong>{locale === "nl" ? "Advies: " : "Recommendation: "}</strong>
-              {a.recommendation}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
+      <AnalystCover analyst={report.analyst} locale={locale} />
       <div className={styles.sections}>
         {report.sections.map((section) => (
-          <SectionCard key={section.id} section={section} />
+          <AgentSection key={section.id} section={section} />
         ))}
       </div>
-
-      <p className={styles.disclaimer}>
-        {report.aiSource === "fallback"
-          ? locale === "nl"
-            ? "Automatisch gegenereerd (AI tijdelijk niet beschikbaar). Indicatie op basis van RDW-data, geen garantie."
-            : "Automatically generated (AI temporarily unavailable). Indication based on RDW data, no guarantee."
-          : locale === "nl"
-          ? "Analyse door gespecialiseerde AI-agents op basis van officiele RDW-data. Een indicatie, geen taxatie of garantie. Combineer altijd met een fysieke inspectie."
-          : "Analysis by specialised AI agents based on official RDW data. An indication, not an appraisal or guarantee. Always combine with a physical inspection."}
-      </p>
+      <Disclaimer aiSource={report.aiSource} locale={locale} />
     </div>
   );
 }

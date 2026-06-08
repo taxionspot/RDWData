@@ -14,6 +14,8 @@ import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import styles from "./MarketAnalysisScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { PremiumLock } from "../ui/PremiumLock";
+import { AgentSection } from "./AgentReport";
+import { useVehicleReport, pickSection } from "@/hooks/useVehicleReport";
 import { useI18n } from "@/lib/i18n/context";
 import { computeMarketValueV3 } from "@/lib/rdw/heuristics";
 
@@ -60,6 +62,8 @@ export function MarketAnalysisScreen({ plate }: Props) {
     return Math.round(value);
   }, [mileageInput]);
   const { normalized, isValid, data, isLoading, isError } = useVehicleLookup(plate, mileageValue);
+  const { report } = useVehicleReport(normalized, mileageValue);
+  const valueSection = pickSection(report, "value");
   const [sellerPrice, setSellerPrice] = useState<string>("");
   const [appliedMileage, setAppliedMileage] = useState<number | null>(mileageValue);
   const [isRecalculating, setIsRecalculating] = useState(false);
@@ -262,6 +266,12 @@ export function MarketAnalysisScreen({ plate }: Props) {
             <h1 className={styles.dashboardTitle}>{locale === "nl" ? "Marktprijsanalyse" : "Market Price Analysis"}</h1>
             <p className={styles.dashboardSubtitle}>{title || (locale === "nl" ? "Voertuigprofiel" : "Vehicle profile")}</p>
           </div>
+
+          {valueSection ? (
+            <div style={{ marginBottom: "18px" }}>
+              <AgentSection section={valueSection} />
+            </div>
+          ) : null}
 
           <div className={styles.mainGrid}>
             <div className={styles.panel}>
