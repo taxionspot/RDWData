@@ -32,7 +32,7 @@ import { VehicleNavBar } from "./VehicleNavBar";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
 import { UserAuthModal } from "@/components/ui/UserAuthModal";
 
-type Props = { plate: string };
+type Props = { plate: string; embedded?: boolean };
 
 type ScoreTone = "strong" | "steady" | "mixed" | "caution";
 
@@ -346,7 +346,7 @@ function ErrorScreen({ plate, locale }: { plate: string; locale: "nl" | "en" }) 
   );
 }
 
-export function VehicleResultScreen({ plate }: Props) {
+export function VehicleResultScreen({ plate, embedded = false }: Props) {
   const searchParams = useSearchParams();
   const { locale } = useI18n();
   const { settings } = useSiteSettings();
@@ -563,13 +563,38 @@ export function VehicleResultScreen({ plate }: Props) {
 
 
 
-  return (
-    <div className={styles.page}>
-      <div className={styles.pageContainer}>
-        <div className={styles.contentContainer}>
-          <VehicleNavBar plate={normalizedPlate} />
+  const modals = (
+    <>
+      <SubscriptionModal
+        isOpen={showPayment}
+        onClose={() => {
+          setShowPayment(false);
+          setDownloadAfterUnlock(false);
+        }}
+        featureName={locale === "nl" ? "Rapportdownload en premium toegang" : "Report download and premium access"}
+        plate={normalizedPlate}
+        onUnlocked={(payload) => {
+          setIsPaidForPlate(true);
+          setRecipientEmail(payload?.email ?? null);
+          if (downloadAfterUnlock) {
+            void downloadReport();
+          }
+          setDownloadAfterUnlock(false);
+        }}
+      />
+      <UserAuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onAuthenticated={async () => {
+          setIsUserLoggedIn(true);
+          await saveVehicle();
+        }}
+      />
+    </>
+  );
 
-          <div className={styles.heroShell}>
+  const heroShell = (
+    <div className={styles.heroShell}>
             <div className={styles.heroCard}>
               <div className={styles.heroImagePanel}>
                 <div className={styles.heroImageWrapper}>
@@ -685,33 +710,26 @@ export function VehicleResultScreen({ plate }: Props) {
               />
             </div>
           </div>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {heroShell}
+        {modals}
+      </>
+    );
+  }
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.pageContainer}>
+        <div className={styles.contentContainer}>
+          <VehicleNavBar plate={normalizedPlate} />
+          {heroShell}
         </div>
       </div>
-      <SubscriptionModal
-        isOpen={showPayment}
-        onClose={() => {
-          setShowPayment(false);
-          setDownloadAfterUnlock(false);
-        }}
-        featureName={locale === "nl" ? "Rapportdownload en premium toegang" : "Report download and premium access"}
-        plate={normalizedPlate}
-        onUnlocked={(payload) => {
-          setIsPaidForPlate(true);
-          setRecipientEmail(payload?.email ?? null);
-          if (downloadAfterUnlock) {
-            void downloadReport();
-          }
-          setDownloadAfterUnlock(false);
-        }}
-      />
-      <UserAuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onAuthenticated={async () => {
-          setIsUserLoggedIn(true);
-          await saveVehicle();
-        }}
-      />
+      {modals}
     </div>
   );
 }

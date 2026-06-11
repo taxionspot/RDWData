@@ -16,6 +16,7 @@ import { useI18n } from "@/lib/i18n/context";
 
 type Props = {
   plate: string;
+  embedded?: boolean;
 };
 
 type TimelineEvent = {
@@ -99,7 +100,7 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function MileageTimelineScreen({ plate }: Props) {
+export function MileageTimelineScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const { normalized, isValid, data, isLoading, isError } = useVehicleLookup(plate);
 
@@ -220,9 +221,9 @@ export function MileageTimelineScreen({ plate }: Props) {
   const yLabels = [chartMileageMax, chartMileageMax * 0.66, chartMileageMax * 0.33, 0];
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.contentContainer}>
-        <VehicleNavBar plate={normalized} subtitle={locale === "nl" ? "Kilometerhistorie" : "Mileage history"} />
+    <div className={embedded ? undefined : styles.pageContainer}>
+      <div className={embedded ? undefined : styles.contentContainer}>
+        {!embedded && <VehicleNavBar plate={normalized} subtitle={locale === "nl" ? "Kilometerhistorie" : "Mileage history"} />}
 
         <PremiumLock featureName={locale === "nl" ? "Kilometerhistorie" : "Mileage History"} isLocked={true} plate={normalized} sectionKey="mileageHistory">
           <div className={`${styles.heroPanel} ${styles.glassPanel}`}>

@@ -20,6 +20,7 @@ import { computeMarketValueV3 } from "@/lib/rdw/heuristics";
 
 type Props = {
   plate: string;
+  embedded?: boolean;
 };
 
 function formatCurrency(value: number | null) {
@@ -40,7 +41,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-export function MarketAnalysisScreen({ plate }: Props) {
+export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
@@ -231,9 +232,11 @@ export function MarketAnalysisScreen({ plate }: Props) {
   const title = [v.brand, v.tradeName, v.year].filter(Boolean).join(" ");
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.contentContainer}>
-        <VehicleNavBar plate={normalized} subtitle={`${locale === "nl" ? "Marktanalyse" : "Market analysis"} · ${displayPlate}`} />
+    <div className={embedded ? undefined : styles.pageContainer}>
+      <div className={embedded ? undefined : styles.contentContainer}>
+        {!embedded && (
+          <VehicleNavBar plate={normalized} subtitle={`${locale === "nl" ? "Marktanalyse" : "Market analysis"} · ${displayPlate}`} />
+        )}
 
         <PremiumLock featureName={locale === "nl" ? "Marktanalyse" : "Market Analysis"} isLocked={true} plate={normalized} sectionKey="marketAnalysis">
           <div className={styles.dashboardHeader}>

@@ -21,6 +21,7 @@ import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 
 type Props = {
   plate?: string;
+  embedded?: boolean;
 };
 
 
@@ -52,7 +53,7 @@ function formatDateLabel(value: unknown): string {
   return raw;
 }
 
-export function DamageHistoryScreen({ plate }: Props) {
+export function DamageHistoryScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const isNl = locale === "nl";
   const backHref = buildPlateHref(plate);
@@ -118,9 +119,9 @@ export function DamageHistoryScreen({ plate }: Props) {
   }
 
   return (
-    <div className={styles.page}>
-      <div className={styles.shell}>
-        {plate ? (
+    <div className={embedded ? undefined : styles.page}>
+      <div className={embedded ? undefined : styles.shell}>
+        {embedded ? null : plate ? (
           <VehicleNavBar plate={plate} subtitle={isNl ? "Schadehistorie" : "Damage history"} />
         ) : (
           <div className={`${styles.topbar} ${styles.surface}`}>

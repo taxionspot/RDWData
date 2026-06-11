@@ -4,7 +4,7 @@ import { Button } from "./Button";
 import { Lock } from "lucide-react";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { useI18n } from "@/lib/i18n/context";
-import { hasPaidAccessForPlate } from "@/lib/payments/access";
+import { hasPaidAccessForPlate, ensurePaidAccessChecked, onPlateAccessChanged } from "@/lib/payments/access";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
 
@@ -26,8 +26,14 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
 
   useEffect(() => {
     if (!plate) return;
-    const localPaid = hasPaidAccessForPlate(plate);
-    setIsUnlockedForPlate(localPaid);
+    setIsUnlockedForPlate(hasPaidAccessForPlate(plate));
+    // Restore paid access after refresh (server is source of truth) and stay
+    // in sync when another section on the page unlocks this plate.
+    void ensurePaidAccessChecked(plate).then((paid) => {
+      if (paid) setIsUnlockedForPlate(true);
+    });
+    const unsubscribe = onPlateAccessChanged(plate, (paid) => setIsUnlockedForPlate(paid));
+    return unsubscribe;
   }, [plate]);
 
   const lockByAdmin = sectionKey ? settings.lockSections[sectionKey] : isLocked;

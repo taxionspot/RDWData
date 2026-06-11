@@ -20,6 +20,7 @@ import { useI18n } from "@/lib/i18n/context";
 
 type Props = {
   plate?: string;
+  embedded?: boolean;
 };
 
 function buildPlateHref(plate: string | undefined, suffix = "") {
@@ -98,31 +99,33 @@ function RiskCard({
   );
 }
 
-export function RiskOverviewScreen({ plate }: Props) {
+export function RiskOverviewScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate ?? "");
 
-  if (!plate || !isValid || isError) {
-    return (
+  const wrap = (content: React.ReactNode) =>
+    embedded ? (
+      <>{content}</>
+    ) : (
       <div className={styles.page}>
         <div className={styles.pageContainer}>
           <div className={styles.contentContainer}>
-            <div className={styles.glassPanel}>{locale === "nl" ? "Voertuig niet gevonden." : "Vehicle not found."}</div>
+            <VehicleNavBar plate={plate ?? ""} subtitle={locale === "nl" ? "Risico-overzicht" : "Risk overview"} />
+            {content}
           </div>
         </div>
       </div>
     );
+
+  if (!plate || !isValid || isError) {
+    return wrap(
+      <div className={styles.glassPanel}>{locale === "nl" ? "Voertuig niet gevonden." : "Vehicle not found."}</div>
+    );
   }
 
   if (isLoading || !data) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.pageContainer}>
-          <div className={styles.contentContainer}>
-            <div className={styles.glassPanel}>{locale === "nl" ? "Risico-overzicht laden..." : "Loading risk overview..."}</div>
-          </div>
-        </div>
-      </div>
+    return wrap(
+      <div className={styles.glassPanel}>{locale === "nl" ? "Risico-overzicht laden..." : "Loading risk overview..."}</div>
     );
   }
 
@@ -216,13 +219,8 @@ export function RiskOverviewScreen({ plate }: Props) {
     link: buildPlateHref(plate, card.link)
   }));
 
-  return (
-    <div className={styles.page}>
-      <div className={styles.pageContainer}>
-        <div className={styles.contentContainer}>
-          <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Risico-overzicht" : "Risk overview"} />
-
-          <PremiumLock featureName={locale === "nl" ? "Risico-overzicht" : "Risk Overview"} isLocked={true} plate={plate} sectionKey="riskOverview">
+  return wrap(
+    <PremiumLock featureName={locale === "nl" ? "Risico-overzicht" : "Risk Overview"} isLocked={true} plate={plate} sectionKey="riskOverview">
             <div className={`${styles.heroPanel} ${styles.glassPanel}`}>
               <div className={styles.heroCopy}>
                 <div className={styles.eyebrow}>
@@ -285,11 +283,7 @@ export function RiskOverviewScreen({ plate }: Props) {
                 ))}
               </div>
             </div>
-          </PremiumLock>
-
-        </div>
-      </div>
-    </div>
+    </PremiumLock>
   );
 }
 

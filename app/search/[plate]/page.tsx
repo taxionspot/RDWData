@@ -1,9 +1,9 @@
-import { VehicleResultScreen } from "@/components/vehicle/VehicleResultScreen";
+import { FullReportScreen } from "@/components/vehicle/FullReportScreen";
 
 type Props = {
   params: { plate: string };
 };
 
 export default function PlateResultPage({ params }: Props) {
-  return <VehicleResultScreen plate={params.plate} />;
+  return <FullReportScreen plate={params.plate} />;
 }

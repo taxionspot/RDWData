@@ -9,7 +9,7 @@ import { PremiumLock } from "../ui/PremiumLock";
 import { useI18n } from "@/lib/i18n/context";
 import styles from "./ApkFailureIntelligenceScreen.module.css";
 
-type Props = { plate: string };
+type Props = { plate: string; embedded?: boolean };
 
 function toCategory(description: string): string {
   const text = description.toLowerCase();
@@ -29,7 +29,7 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-export function ApkFailureIntelligenceScreen({ plate }: Props) {
+export function ApkFailureIntelligenceScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const { normalized, isValid, data, isLoading, isError } = useVehicleLookup(plate);
 
@@ -83,12 +83,14 @@ export function ApkFailureIntelligenceScreen({ plate }: Props) {
   });
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.contentContainer}>
-        <VehicleNavBar
-          plate={normalized}
-          subtitle={locale === "nl" ? "Model-Year APK Failure Intelligence" : "Model-Year APK Failure Intelligence"}
-        />
+    <div className={embedded ? undefined : styles.pageContainer}>
+      <div className={embedded ? undefined : styles.contentContainer}>
+        {!embedded && (
+          <VehicleNavBar
+            plate={normalized}
+            subtitle={locale === "nl" ? "Model-Year APK Failure Intelligence" : "Model-Year APK Failure Intelligence"}
+          />
+        )}
         <PremiumLock
           featureName={locale === "nl" ? "APK Failure Intelligence" : "APK Failure Intelligence"}
           isLocked={true}

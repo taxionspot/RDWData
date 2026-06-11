@@ -20,6 +20,7 @@ import { PremiumLock } from "../ui/PremiumLock";
 
 type Props = {
   plate: string;
+  embedded?: boolean;
 };
 
 type InspectionEvent = {
@@ -115,7 +116,7 @@ function statusBadge(result: InspectionEvent["result"], locale: "nl" | "en") {
   return { label: locale === "nl" ? "Goedgekeurd" : "Pass", className: "badgePass" };
 }
 
-export function InspectionTimelineScreen({ plate }: Props) {
+export function InspectionTimelineScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate);
   const [filter, setFilter] = useState<"all" | "pass" | "advisory" | "fail">("all");
@@ -229,9 +230,9 @@ export function InspectionTimelineScreen({ plate }: Props) {
   }
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.contentContainer}>
-        <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Inspectietijdlijn" : "Inspection timeline"} />
+    <div className={embedded ? undefined : styles.pageContainer}>
+      <div className={embedded ? undefined : styles.contentContainer}>
+        {!embedded && <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Inspectietijdlijn" : "Inspection timeline"} />}
 
         <PremiumLock
           featureName={locale === "nl" ? "Inspectietijdlijn" : "Inspection timeline"}

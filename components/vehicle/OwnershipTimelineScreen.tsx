@@ -10,6 +10,7 @@ import { PremiumLock } from "../ui/PremiumLock";
 
 type Props = {
   plate: string;
+  embedded?: boolean;
 };
 
 type OwnershipEntry = {
@@ -105,7 +106,7 @@ function IconForType({ type }: { type: OwnershipEntry["icon"] }) {
   return <User size={24} />;
 }
 
-export function OwnershipTimelineScreen({ plate }: Props) {
+export function OwnershipTimelineScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate);
 
@@ -146,9 +147,9 @@ export function OwnershipTimelineScreen({ plate }: Props) {
   ];
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.contentContainer}>
-        <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Eigendomshistorie" : "Ownership history"} />
+    <div className={embedded ? undefined : styles.pageContainer}>
+      <div className={embedded ? undefined : styles.contentContainer}>
+        {!embedded && <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Eigendomshistorie" : "Ownership history"} />}
 
         <PremiumLock
           featureName={locale === "nl" ? "Eigendomshistorie" : "Ownership history"}
