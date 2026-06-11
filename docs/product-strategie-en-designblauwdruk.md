@@ -141,9 +141,11 @@ een aankoop van €15.000?" belachelijk maken.
 | **Dealer/handelaar-abonnement** | €29/mnd (20 rapporten) / €79/mnd (onbeperkt) | Bestaande README-tiering; B2B later activeren. |
 | **Watch mode (na aankoop)** | gratis bij rapport | Retentie + e-mailadres + reden om terug te komen (recall-alerts → nieuwe aankoopcyclus). |
 
-Betaling: **Mollie met iDEAL als eerste knop**, PayPal/kaart als tweede. Eén klik,
-geen verplicht account: e-mail invullen → betalen → rapport open + linkje per mail
-(de mail is meteen het account-zaadje: "zet een wachtwoord en bewaar je rapporten").
+Betaling: **PayPal-checkout** (dekt in NL iDEAL, Apple Pay, Google Pay en creditcard —
+geen extra PSP nodig). iDEAL-knop als eerste funding source voor NL-bezoekers, guest
+checkout aan. Eén klik, geen verplicht account: e-mail invullen → betalen → rapport
+open + linkje per mail (de mail is meteen het account-zaadje: "zet een wachtwoord en
+bewaar je rapporten").
 
 ### 2.4 Nieuwe aanbod-ideeën (gerangschikt op waarde/moeite)
 
@@ -207,17 +209,33 @@ weten: WOK-status (echt!), afgekeurde APK's met structurele gebreken, importgesc
 NAP-anomalieën. Eén zin: "Volledige schadehistorie van verzekeraars is in Nederland niet
 openbaar; dit zijn de officiële signalen." → eerlijkheid verkoopt en beschermt juridisch.
 
+**3.1.5 Tellerrapport-upload (vervangt de lege kilometergrafiek).**
+Onderzoek (zie `onderzoek-rdw-zakelijk-en-concurrenten.md` §2) wees uit dat volledige
+tellerstanden aan níemand verstrekt mogen worden — ook niet aan CARFAX/carVertical —
+en dat onze `MileageTimelineScreen` km-velden parseert die in de open APK-data niet
+bestaan (grafiek is dus leeg). Herontwerp: NAP-oordeel + jaar laatste registratie
+prominent, plus een uploadstap "vraag de verkoper om het gratis RDW-tellerrapport
+(DigiD)" waarvan wij de standen op consistentie toetsen. Weigering van de verkoper
+wordt zelf een signaal. Check daarnaast `aantal_houders` in de mapper: dat veld zit
+niet in de open data, dus de eigenaren-teller is nu leeg — datums tonen i.p.v. aantal.
+
 Daarnaast goedkope verrijkingen uit RDW-velden die we al binnenkrijgen maar niet tonen:
 **maximale trekgewichten** (caravan-kopers!), WLTP-verbruik, zuinigheidsclassificatie,
 taxi-verleden (hebben we al als vlag — prominenter tonen, het is een klassieke rode vlag).
 
 ### 3.2 Fase B — Te regelen externe data-API's (prioriteitsvolgorde)
 
+> ⚠️ **Update na RDW-reactie en onderzoek (zie `onderzoek-rdw-zakelijk-en-concurrenten.md`):**
+> RDW Zakelijk/XML vervalt — RDW verstrekt géén volledige tellerstanden, de dienst heeft
+> een onzekere toekomst en voegt boven open data alleen eigenaren-aantal en
+> gestolen-indicator toe. Mollie vervalt — PayPal dekt iDEAL/Apple Pay/Google Pay/kaart.
+> VWE reageert niet → RDC als alternatief, anders parkeren.
+
 | # | Bron | Wat het toevoegt | Toegang | Kosten (indicatie) | Prioriteit |
 |---|---|---|---|---|---|
-| 1 | **RDW Zakelijk / NAP-tellerstanden** (evt. via VWE of RDC) | Volledige kilometerhistorie (alle registratiemomenten, niet alleen APK) → kilometergrafiek wordt 🟢 i.p.v. 🔵 | RDW-erkenning + certificaat — **let op: er ligt al een Taxionspot-.pfx in de repo; check of er al een RDW-zakelijk relatie is** | ~€0,20–0,50/query | **Hoog — dé kern van het rapport** |
-| 2 | **Mollie** (geen data, wel omzet) | iDEAL-betalingen | Account aanmaken | ~€0,29/transactie | **Hoog — direct doen** |
-| 3 | **VWE voertuigdata** | Uitvoering/opties, importhistorie, schadeverleden-indicatoren, koerslijst-waarde | Commercieel contract (vwe.nl) | per query, custom | Hoog |
+| ~~1~~ | ~~RDW Zakelijk / NAP-tellerstanden~~ | **Vervallen** — tellerstanden mogen niet verstrekt worden; OVI-zakelijk voegt alleen eigenaren-aantal + gestolen-vlag toe | n.v.t. | n.v.t. | ❌ Niet doen |
+| ~~2~~ | ~~Mollie~~ | **Vervallen** — PayPal-checkout dekt iDEAL, Apple Pay, Google Pay en kaarten in NL; wel iDEAL-knop prominent + guest checkout aanzetten | n.v.t. | n.v.t. | ❌ Niet nodig |
+| 3 | **VWE / RDC voertuigdata** | Uitvoering/opties, eigenarenhistorie, schadeverleden-indicatoren, koerslijst-waarde | VWE reageert niet op contactpogingen → **RDC proberen**; anders parkeren | per query, custom | Middel |
 | 4 | **Marktprijzen/comparables** — AutoScout24/Marktplaats partner-API, of Indicata/Autotelex koerslijst | Echte marktwaarde + actuele vergelijkbare advertenties ("12 vergelijkbare auto's, mediaan €14.250") → vraagprijs-check wordt hard | Partnercontract; alternatief: eigen comparables-pipeline | custom / scraping-risico afwegen | **Hoog — grootste waarde-upgrade voor de prijsvraag** |
 | 5 | **CARFAX Europe / autoDNA** | Buitenlandse historie van importauto's (schade, km, taxi in DE/BE/…) | B2B API | ~€1–3/rapport | Middel — alleen automatisch afnemen bij importvlag (kostenefficiënt: ~20% van de auto's) |
 | 6 | **VbV / gestolen-voertuigenregister** | Gestolen-status | Convenant/partner | custom | Middel |
@@ -437,9 +455,10 @@ Volgorde van boven naar beneden (mobiel = zelfde volgorde, gestapeld):
 11. Voorbeeldrapport + landing-herstructurering (§4.6)
 12. Bundel-pricing (3 voor €19,95) + post-purchase upsell
 
-**Parallel (zakelijk):** RDW-zakelijk/NAP-aanvraag starten (checken of de bestaande
-Taxionspot-erkenning bruikbaar is), gesprek met VWE, marktprijzen-bron kiezen,
-affiliate-aanmeldingen (verzekering/aankoopkeuring).
+**Parallel (zakelijk):** marktprijzen-bron kiezen (AutoScout24/Marktplaats/Indicata/
+Autotelex), RDC benaderen (VWE reageert niet), VbV-partnertraject voor gestolen-status,
+affiliate-aanmeldingen (verzekering/aankoopkeuring). RDW-zakelijk en Mollie zijn na
+onderzoek vervallen — zie `onderzoek-rdw-zakelijk-en-concurrenten.md`.
 
 ---
 
