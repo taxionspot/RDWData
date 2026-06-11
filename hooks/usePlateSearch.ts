@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDisplayPlate, normalizePlate, validateDutchPlate } from "@/lib/rdw/normalize";
 import { useI18n } from "@/lib/i18n/context";
+import { trackPlateSearch } from "@/lib/analytics/gtm";
 
 export function usePlateSearch() {
   const router = useRouter();
@@ -34,6 +35,7 @@ export function usePlateSearch() {
     }
 
     setError(null);
+    trackPlateSearch(plate);
     router.push(`/search/${encodeURIComponent(plate)}`);
   };
 

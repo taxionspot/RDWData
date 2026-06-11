@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { PayPalCheckout } from "@/components/payments/PayPalCheckout";
 import { grantPaidAccessForPlate } from "@/lib/payments/access";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { trackBeginCheckout } from "@/lib/analytics/gtm";
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -39,11 +40,21 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
   const [isMounted, setIsMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
-  const canSkipPaymentForDemo = true;
+  const canSkipPaymentForDemo = process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const value = Number.parseFloat(settings.payment.amount);
+    trackBeginCheckout({
+      plate,
+      value: Number.isFinite(value) ? value : 0,
+      currency: settings.payment.currency
+    });
+  }, [isOpen, plate, settings.payment.amount, settings.payment.currency]);
 
   if (!isMounted || !isOpen) return null;
 

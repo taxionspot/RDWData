@@ -97,7 +97,14 @@ export async function POST(request: Request) {
       { upsert: true }
     );
 
-    return NextResponse.json({ ok: true, plate, orderId, status: "COMPLETED" });
+    return NextResponse.json({
+      ok: true,
+      plate,
+      orderId,
+      status: "COMPLETED",
+      amount: firstCapture?.amount?.value ?? "9.95",
+      currency: firstCapture?.amount?.currency_code ?? "EUR"
+    });
   } catch (error) {
     const mapped = mapCaptureError(error);
     return NextResponse.json({ error: mapped.error, code: mapped.code }, { status: mapped.status });

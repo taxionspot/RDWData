@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { trackPurchase } from "@/lib/analytics/gtm";
 
 declare global {
   interface Window {
@@ -46,6 +47,8 @@ function loadPaypalScript(clientId: string, currency: string): Promise<void> {
     script.id = SCRIPT_ID;
     script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=${encodeURIComponent(currency)}`;
     script.async = true;
+    // Payment is strictly necessary; keep Cookiebot auto-blocking from breaking checkout.
+    script.setAttribute("data-cookieconsent", "ignore");
     script.onload = () => resolve();
     script.onerror = () => reject(new Error("Failed to load PayPal SDK."));
     document.body.appendChild(script);
@@ -117,6 +120,19 @@ export function PayPalCheckout({
           const payload = (await response.json().catch(() => ({}))) as { error?: string };
           throw new Error(payload.error ?? "Unable to capture payment.");
         }
+
+        const result = (await response.json().catch(() => ({}))) as {
+          orderId?: string;
+          amount?: string;
+          currency?: string;
+        };
+        const capturedValue = Number.parseFloat(result.amount ?? amount);
+        trackPurchase({
+          transactionId: result.orderId ?? orderID,
+          plate,
+          value: Number.isFinite(capturedValue) ? capturedValue : 0,
+          currency: result.currency ?? currency
+        });
 
         onSuccess();
       },
