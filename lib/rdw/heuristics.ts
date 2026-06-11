@@ -219,8 +219,30 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function getMileagePoints(profile: VehicleProfile, registrationDate: Date | null): MileagePoint[] {
-  const points: MileagePoint[] = [];
+/** Expected annual km from usage signals; 13,500 is the value model's own benchmark. */
+function estimateAnnualKm(v: VehicleProfile["vehicle"]): number {
+  let annual = 13500;
+  const fuel = (v.fuelType ?? "").toLowerCase();
+  if (fuel.includes("diesel")) annual = 22000;
+  else if (fuel.includes("lpg") || fuel.includes("cng") || fuel.includes("aardgas")) annual = 25000;
+  else if (fuel.includes("hybr")) annual = 16000;
+  else if (fuel.includes("elektr")) annual = 15000;
+
+  const body = (v.bodyType ?? "").toLowerCase();
+  if (body.includes("bestel") || body.includes("van")) annual = Math.round(annual * 1.25);
+  if (v.isTaxi) annual = 45000;
+  return annual;
+}
+
+function usageProfileForSlope(kmPerYear: number): string {
+  if (kmPerYear < 8000) return "Recreational";
+  if (kmPerYear < 15000) return "Average";
+  if (kmPerYear < 25000) return "Above average";
+  if (kmPerYear < 45000) return "Intensive";
+  return "Very intensive";
+}
+
+function getMileagePoints(profile: VehicleProfile, registrationDate: Date | null): MileagePoint[] {  const points: MileagePoint[] = [];
   if (!registrationDate) return points;
 
   for (const record of profile.inspections ?? []) {
@@ -244,12 +266,30 @@ function estimateMileage(profile: VehicleProfile, registrationDate: Date | null)
   const dataPoints = [...basePoints, ...points];
 
   if (dataPoints.length < 2) {
+    // RDW open data publishes no per-inspection odometer readings, so this is
+    // the common case. Fall back to our own formula: expected annual km from
+    // usage signals (fuel, body type, taxi history) times vehicle age.
     const latest = points.length ? points[points.length - 1].km : null;
+    if (registrationDate) {
+      const ageYears = Math.max((Date.now() - registrationDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25), 0);
+      const annualKm = estimateAnnualKm(profile.vehicle);
+      const estimated = Math.max(0, roundTo(ageYears * annualKm, 500));
+      return {
+        estimatedMileageNow: estimated,
+        estimatedMileageMin: Math.max(0, roundTo(estimated * 0.75, 500)),
+        estimatedMileageMax: Math.max(0, roundTo(estimated * 1.25, 500)),
+        mileageVerdict: "UNKNOWN" as MileageVerdict,
+        mileageUsageProfile: usageProfileForSlope(annualKm),
+        mileageSlopeKmPerYear: annualKm,
+        mileageAnomalies: [] as MileageAnomaly[],
+        latestMileage: latest
+      };
+    }
     return {
       estimatedMileageNow: latest,
       estimatedMileageMin: null,
       estimatedMileageMax: null,
-      mileageVerdict: latest != null ? "UNKNOWN" : "UNKNOWN" as MileageVerdict,
+      mileageVerdict: "UNKNOWN" as MileageVerdict,
       mileageUsageProfile: null,
       mileageSlopeKmPerYear: null,
       mileageAnomalies: [] as MileageAnomaly[],

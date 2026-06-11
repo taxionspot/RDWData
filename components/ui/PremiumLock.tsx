@@ -5,6 +5,7 @@ import { Lock } from "lucide-react";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { useI18n } from "@/lib/i18n/context";
 import { hasPaidAccessForPlate, ensurePaidAccessChecked, onPlateAccessChanged } from "@/lib/payments/access";
+import { isSamplePlate } from "@/lib/sample";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
 
@@ -39,7 +40,8 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
   const lockByAdmin = sectionKey ? settings.lockSections[sectionKey] : isLocked;
   const shouldLock = settings.paymentEnabled && lockByAdmin && isLocked;
 
-  if (!shouldLock || isUnlockedForPlate) return <>{children}</>;
+  // The public sample plate is always fully open so visitors can see the product.
+  if (!shouldLock || isUnlockedForPlate || isSamplePlate(plate)) return <>{children}</>;
 
 
 

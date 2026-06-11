@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils/cn";
 import { useI18n } from "@/lib/i18n/context";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useCmsPages } from "@/hooks/useCmsPages";
+import { SAMPLE_PLATE } from "@/lib/sample";
 import { ShieldCheck, Menu, X } from "lucide-react";
 
 export function SiteHeader() {
@@ -17,9 +18,9 @@ export function SiteHeader() {
   const { settings } = useSiteSettings();
   const cmsPages = useCmsPages();
   const navLinks = [
-    settings.ui.showFeaturesLink ? { href: "#features", label: t("header.features") } : null,
-    settings.ui.showSampleLink ? { href: "#sample", label: t("header.sample") } : null,
-    settings.ui.showPricingLink ? { href: "#pricing", label: t("header.pricing") } : null
+    settings.ui.showFeaturesLink ? { href: "/#features", label: t("header.features") } : null,
+    settings.ui.showSampleLink ? { href: `/search/${SAMPLE_PLATE}`, label: t("header.sample") } : null,
+    settings.ui.showPricingLink ? { href: "/#pricing", label: t("header.pricing") } : null
   ].filter(Boolean) as Array<{ href: string; label: string }>;
   const pageLinks = cmsPages.filter((page) => page.showInHeader).map((page) => ({ href: `/p/${page.slug}`, label: page.title }));
   const allLinks = [...navLinks, ...pageLinks];

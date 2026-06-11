@@ -32,6 +32,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import styles from "./page.module.css";
 
+import { SAMPLE_PLATE } from "@/lib/sample";
+
 const ICON_MAP: Record<string, LucideIcon> = {
   CarFront,
   Gauge,
@@ -42,8 +44,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Sparkles,
   ShieldCheck
 };
-
-const SAMPLE_PLATE = "16RSL9";
 
 function resolveLegalHref(label: string): string | null {
   const normalized = label.trim().toLowerCase();
@@ -100,16 +100,6 @@ function PlateSearch({ id }: { id?: string }) {
         </button>
       </div>
       {error && <p className={styles.plateError}>{error}</p>}
-      <div className={styles.plateMicro}>
-        <span>
-          <strong>{locale === "nl" ? "Gratis basischeck" : "Free basic check"}</strong>{" "}
-          · {locale === "nl" ? "geen account nodig" : "no account needed"}
-        </span>
-        <span>
-          {locale === "nl" ? "Voorbeeld:" : "Example:"}{" "}
-          <strong>16-RSL-9</strong>
-        </span>
-      </div>
     </div>
   );
 }
@@ -333,31 +323,12 @@ export default function LandingPage() {
           <div className={styles.heroGrid} aria-hidden />
           <div className={styles.heroInner}>
             <div className={styles.heroCopy}>
-              <div className={styles.heroBadge}>
-                <ShieldCheck size={14} />
-                {nl ? "Officiële RDW-data · dagelijks ververst" : "Official RDW data · refreshed daily"}
-              </div>
               <h1 className={styles.heroTitle}>
                 {settings.content.landingHeroTitleA} <span>{settings.content.landingHeroTitleB}</span>
               </h1>
               <p className={styles.heroSubtitle}>{settings.content.landingHeroSubtitle}</p>
 
               <PlateSearch id="hero-plate-input" />
-
-              <div className={styles.heroTrustRow}>
-                <span className={styles.trustChip}>
-                  <CheckCircle2 size={14} />
-                  {nl ? "Officiële RDW-bronnen" : "Official RDW sources"}
-                </span>
-                <span className={styles.trustChip}>
-                  <CheckCircle2 size={14} />
-                  {nl ? "Niet-goed-geld-terug" : "Money-back guarantee"}
-                </span>
-                <span className={styles.trustChip}>
-                  <CheckCircle2 size={14} />
-                  {nl ? "iDEAL · Apple Pay · PayPal" : "iDEAL · Apple Pay · PayPal"}
-                </span>
-              </div>
 
               <div className={styles.heroStats}>
                 <div className={styles.heroStat}>

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
+import { useAiReport } from "@/hooks/useAiReport";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import { getVehicleImageUrl } from "@/lib/utils/imagin";
@@ -368,33 +369,11 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
   const [isSaved, setIsSaved] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
-  const [claudeValue, setClaudeValue] = useState<number | null>(null);
-  const [isCalculatingClaude, setIsCalculatingClaude] = useState(false);
-
-  useEffect(() => {
-    if (!normalized || isError) return;
-    let active = true;
-    setIsCalculatingClaude(true);
-    void (async () => {
-      try {
-        const response = await fetch(`/api/vehicle/${encodeURIComponent(normalized)}?lang=${encodeURIComponent(locale)}&include_ai=1${
-          typeof mileageInput === "number" && Number.isFinite(mileageInput) ? `&mileage=${encodeURIComponent(String(mileageInput))}` : ""
-        }`, { cache: "no-store" });
-        if (!response.ok || !active) return;
-        const payload = await response.json();
-        if (active && payload.aiValuation?.estimatedValueNow) {
-          setClaudeValue(payload.aiValuation.estimatedValueNow);
-        }
-      } catch {
-        // silently fallback
-      } finally {
-        if (active) setIsCalculatingClaude(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [normalized, locale, isError, mileageInput]);
+  const { valuation: aiValuation, loading: isCalculatingClaude } = useAiReport(
+    !isError && normalized ? normalized : "",
+    mileageInput
+  );
+  const claudeValue = aiValuation?.estimatedValueNow ?? null;
 
   const score = useMemo(() => {
     if (!data?.vehicle || !data.enriched) {
@@ -559,7 +538,8 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
     { label: locale === "nl" ? "Zitplaatsen" : "Seats", value: formatNumber(v.seats) },
     { label: locale === "nl" ? "Kleur" : "Color", value: titleCase(v.color.primary) },
     { label: locale === "nl" ? "Leeggewicht" : "Empty weight", value: formatNumber(v.weight?.empty, "kg") }
-  ];
+    // Hide cards without real data instead of showing dashes/"unknown".
+  ].filter((card) => card.value && !["-", "Onbekend", "Unknown", "N/A"].includes(card.value));
 
 
 
@@ -629,7 +609,7 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
                 </div>
                 <div className={styles.imageMetaRow}>
                   <MetaCard label={locale === "nl" ? "Conditie" : "Condition"} value={conditionLabel} />
-                  <MetaCard label={locale === "nl" ? "Eigenaren" : "Owners"} value={ownersLabel} />
+                  {v.owners.count ? <MetaCard label={locale === "nl" ? "Eigenaren" : "Owners"} value={ownersLabel} /> : null}
                   <MetaCard label={locale === "nl" ? "Markt" : "Market"} value={marketLabel} />
                 </div>
               </div>
