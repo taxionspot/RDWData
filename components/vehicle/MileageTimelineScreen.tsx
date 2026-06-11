@@ -306,6 +306,32 @@ export function MileageTimelineScreen({ plate, embedded = false }: Props) {
             </div>
           </div>
 
+          {enrichedMileage?.mileageAnomalies && enrichedMileage.mileageAnomalies.length > 0 ? (
+            <div className={styles.anomalyList}>
+              {enrichedMileage.mileageAnomalies.map((anomaly) => (
+                <div
+                  key={`${anomaly.type}-${anomaly.message}`}
+                  className={`${styles.anomalyItem} ${anomaly.severity === "HIGH" ? styles.anomalyHigh : styles.anomalyMedium}`}
+                >
+                  <strong>
+                    {anomaly.type === "ROLLBACK"
+                      ? locale === "nl" ? "Mogelijke terugdraaiing" : "Possible rollback"
+                      : anomaly.type === "LOW_USAGE"
+                      ? locale === "nl" ? "Opvallend laag gebruik" : "Unusually low usage"
+                      : anomaly.type === "HIGH_USAGE"
+                      ? locale === "nl" ? "Opvallend hoog gebruik" : "Unusually high usage"
+                      : locale === "nl" ? "Afwijkende meting" : "Outlier reading"}
+                  </strong>
+                  <span>
+                    {locale === "nl"
+                      ? "Controleer dit met het RDW-tellerrapport van de verkoper voordat je koopt."
+                      : "Verify this with the seller's RDW odometer report before buying."}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           <div className={styles.dashboardGrid}>
             <div className={styles.chartPanel}>
               <div className={styles.chartHeader}>

@@ -27,6 +27,7 @@ import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
 import { SectionErrorBoundary } from "@/components/ui/SectionErrorBoundary";
 import { isSamplePlate } from "@/lib/sample";
+import { track } from "@/lib/analytics";
 import { ScanIntro } from "./ScanIntro";
 import { AiAnalysisScreen } from "./AiAnalysisScreen";
 import { VehicleResultScreen } from "./VehicleResultScreen";
@@ -369,6 +370,10 @@ export function FullReportScreen({ plate }: Props) {
 
   const unlocked = usePlateUnlocked(normalized, settings.paymentEnabled);
   const priceLabel = `€ ${settings.payment.amount}`;
+
+  useEffect(() => {
+    if (isValid && normalized) track("report_viewed", { sample: isSamplePlate(normalized) });
+  }, [isValid, normalized]);
 
   const isPremiumSection = (section: SectionDef) => {
     if (!section.lockKey) return false;

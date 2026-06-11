@@ -83,6 +83,44 @@ function metricRows(locale: "nl" | "en", data: Record<string, unknown> | null) {
   ];
 }
 
+
+type ScoreInput = {
+  defects: number;
+  recalls: number;
+  riskScore: number;
+  apkPassChance: number;
+  wok: boolean;
+  napOnlogisch: boolean;
+};
+
+/** Gewogen betrouwbaarheidsscore 0-10 voor de vergelijking. */
+function weightedComparisonScore(input: ScoreInput): number {
+  let score = 10;
+  score -= Math.min(input.defects * 0.6, 3.5);
+  score -= Math.min(input.recalls * 0.8, 1.6);
+  score -= Math.min(Math.max(input.riskScore - 4, 0) * 0.35, 2);
+  score += (input.apkPassChance - 75) / 25;
+  if (input.napOnlogisch) score -= 2.5;
+  if (input.wok) score = Math.min(score, 2.5);
+  return Math.max(0.5, Math.min(10, Math.round(score * 10) / 10));
+}
+
+function scoreInputFrom(data: Record<string, unknown> | null | undefined): ScoreInput | null {
+  if (!data) return null;
+  const vehicle = (data.vehicle ?? {}) as Record<string, unknown>;
+  const enriched = (data.enriched ?? {}) as Record<string, unknown>;
+  const defects = Array.isArray(data.defects) ? data.defects.length : 0;
+  const recalls = Array.isArray(data.recalls) ? data.recalls.length : 0;
+  return {
+    defects,
+    recalls,
+    riskScore: Number(enriched.maintenanceRiskScore ?? 5),
+    apkPassChance: Number(enriched.apkPassChance ?? 75),
+    wok: Boolean(vehicle.wok),
+    napOnlogisch: String(vehicle.napVerdict ?? "").toLowerCase().includes("onlogisch")
+  };
+}
+
 export function VehicleComparisonScreen({ plate }: Props) {
   const { locale } = useI18n();
   const router = useRouter();
@@ -306,6 +344,43 @@ export function VehicleComparisonScreen({ plate }: Props) {
               <div className={styles.heroMeta}>{String(compareVehicle.brand ?? "-")} {String(compareVehicle.tradeName ?? "")} {compareVehicle.year ? `(${String(compareVehicle.year)})` : ""}</div>
             </div>
           </div>
+
+          {(() => {
+            const baseInput = scoreInputFrom(baseLookup.data as unknown as Record<string, unknown>);
+            const compareInput = isCompareValid ? scoreInputFrom(compareLookup.data as unknown as Record<string, unknown>) : null;
+            if (!baseInput || !compareInput) return null;
+            const baseScore = weightedComparisonScore(baseInput);
+            const compareScore = weightedComparisonScore(compareInput);
+            const tie = Math.abs(baseScore - compareScore) < 0.3;
+            const winner = tie ? null : baseScore > compareScore ? "A" : "B";
+            return (
+              <div className={styles.scorecard}>
+                <div className={styles.scorecardCol}>
+                  <span className={styles.scorecardLabel}>{locale === "nl" ? "Voertuig A" : "Vehicle A"}</span>
+                  <span className={`${styles.scorecardValue} ${winner === "A" ? styles.scorecardWin : ""}`}>{baseScore.toFixed(1)}</span>
+                </div>
+                <div className={styles.scorecardMid}>
+                  <span className={styles.scorecardTitle}>{locale === "nl" ? "Gewogen betrouwbaarheidsscore" : "Weighted reliability score"}</span>
+                  <span className={styles.scorecardVerdict}>
+                    {tie
+                      ? locale === "nl" ? "Vrijwel gelijkwaardig" : "Nearly equal"
+                      : winner === "A"
+                      ? locale === "nl" ? "Voertuig A scoort beter" : "Vehicle A scores better"
+                      : locale === "nl" ? "Voertuig B scoort beter" : "Vehicle B scores better"}
+                  </span>
+                  <span className={styles.scorecardNote}>
+                    {locale === "nl"
+                      ? "Weging: gebreken, terugroepacties, onderhoudsrisico, APK-kans, NAP en WOK."
+                      : "Weighting: defects, recalls, maintenance risk, APK chance, NAP and WOK."}
+                  </span>
+                </div>
+                <div className={styles.scorecardCol}>
+                  <span className={styles.scorecardLabel}>{locale === "nl" ? "Voertuig B" : "Vehicle B"}</span>
+                  <span className={`${styles.scorecardValue} ${winner === "B" ? styles.scorecardWin : ""}`}>{compareScore.toFixed(1)}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className={styles.table}>
             <div className={styles.colHeader}>

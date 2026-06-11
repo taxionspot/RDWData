@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import styles from "./page.module.css";
+import { track } from "@/lib/analytics";
 
 import { SAMPLE_PLATE } from "@/lib/sample";
 
@@ -67,8 +68,10 @@ function PlateSearch({ id }: { id?: string }) {
     const plate = normalizePlate(value);
     if (!validateDutchPlate(plate)) {
       setError(t("landing.invalidPlate"));
+      track("plate_search_invalid");
       return;
     }
+    track("plate_search_submitted");
     router.push(`/search/${plate}`);
   };
 
@@ -336,6 +339,7 @@ export default function LandingPage() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.sampleBtn}
+                  onClick={() => track("sample_pdf_opened")}
                 >
                   <FileCheck size={16} />
                   {nl ? "Bekijk voorbeeldrapport (PDF)" : "View sample report (PDF)"}

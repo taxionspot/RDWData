@@ -1,5 +1,6 @@
 import { VehicleProfile } from "@/lib/rdw/types";
 import { parseISO, differenceInMonths, differenceInYears } from "date-fns";
+import { computeMrbQuarter } from "@/lib/tax/mrb";
 
 export type MarketValueConfidence = "HIGH" | "MEDIUM" | "LOW";
 export type MileageVerdict = "LOGISCH" | "TWIJFELACHTIG" | "ONLOGISCH" | "UNKNOWN";
@@ -633,32 +634,13 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
   if (ageInMonths && ageInMonths > 120) passChance -= 15;
   if (isImported) passChance -= 5;
 
-  // 6. Repair Chances (Mocked for UI testing, would need B2B data for real)
+  // 6. Repair chances: bewust leeg. We tonen geen verzonnen kansen of
+  // kostenbanden meer; echte modelstatistieken komen uit lib/stats/modelStats.
   const repairChances = [] as { name: string; chance: number; estMin: number; estMax: number }[];
-  if (ageInMonths && ageInMonths > 80) {
-    repairChances.push({ name: "Brakes (discs/pads)", chance: 75, estMin: 350, estMax: 600 });
-    repairChances.push({ name: "Battery replacement", chance: 40, estMin: 100, estMax: 250 });
-  }
-  if (ageInMonths && ageInMonths > 140) {
-    repairChances.push({ name: "Timing belt/chain", chance: 65, estMin: 400, estMax: 800 });
-    repairChances.push({ name: "Shock absorbers", chance: 55, estMin: 300, estMax: 500 });
-  }
 
-  // 7. Road Tax Estimate (Extremely simplified)
-  let taxMin = 0; let taxMax = 0;
-  if (v.weight?.empty) {
-    const w = v.weight.empty;
-    if (v.fuelType === "Benzine") {
-      taxMin = Math.floor(w * 0.05); taxMax = taxMin + 15;
-    } else if (v.fuelType === "Diesel") {
-      taxMin = Math.floor(w * 0.09); taxMax = taxMin + 25;
-    } else if (v.fuelType === "Elektriciteit") {
-      taxMin = 0; taxMax = 0; // temporary exemption
-    } else {
-      taxMin = Math.floor(w * 0.05); taxMax = taxMin + 20;
-    }
-  }
-  const tax = taxMin > 0 ? { min: taxMin, max: taxMax } : null;
+  // 7. Road Tax (MRB): Belastingdienst-structuur, bandbreedte over provincies.
+  const mrb = computeMrbQuarter(v.weight?.empty ?? null, v.fuelType);
+  const tax = mrb ? { min: mrb.min, max: mrb.max } : null;
 
   // 8. Insurance Estimate (Heuristic based on Value & Weight)
   // Very rough heuristic: Base 25 + (Value * 0.0015) + (Weight * 0.01)
@@ -688,24 +670,9 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     fuelEst = Math.round((1000 / 100) * consumptionAvg * pricePerUnit);
   }
 
-  // 10. Known Issues (Mocked heuristics)
+  // 10. Known issues: bewust leeg. Generieke merk-templates zijn verwijderd;
+  // echte gebrekstatistieken per model komen uit lib/stats/modelStats.
   const knownIssues = [] as { title: string; severity: string; target: string; advice: string }[];
-  const brand = (v.brand || "").toUpperCase();
-  if (ageInMonths && ageInMonths > (10 * 12)) {
-    if (brand.includes("TOYOTA")) {
-      knownIssues.push({
-        title: "Timing chain wear", severity: "Moderate", target: "Older VVT-i engines", advice: "Check for rattling noises during cold start."
-      });
-    }
-    if (brand.includes("VOLKSWAGEN") || brand.includes("AUDI")) {
-      knownIssues.push({
-        title: "Oil consumption TFSI", severity: "High", target: "1.8 and 2.0 engines (2008-2012)", advice: "Ask for oil consumption history."
-      });
-    }
-    knownIssues.push({
-      title: "Clutch issues", severity: "Common", target: "All years", advice: "Check for wear during test drive."
-    });
-  }
 
   return {
     ageInMonths,

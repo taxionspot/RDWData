@@ -298,3 +298,136 @@
   font-weight: 600;
   color: #94a3b8;
 }
+
+/* Checkout polish */
+.payMethodsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.payMethodsRow span {
+  border: 1px solid #e2e8f2;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.guaranteeLine {
+  margin-top: 10px;
+  color: #16a34a;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.emailNote {
+  margin-top: 8px;
+  color: #5b6b84;
+  font-size: 0.78rem;
+}
+
+.emailHint {
+  margin-top: 8px;
+  color: #dc2626;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.errorBox {
+  margin-top: 12px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #991b1b;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.retryBtn {
+  border: none;
+  cursor: pointer;
+  border-radius: 9px;
+  padding: 8px 14px;
+  background: #dc2626;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* Success view */
+.successView {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 26px 8px 10px;
+}
+
+.successIcon {
+  color: #16a34a;
+}
+
+.successTitle {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.successText {
+  color: #5b6b84;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  max-width: 380px;
+}
+
+.successActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.successPrimary {
+  border: none;
+  cursor: pointer;
+  border-radius: 12px;
+  padding: 12px 22px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.successSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cbd8ea;
+  border-radius: 12px;
+  padding: 12px 18px;
+  background: #fff;
+  color: #1d4ed8;
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.successUpsell {
+  margin-top: 8px;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

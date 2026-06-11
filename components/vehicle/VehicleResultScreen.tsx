@@ -28,6 +28,7 @@ import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import { getVehicleImageUrl } from "@/lib/utils/imagin";
 import { useI18n } from "@/lib/i18n/context";
 import { hasPaidAccessForPlate } from "@/lib/payments/access";
+import { track } from "@/lib/analytics";
 import styles from "./VehicleResultScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
@@ -44,6 +45,7 @@ type ScoreResult = {
   description: string;
   confidence: string;
   riskFlag: string;
+  breakdown: Array<{ label: string; points: number }>;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -93,57 +95,81 @@ function buildScoreResult(args: {
   apkPassChance: number | null;
   wok: boolean;
   imported: boolean;
+  napOnlogisch: boolean;
+  openRecall: boolean;
   locale: "nl" | "en";
 }): ScoreResult {
-  const base = 78;
-  const defectPenalty = Math.min(args.defects * 2.5, 18);
-  const riskPenalty = Math.round(args.riskScore * 2.2);
-  const wokPenalty = args.wok ? 16 : 0;
-  const importPenalty = args.imported ? 6 : 0;
-  const apkBonus = args.apkPassChance ? Math.round(args.apkPassChance / 12) : 0;
+  const nl = args.locale === "nl";
+  const breakdown: Array<{ label: string; points: number }> = [];
+  const base = 82;
+  breakdown.push({ label: nl ? "Basisscore" : "Base score", points: base });
 
-  const score = clamp(base + apkBonus - defectPenalty - riskPenalty - wokPenalty - importPenalty, 32, 95);
+  // Defects are counted here directly; the maintenance risk factor below only
+  // carries age/weight signals, so defects are not penalised twice.
+  const defectPenalty = Math.min(args.defects * 2.5, 20);
+  if (defectPenalty > 0) {
+    breakdown.push({ label: nl ? `${args.defects} geconstateerde gebreken` : `${args.defects} recorded defects`, points: -Math.round(defectPenalty) });
+  }
+
+  const maintenancePenalty = Math.min(Math.max(args.riskScore - 4, 0) * 1.5, 9);
+  if (maintenancePenalty > 0) {
+    breakdown.push({ label: nl ? "Onderhoudsrisico (leeftijd/gewicht)" : "Maintenance risk (age/weight)", points: -Math.round(maintenancePenalty) });
+  }
+
+  const napPenalty = args.napOnlogisch ? 20 : 0;
+  if (napPenalty > 0) breakdown.push({ label: nl ? "NAP-oordeel onlogisch" : "NAP verdict implausible", points: -napPenalty });
+
+  const importPenalty = args.imported ? 6 : 0;
+  if (importPenalty > 0) breakdown.push({ label: nl ? "Importvoertuig" : "Imported vehicle", points: -importPenalty });
+
+  const recallPenalty = args.openRecall ? 5 : 0;
+  if (recallPenalty > 0) breakdown.push({ label: nl ? "Open terugroepactie" : "Open recall", points: -recallPenalty });
+
+  const apkBonus = args.apkPassChance != null ? Math.round(clamp((args.apkPassChance - 70) / 4, -5, 7)) : 0;
+  if (apkBonus !== 0) {
+    breakdown.push({ label: nl ? "APK-slaagkans" : "APK pass chance", points: apkBonus });
+  }
+
+  let score = clamp(
+    Math.round(base - defectPenalty - maintenancePenalty - napPenalty - importPenalty - recallPenalty + apkBonus),
+    20,
+    95
+  );
+
+  // A WOK registration (awaiting inspection after serious damage) is a hard
+  // cap: this vehicle cannot score as a safe buy.
+  if (args.wok) {
+    score = Math.min(score, 35);
+    breakdown.push({ label: nl ? "WOK-registratie (maximum 35)" : "WOK registration (capped at 35)", points: 0 });
+  }
+
   const tone = getScoreTone(score);
 
   const labelByTone: Record<ScoreTone, string> = {
-    strong: args.locale === "nl" ? "Sterk resultaat" : "Strong result",
-    steady: args.locale === "nl" ? "Stabiel profiel" : "Steady profile",
-    mixed: args.locale === "nl" ? "Gemengde signalen" : "Mixed signals",
-    caution: args.locale === "nl" ? "Controle nodig" : "Needs review"
+    strong: nl ? "Sterk resultaat" : "Strong result",
+    steady: nl ? "Stabiel profiel" : "Steady profile",
+    mixed: nl ? "Gemengde signalen" : "Mixed signals",
+    caution: nl ? "Controle nodig" : "Needs review"
   };
 
   const descriptionByTone: Record<ScoreTone, string> = {
-    strong:
-      args.locale === "nl"
-        ? "Positief eigendoms- en gebruiksprofiel met een sterk vertrouwenssignaal."
-        : "Positive ownership and usage profile with a healthy overall confidence signal.",
-    steady:
-      args.locale === "nl"
-        ? "De meeste signalen zijn stabiel, met enkele kleine aandachtspunten."
-        : "Most signals look solid with only minor items to double-check.",
-    mixed:
-      args.locale === "nl"
-        ? "Meerdere signalen vragen extra controle voor je beslist."
-        : "Several signals need closer attention before making a decision.",
-    caution:
-      args.locale === "nl"
-        ? "Belangrijke signalen vereisen opvolging voordat je doorgaat."
-        : "Key signals require follow-up before moving forward."
+    strong: nl
+      ? "Positief profiel met sterke signalen in de officiële datasets."
+      : "Positive profile with strong signals in the official datasets.",
+    steady: nl
+      ? "De meeste signalen zijn stabiel, met enkele kleine aandachtspunten."
+      : "Most signals look solid with only minor items to double-check.",
+    mixed: nl
+      ? "Meerdere signalen vragen extra controle voor je beslist."
+      : "Several signals need closer attention before making a decision.",
+    caution: nl
+      ? "Belangrijke signalen vereisen opvolging voordat je doorgaat."
+      : "Key signals require follow-up before moving forward."
   };
 
   const confidence =
-    tone === "strong" || tone === "steady"
-      ? args.locale === "nl"
-        ? "Hoog"
-        : "High"
-      : tone === "mixed"
-      ? args.locale === "nl"
-        ? "Middel"
-        : "Medium"
-      : args.locale === "nl"
-      ? "Laag"
-      : "Low";
-  const riskFlag = args.wok || args.defects > 4 ? (args.locale === "nl" ? "Verhoogd" : "Elevated") : args.locale === "nl" ? "Laag" : "Low";
+    tone === "strong" || tone === "steady" ? (nl ? "Hoog" : "High") : tone === "mixed" ? (nl ? "Middel" : "Medium") : nl ? "Laag" : "Low";
+  const riskFlag = args.wok || args.napOnlogisch || args.defects > 4 ? (nl ? "Verhoogd" : "Elevated") : nl ? "Laag" : "Low";
 
   return {
     score,
@@ -151,7 +177,8 @@ function buildScoreResult(args: {
     label: labelByTone[tone],
     description: descriptionByTone[tone],
     confidence,
-    riskFlag
+    riskFlag,
+    breakdown
   };
 }
 
@@ -276,6 +303,18 @@ function ScoreModule({
 
       <div className={styles.scoreCopy}>{score.description}</div>
 
+      <details className={styles.scoreBreakdown}>
+        <summary>{locale === "nl" ? "Waarom deze score?" : "Why this score?"}</summary>
+        <ul>
+          {score.breakdown.map((item) => (
+            <li key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.points > 0 ? `+${item.points}` : item.points === 0 ? "" : item.points}</strong>
+            </li>
+          ))}
+        </ul>
+      </details>
+
       <div className={styles.scoreMetrics}>
         <div className={styles.scoreMetricCard}>
           <div className={styles.scoreMetricLabel}>{locale === "nl" ? "Betrouwbaarheid" : "Confidence"}</div>
@@ -377,7 +416,7 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
 
   const score = useMemo(() => {
     if (!data?.vehicle || !data.enriched) {
-      return buildScoreResult({ defects: 0, riskScore: 6, apkPassChance: 78, wok: false, imported: false, locale });
+      return buildScoreResult({ defects: 0, riskScore: 6, apkPassChance: 78, wok: false, imported: false, napOnlogisch: false, openRecall: false, locale });
     }
 
     return buildScoreResult({
@@ -386,6 +425,8 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
       apkPassChance: data.enriched.apkPassChance,
       wok: data.vehicle.wok,
       imported: data.enriched.isImported,
+      napOnlogisch: (data.vehicle.napVerdict ?? "").toLowerCase().includes("onlogisch"),
+      openRecall: Boolean(data.vehicle.hasOpenRecall),
       locale
     });
   }, [data, locale]);
@@ -421,6 +462,7 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
 
   const downloadReport = async () => {
     if (isDownloading) return;
+    track("pdf_download", { plate: normalizedPlate });
     setIsDownloading(true);
     try {
       await downloadReportFile(normalizedPlate, locale, mileageInput);

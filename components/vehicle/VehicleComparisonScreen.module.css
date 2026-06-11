@@ -238,3 +238,90 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Mobile: stack metric label above the two value columns */
+@media (max-width: 700px) {
+  .row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .metric {
+    grid-column: 1 / -1;
+    padding: 8px 14px;
+    font-size: 0.78rem;
+    background: #f1f5f9;
+  }
+}
+
+/* Weighted scorecard */
+.scorecard {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+  border: 1px solid #dce3ec;
+  border-radius: 14px;
+  background: #fff;
+  padding: 18px 22px;
+  margin-bottom: 14px;
+}
+
+.scorecardCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.scorecardLabel {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5b6b84;
+}
+
+.scorecardValue {
+  font-size: 1.9rem;
+  font-weight: 900;
+  color: #334155;
+}
+
+.scorecardWin {
+  color: #16a34a;
+}
+
+.scorecardMid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.scorecardTitle {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.scorecardVerdict {
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.scorecardNote {
+  color: #94a3b8;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 560px) {
+  .scorecard {
+    grid-template-columns: 1fr 1fr;
+  }
+  .scorecardMid {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+}

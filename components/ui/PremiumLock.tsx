@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { hasPaidAccessForPlate, ensurePaidAccessChecked, onPlateAccessChanged } from "@/lib/payments/access";
 import { isSamplePlate } from "@/lib/sample";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { track } from "@/lib/analytics";
 import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
 
 
@@ -45,7 +46,10 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
 
 
 
-  const openModal = () => setShowModal(true);
+  const openModal = () => {
+    track("lock_clicked", { feature: featureName, section: sectionKey ?? "generic" });
+    setShowModal(true);
+  };
 
   return (
     <div className={styles.lockContainer}>

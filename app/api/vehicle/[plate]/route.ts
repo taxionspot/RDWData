@@ -49,6 +49,46 @@ async function hasPaidReportAccess(plate: string): Promise<boolean> {
   return Boolean(hasPaid);
 }
 
+const AI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * AI output is cached per plate+locale (mileage rounded to 5.000 km buckets)
+ * and shared across all visitors: the same car yields the same analysis, so
+ * one Claude call serves everyone for a week.
+ */
+function aiCacheKey(plate: string, locale: Locale, userMileage: number | null): string {
+  const bucket = userMileage === null ? "" : String(Math.round(userMileage / 5000) * 5000);
+  return `${plate}|${locale}|${bucket}`;
+}
+
+async function readAiCache(key: string): Promise<{ insights: unknown; valuation: unknown } | null> {
+  try {
+    await connectMongo();
+    const { AiReportCacheModel } = await import("@/models/AiReportCache");
+    const doc = await AiReportCacheModel.findById(key).lean();
+    if (doc && doc.expiresAt && new Date(doc.expiresAt).getTime() > Date.now() && doc.insights) {
+      return { insights: doc.insights, valuation: doc.valuation };
+    }
+  } catch {
+    // cache unavailable: fall through to live generation
+  }
+  return null;
+}
+
+async function writeAiCache(key: string, insights: unknown, valuation: unknown): Promise<void> {
+  try {
+    await connectMongo();
+    const { AiReportCacheModel } = await import("@/models/AiReportCache");
+    await AiReportCacheModel.findByIdAndUpdate(
+      key,
+      { _id: key, insights, valuation, createdAt: new Date(), expiresAt: new Date(Date.now() + AI_CACHE_TTL_MS) },
+      { upsert: true }
+    );
+  } catch {
+    // best effort
+  }
+}
+
 async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: number | null) {
   const profile = await getVehicleProfile(plate);
   let localized = localizeVehicleProfile(profile, locale) as Record<string, unknown>;
@@ -66,6 +106,17 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
           : null
     };
   }
+
+  const cacheKey = aiCacheKey(plate, locale, userMileage);
+  const cached = await readAiCache(cacheKey);
+  if (cached) {
+    return {
+      localized,
+      aiInsights: cached.insights as ReturnType<typeof buildFallbackVehicleAiReport>["insights"],
+      aiValuation: cached.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
+    };
+  }
+
   try {
     const aiReport = await generateVehicleAiReport({
       plate,
@@ -75,6 +126,7 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
         userContext: userMileage !== null ? { mileageInput: userMileage } : undefined
       }
     });
+    await writeAiCache(cacheKey, aiReport.insights, aiReport.valuation);
     return {
       localized,
       aiInsights: aiReport.insights,

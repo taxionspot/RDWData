@@ -1,6 +1,7 @@
 import { PDFDocument, rgb, StandardFonts, type PDFPage, type PDFFont, type PDFImage } from "pdf-lib";
 import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import { getVehicleImageUrl } from "@/lib/utils/imagin";
+import { computeNegotiationPricing } from "@/lib/api/negotiation-pricing";
 
 type AiInsights = {
   summary: string;
@@ -287,6 +288,40 @@ class PdfLayout {
       rows.forEach((r) => drawRow(r.slice(0, headers.length), false));
     }
     this.y -= 6;
+  }
+
+  disclaimer(title: string, lines: string[]) {
+    const size = 7.5;
+    const lineHeight = 10;
+    const wrapped = lines.flatMap((line) => splitText(line, this.regular, size, CONTENT_WIDTH - 16));
+    const blockHeight = wrapped.length * lineHeight + 24;
+    this.ensureHeight(blockHeight + 6);
+    this.page.drawRectangle({
+      x: MARGIN,
+      y: this.y - blockHeight,
+      width: CONTENT_WIDTH,
+      height: blockHeight,
+      color: rgb(0.97, 0.975, 0.985),
+      borderColor: rgb(0.86, 0.9, 0.96),
+      borderWidth: 0.5
+    });
+    this.page.drawText(title, {
+      x: MARGIN + 8,
+      y: this.y - 13,
+      font: this.bold,
+      size: 8,
+      color: rgb(0.3, 0.38, 0.5)
+    });
+    wrapped.forEach((line, index) => {
+      this.page.drawText(line, {
+        x: MARGIN + 8,
+        y: this.y - 25 - index * lineHeight,
+        font: this.regular,
+        size,
+        color: rgb(0.38, 0.45, 0.55)
+      });
+    });
+    this.y -= blockHeight + 6;
   }
 
   drawCardRow(cards: Array<{ title: string; value: string; accent?: ReturnType<typeof rgb> }>) {
@@ -655,16 +690,93 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   }
 
   if (aiInsights) {
-    layout.section(locale === "nl" ? "AI feedback en advies" : "AI Feedback and Opinion");
-    layout.keyValue(locale === "nl" ? "Aankoop verdict" : "Purchase verdict", `${aiInsights.purchaseVerdict} (${aiInsights.riskLevel})`);
+    layout.section(locale === "nl" ? "AI-analyse" : "AI Analysis");
     layout.keyValue(locale === "nl" ? "Samenvatting" : "Summary", aiInsights.summary);
-    layout.keyValue(locale === "nl" ? "Sterke punten" : "Positives", aiInsights.positives.join(" | "));
-    layout.keyValue(locale === "nl" ? "Risico's" : "Risks", aiInsights.risks.join(" | "));
+    layout.keyValue(locale === "nl" ? "Sterke punten" : "Positives", aiInsights.positives.length > 0 ? aiInsights.positives.join(" | ") : "-");
+    layout.keyValue(locale === "nl" ? "Aandachtspunten" : "Points of attention", aiInsights.risks.length > 0 ? aiInsights.risks.join(" | ") : "-");
     layout.keyValue(locale === "nl" ? "Aanbeveling" : "Recommendation", aiInsights.recommendation);
+    layout.keyValue(locale === "nl" ? "Aankoopverdict" : "Purchase verdict", `${aiInsights.purchaseVerdict} (${aiInsights.riskLevel})`);
     if (aiInsights.recommendations.length > 0) {
       layout.keyValue(locale === "nl" ? "Concrete vervolgstappen" : "Concrete next steps", aiInsights.recommendations.join(" | "));
     }
   }
+
+  const marketNowRaw = toNumber(enriched.estimatedValueNow);
+  const marketNow = marketNowRaw ?? 0;
+  const marketMin = toNumber(enriched.estimatedValueMin) ?? marketNow * 0.9;
+  const marketMax = toNumber(enriched.estimatedValueMax) ?? marketNow * 1.1;
+  const riskScore = toNumber(enriched.maintenanceRiskScore) ?? 6;
+  const mileagePlausible =
+    enriched.userMileagePlausible === null || enriched.userMileagePlausible === undefined
+      ? null
+      : Boolean(enriched.userMileagePlausible);
+  const pricing = computeNegotiationPricing({
+    marketNow,
+    marketMin,
+    marketMax,
+    riskScore,
+    defects: defects.length,
+    recalls: recalls.length,
+    mileagePlausible
+  });
+
+  layout.section(locale === "nl" ? "Onderhandelcoach" : "Negotiation Coach");
+  if (marketNowRaw !== null && marketNowRaw > 0) {
+    layout.drawCardRow([
+      {
+        title: locale === "nl" ? "Aanbevolen biedrange" : "Recommended offer range",
+        value: `${currency(pricing.offerMin)} - ${currency(pricing.offerMax)}`,
+        accent: rgb(0.07, 0.44, 0.63)
+      },
+      {
+        title: locale === "nl" ? "Walk-away grens" : "Walk-away threshold",
+        value: currency(pricing.walkAway),
+        accent: rgb(0.72, 0.12, 0.18)
+      },
+      {
+        title: locale === "nl" ? "Reparatiereserve" : "Repair reserve",
+        value: `${currency(pricing.reserveMin)} - ${currency(pricing.reserveMax)}`,
+        accent: rgb(0.78, 0.5, 0.08)
+      }
+    ]);
+    layout.keyValue(
+      locale === "nl" ? "Strategie" : "Strategy",
+      locale === "nl"
+        ? "Start bij de onderkant van de biedrange en sluit idealiter binnen deze band. Boven de walk-away grens neemt uw nadeel toe ten opzichte van markt en risico. Houd de reparatiereserve apart voor verrassingskosten in het eerste jaar."
+        : "Start near the lower bound of the offer range and ideally close within this band. Above the walk-away threshold your downside increases against market and risk. Keep the repair reserve aside for surprise costs in the first year."
+    );
+    layout.keyValue(
+      locale === "nl" ? "Referentiewaarde" : "Reference value",
+      `${currency(marketNow)} (${currency(marketMin)} - ${currency(marketMax)})`
+    );
+  } else {
+    layout.keyValue(
+      locale === "nl" ? "Status" : "Status",
+      locale === "nl"
+        ? "Onvoldoende marktdata om een biedstrategie te berekenen."
+        : "Insufficient market data to compute an offer strategy."
+    );
+  }
+
+  const yesNo = (value: unknown) =>
+    value === true ? (locale === "nl" ? "Ja" : "Yes") : value === false ? (locale === "nl" ? "Nee" : "No") : "-";
+
+  layout.section(locale === "nl" ? "Schadesignalen" : "Damage Signals");
+  layout.keyValue(locale === "nl" ? "WOK-status (Wachten Op Keuren)" : "WOK status (awaiting inspection)", yesNo(vehicle.wok));
+  layout.keyValue(
+    locale === "nl" ? "Geconstateerde gebreken" : "Recorded defects",
+    `${derivedDefects.length} ${locale === "nl" ? "record(s) in APK-historie" : "record(s) in inspection history"}`
+  );
+  layout.keyValue(
+    locale === "nl" ? "Open terugroepactie" : "Open recall",
+    `${yesNo(vehicle.hasOpenRecall)} (${recalls.length} ${locale === "nl" ? "geregistreerd" : "recorded"})`
+  );
+  layout.keyValue(
+    locale === "nl" ? "Belangrijk" : "Important",
+    locale === "nl"
+      ? "Verzekeringsschade is in Nederland niet openbaar. Dit rapport toont daarom alleen schadesignalen uit officiële RDW-data, geen claimhistorie van verzekeraars."
+      : "Insurance damage records are not public in the Netherlands. This report therefore only shows damage signals from official RDW data, not insurer claim history."
+  );
 
   layout.section(locale === "nl" ? "Brondata samenvatting" : "Source Data Summary");
   layout.keyValue("raw.main", `${rawMain.length} ${locale === "nl" ? "records" : "records"}`);
@@ -675,6 +787,22 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   layout.keyValue("raw.body", `${body.length} ${locale === "nl" ? "records" : "records"}`);
   layout.keyValue("raw.typeApprovals", `${typeApprovals.length} ${locale === "nl" ? "records" : "records"}`);
 
+  layout.disclaimer(
+    "Disclaimer",
+    locale === "nl"
+      ? [
+          "De getoonde marktwaarde is een indicatieve schatting en geen aankoopadvies.",
+          "Dit rapport is een automatische analyse op basis van officiële RDW-data en kan onvolledig of verouderd zijn.",
+          "Dit rapport is digitale content. Na levering vervalt het herroepingsrecht.",
+          "Bronvermelding: RDW open data."
+        ]
+      : [
+          "The market value shown is an indicative estimate and not purchase advice.",
+          "This report is an automated analysis based on official RDW data and may be incomplete or outdated.",
+          "This report is digital content. The right of withdrawal lapses after delivery.",
+          "Source attribution: RDW open data."
+        ]
+  );
 }
 
 async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; contentType: string } | null> {

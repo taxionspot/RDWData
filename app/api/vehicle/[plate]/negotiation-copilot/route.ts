@@ -5,6 +5,7 @@ import { getVehicleProfile } from "@/lib/rdw/service";
 import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
 import { buildFallbackNegotiationCopilotAdvice, generateNegotiationCopilotAdvice, generateVehicleAiReport } from "@/lib/api/claude";
+import { computeNegotiationPricingFromAiRisk } from "@/lib/api/negotiation-pricing";
 
 type Params = { params: { plate: string } };
 
@@ -54,7 +55,6 @@ export async function POST(request: Request, { params }: Params) {
       reserveMax: Math.max(500, Math.round(Number(body.context?.reserveMax ?? 0)))
     };
 
-    const roundTo50 = (value: number) => Math.round(value / 50) * 50;
     let context = fallbackContext;
     try {
       const aiReport = await generateVehicleAiReport({
@@ -65,17 +65,12 @@ export async function POST(request: Request, { params }: Params) {
           userContext: mileageInput !== null ? { mileageInput } : undefined
         }
       });
-      const now = aiReport.valuation.estimatedValueNow;
-      const min = aiReport.valuation.estimatedValueMin;
-      const max = aiReport.valuation.estimatedValueMax;
-      const riskBase = aiReport.insights.riskLevel === "HIGH" ? 0.16 : aiReport.insights.riskLevel === "MEDIUM" ? 0.1 : 0.06;
-      context = {
-        offerMin: roundTo50(Math.max(500, min * (1 - riskBase))),
-        offerMax: roundTo50(Math.max(650, now * (1 - riskBase * 0.35))),
-        walkAway: roundTo50(Math.max(700, max * (1 + riskBase * 0.2))),
-        reserveMin: roundTo50(Math.max(350, now * 0.045 + riskBase * 1200)),
-        reserveMax: roundTo50(Math.max(500, now * 0.09 + riskBase * 2000))
-      };
+      context = computeNegotiationPricingFromAiRisk({
+        estimatedValueNow: aiReport.valuation.estimatedValueNow,
+        estimatedValueMin: aiReport.valuation.estimatedValueMin,
+        estimatedValueMax: aiReport.valuation.estimatedValueMax,
+        riskLevel: aiReport.insights.riskLevel
+      });
       localized.aiValuation = aiReport.valuation;
       localized.aiInsights = aiReport.insights;
     } catch {

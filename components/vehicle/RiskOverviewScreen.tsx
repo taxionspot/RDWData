@@ -197,6 +197,42 @@ export function RiskOverviewScreen({ plate, embedded = false }: Props) {
       link: "/ownership-history"
     },
     {
+      id: "insurance",
+      title: locale === "nl" ? "Verzekering (WAM)" : "Insurance (WAM)",
+      status: v.insured ? (locale === "nl" ? "Geregistreerd verzekerd" : "Registered insured") : (locale === "nl" ? "Geen WAM-registratie" : "No WAM registration"),
+      description:
+        locale === "nl"
+          ? "Zonder WAM-verzekering mag een voertuig de openbare weg niet op."
+          : "Without WAM insurance a vehicle is not allowed on public roads.",
+      badge: v.insured ? (locale === "nl" ? "In orde" : "OK") : (locale === "nl" ? "Let op" : "Warning"),
+      trend: v.insured ? (locale === "nl" ? "Actief verzekerd" : "Actively insured") : (locale === "nl" ? "Controleer status" : "Check status"),
+      icon: ShieldCheck,
+      tone: v.insured ? "success" : "warning",
+      link: "/ownership-history"
+    },
+    {
+      id: "usage",
+      title: locale === "nl" ? "Gebruikshistorie" : "Usage history",
+      status: v.isTaxi
+        ? (locale === "nl" ? "Taxi-verleden" : "Taxi history")
+        : v.exportIndicator
+        ? (locale === "nl" ? "Exportmarkering" : "Export flag")
+        : (locale === "nl" ? "Geen bijzonderheden" : "No special flags"),
+      description:
+        locale === "nl"
+          ? "Taxi-gebruik en exportmarkeringen uit het RDW-register."
+          : "Taxi use and export flags from the RDW register.",
+      badge: v.isTaxi || v.exportIndicator ? (locale === "nl" ? "Controleren" : "Review") : (locale === "nl" ? "Schoon" : "Clear"),
+      trend: v.isTaxi
+        ? (locale === "nl" ? "Intensief gebruik waarschijnlijk" : "Intensive use likely")
+        : v.exportIndicator
+        ? (locale === "nl" ? "Voor export gemarkeerd" : "Marked for export")
+        : (locale === "nl" ? "Regulier gebruik" : "Regular use"),
+      icon: Users,
+      tone: v.isTaxi || v.exportIndicator ? "warning" : "success",
+      link: "/ownership-history"
+    },
+    {
       id: "apk",
       title: locale === "nl" ? "APK-keuring" : "APK Inspection",
       status: v.apkExpiryDate

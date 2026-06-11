@@ -3,6 +3,7 @@ import { Inter, Outfit } from "next/font/google";
 import { StoreProvider } from "@/lib/store/provider";
 import { I18nProvider } from "@/lib/i18n/context";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { AnalyticsScripts } from "@/components/layout/AnalyticsScripts";
 import "./globals.css";
 
 const bodyFont = Inter({
@@ -40,6 +41,7 @@ export default function RootLayout({
       >
         <StoreProvider>
           <I18nProvider>
+            <AnalyticsScripts />
             <SiteHeader />
             <div className="min-h-screen">{children}</div>
           </I18nProvider>
