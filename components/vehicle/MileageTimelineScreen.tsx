@@ -154,23 +154,59 @@ export function MileageTimelineScreen({ plate, embedded = false }: Props) {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [data, locale]);
 
-  const latestMileage = events.length ? events[events.length - 1].mileage : null;
-  const firstDate = events.length ? new Date(events[0].date).getTime() : null;
-  const lastDate = events.length ? new Date(events[events.length - 1].date).getTime() : null;
+  const enrichedMileage = data?.enriched ?? null;
+  const realKmEvents = useMemo(
+    () => events.filter((event) => event.mileage != null && event.mileage > 0),
+    [events]
+  );
+  const hasRealKm = realKmEvents.length >= 2;
+  // RDW open data bevat geen tellerstanden; zonder echte meetpunten tonen we
+  // de schatting van onze eigen formule (leeftijd x verwacht jaarkilometrage).
+  const isFormulaEstimate = !hasRealKm && Boolean(enrichedMileage?.estimatedMileageNow);
+
+  const latestMileage = hasRealKm
+    ? realKmEvents[realKmEvents.length - 1].mileage
+    : enrichedMileage?.estimatedMileageNow ?? null;
+
   const avgAnnual = useMemo(() => {
-    if (!firstDate || !lastDate || !latestMileage) return null;
-    const years = Math.max((lastDate - firstDate) / (1000 * 60 * 60 * 24 * 365.25), 1);
-    return Math.round(latestMileage / years);
-  }, [firstDate, lastDate, latestMileage]);
+    if (hasRealKm) {
+      const first = new Date(realKmEvents[0].date).getTime();
+      const last = new Date(realKmEvents[realKmEvents.length - 1].date).getTime();
+      const km = realKmEvents[realKmEvents.length - 1].mileage ?? 0;
+      const years = Math.max((last - first) / (1000 * 60 * 60 * 24 * 365.25), 1);
+      return Math.round(km / years);
+    }
+    return enrichedMileage?.mileageSlopeKmPerYear ?? null;
+  }, [hasRealKm, realKmEvents, enrichedMileage]);
 
   const chartPoints = useMemo(() => {
-    if (!events.length) return [];
-    return events.map((event) => ({
-      date: event.date,
-      mileage: event.mileage ?? 0,
-      type: event.type
-    }));
-  }, [events]);
+    if (hasRealKm) {
+      return realKmEvents.map((event) => ({
+        date: event.date,
+        mileage: event.mileage ?? 0,
+        type: event.type
+      }));
+    }
+    const first = data?.vehicle.firstRegistrationWorld;
+    const slope = enrichedMileage?.mileageSlopeKmPerYear;
+    const now = enrichedMileage?.estimatedMileageNow;
+    if (!first || !slope || !now) return [];
+    const start = new Date(first);
+    if (Number.isNaN(start.getTime())) return [];
+    const totalYears = Math.max((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25), 1);
+    const steps = Math.min(7, Math.max(2, Math.floor(totalYears)));
+    const synthetic: Array<{ date: string; mileage: number; type: TimelineEvent["type"] }> = [];
+    for (let i = 0; i <= steps; i += 1) {
+      const t = (totalYears * i) / steps;
+      const date = new Date(start.getTime() + t * 365.25 * 24 * 60 * 60 * 1000);
+      synthetic.push({
+        date: date.toISOString(),
+        mileage: i === steps ? now : Math.round(slope * t),
+        type: "apk"
+      });
+    }
+    return synthetic;
+  }, [hasRealKm, realKmEvents, enrichedMileage, data]);
 
   if (!isValid || isError) {
     return (
@@ -230,18 +266,42 @@ export function MileageTimelineScreen({ plate, embedded = false }: Props) {
             <div className={styles.heroCopy}>
               <div className={styles.eyebrow}>
                 <CheckCircle2 size={14} />
-                {locale === "nl" ? "Status" : "Status"}: {data.vehicle.napVerdict ?? (locale === "nl" ? "Consistent" : "Consistent")}
+                {data.vehicle.napVerdict
+                  ? `${locale === "nl" ? "NAP-tellerstandoordeel" : "NAP odometer verdict"}: ${data.vehicle.napVerdict}`
+                  : locale === "nl"
+                  ? "Geen NAP-oordeel beschikbaar"
+                  : "No NAP verdict available"}
               </div>
-              <div className={styles.heroTitle}>{locale === "nl" ? "Kilometerhistorie" : "Mileage History"}</div>
+              <div className={styles.heroTitle}>{locale === "nl" ? "Kilometerstand" : "Mileage"}</div>
               <div className={styles.heroSubtitle}>
-                {locale === "nl"
-                  ? "Geregistreerde kilometerstand volgt een logisch patroon zonder duidelijke terugdraaiing."
-                  : "Recorded mileage follows a believable pattern with no obvious rollback or unusual reporting gaps. The progression is steady and correlates logically with ownership transfers and APK inspections."}
+                {isFormulaEstimate
+                  ? locale === "nl"
+                    ? "De RDW publiceert geen tellerstanden. Deze schatting komt uit onze eigen formule: leeftijd maal verwacht jaarkilometrage op basis van brandstof, carrosserie en gebruiksprofiel. Vraag de verkoper om het gratis RDW-tellerrapport voor de exacte standen."
+                    : "The RDW does not publish odometer readings. This estimate comes from our own formula: age times expected annual mileage based on fuel, body type and usage profile. Ask the seller for the free RDW odometer report for exact readings."
+                  : locale === "nl"
+                  ? "Geregistreerde kilometerstanden uit officiële metingen, getoetst op terugdraaiing en afwijkende patronen."
+                  : "Recorded odometer readings from official measurements, checked for rollback and unusual patterns."}
               </div>
               <div className={styles.heroMetrics}>
-                <HeroMetric label={locale === "nl" ? "Laatste meting" : "Latest Reading"} value={latestMileage ? `${formatNumber(latestMileage)} km` : "-"} />
-                <HeroMetric label={locale === "nl" ? "Gem. per jaar" : "Avg. Annual"} value={avgAnnual ? `~${formatNumber(avgAnnual)} km` : "-"} />
-                <HeroMetric label={locale === "nl" ? "Datapunten" : "Data Points"} value={`${events.length} ${locale === "nl" ? "records" : "records"}`} />
+                <HeroMetric
+                  label={
+                    isFormulaEstimate
+                      ? locale === "nl" ? "Geschatte stand (formule)" : "Estimated reading (formula)"
+                      : locale === "nl" ? "Laatste meting" : "Latest reading"
+                  }
+                  value={latestMileage ? `${formatNumber(latestMileage)} km` : "-"}
+                />
+                {isFormulaEstimate && enrichedMileage?.estimatedMileageMin && enrichedMileage?.estimatedMileageMax ? (
+                  <HeroMetric
+                    label={locale === "nl" ? "Bandbreedte" : "Range"}
+                    value={`${formatNumber(enrichedMileage.estimatedMileageMin)} - ${formatNumber(enrichedMileage.estimatedMileageMax)} km`}
+                  />
+                ) : null}
+                <HeroMetric label={locale === "nl" ? "Per jaar" : "Per year"} value={avgAnnual ? `~${formatNumber(avgAnnual)} km` : "-"} />
+                <HeroMetric
+                  label={locale === "nl" ? "Gebruiksprofiel" : "Usage profile"}
+                  value={enrichedMileage?.mileageUsageProfile ?? (locale === "nl" ? "Gemiddeld" : "Average")}
+                />
               </div>
             </div>
           </div>
@@ -250,19 +310,35 @@ export function MileageTimelineScreen({ plate, embedded = false }: Props) {
             <div className={styles.chartPanel}>
               <div className={styles.chartHeader}>
                 <div className={styles.chartTitleArea}>
-                  <div className={styles.chartTitle}>{locale === "nl" ? "Kilometertrend" : "Mileage Growth Trend"}</div>
-                  <div className={styles.chartSubtitle}>{locale === "nl" ? "Visuele controle van consistentie door de tijd" : "Visual verification of reading consistency over time"}</div>
+                  <div className={styles.chartTitle}>
+                    {isFormulaEstimate
+                      ? locale === "nl" ? "Geschat kilometerverloop" : "Estimated mileage progression"
+                      : locale === "nl" ? "Kilometertrend" : "Mileage trend"}
+                  </div>
+                  <div className={styles.chartSubtitle}>
+                    {isFormulaEstimate
+                      ? locale === "nl" ? "Berekend met onze formule, geen officiële metingen" : "Calculated with our formula, no official readings"
+                      : locale === "nl" ? "Visuele controle van consistentie door de tijd" : "Visual verification of reading consistency over time"}
+                  </div>
                 </div>
                 <div className={styles.chartLegend}>
-                  <div className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.legendApk}`} /> {locale === "nl" ? "APK-keuring" : "APK Inspection"}
-                  </div>
-                  <div className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.legendWorkshop}`} /> {locale === "nl" ? "Werkplaats" : "Workshop"}
-                  </div>
-                  <div className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.legendOwner}`} /> {locale === "nl" ? "Overdracht" : "Transfer"}
-                  </div>
+                  {isFormulaEstimate ? (
+                    <div className={styles.legendItem}>
+                      <span className={`${styles.legendDot} ${styles.legendApk}`} /> {locale === "nl" ? "Formule-schatting" : "Formula estimate"}
+                    </div>
+                  ) : (
+                    <>
+                      <div className={styles.legendItem}>
+                        <span className={`${styles.legendDot} ${styles.legendApk}`} /> {locale === "nl" ? "APK-keuring" : "APK Inspection"}
+                      </div>
+                      <div className={styles.legendItem}>
+                        <span className={`${styles.legendDot} ${styles.legendWorkshop}`} /> {locale === "nl" ? "Werkplaats" : "Workshop"}
+                      </div>
+                      <div className={styles.legendItem}>
+                        <span className={`${styles.legendDot} ${styles.legendOwner}`} /> {locale === "nl" ? "Overdracht" : "Transfer"}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -341,9 +417,9 @@ export function MileageTimelineScreen({ plate, embedded = false }: Props) {
                     <div className={styles.timelineContent}>
                       <div className={styles.timelineTop}>
                         <div className={styles.timelineTitle}>{event.title}</div>
-                        <div className={styles.timelineMileage}>
-                          {event.mileage ? `${formatNumber(event.mileage)} km` : "-"}
-                        </div>
+                        {event.mileage ? (
+                          <div className={styles.timelineMileage}>{formatNumber(event.mileage)} km</div>
+                        ) : null}
                       </div>
                       <div className={styles.timelineDate}>{formatDate(event.date, locale)}</div>
                       <div className={styles.timelineDesc}>{event.description}</div>

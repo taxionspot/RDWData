@@ -242,7 +242,7 @@ export function MapPanel(): React.ReactElement {
                         >
                             <MapPin className="h-3.5 w-3.5 shrink-0 text-brand-400" />
                             <span className="min-w-0 flex-1 truncate text-sm text-slate-700">
-                                {g.erkenninghouder_naam ?? "—"}
+                                {g.erkenninghouder_naam ?? "-"}
                             </span>
                             <span className="shrink-0 text-xs text-slate-400">
                                 {g.erkenning_plaatsnaam}

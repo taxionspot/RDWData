@@ -493,7 +493,7 @@
 .contentsGrid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 24px;
 }
 
 @media (min-width: 640px) {
@@ -512,11 +512,11 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   background: #fff;
   border: 1px solid #e6ebf3;
   border-radius: 18px;
-  padding: 22px;
+  padding: 28px;
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
 
@@ -1155,4 +1155,45 @@
 .socialIcon:hover {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.4);
+}
+
+
+/* Sample report buttons in hero */
+.sampleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.sampleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 12px;
+  padding: 11px 18px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 130ms ease, border-color 130ms ease;
+}
+
+.sampleBtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.sampleBtnGhost {
+  color: #8fa3c2;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sampleBtnGhost:hover {
+  color: #d7e2f5;
 }

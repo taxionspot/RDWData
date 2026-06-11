@@ -162,7 +162,7 @@ function MockReportCard({ locale }: { locale: "nl" | "en" }) {
           </div>
           <div className={`${styles.mockRow} ${styles.mockBlur}`}>
             <HandCoins size={16} />
-            <span>{locale === "nl" ? "Biedrange € 12.900 – € 13.600" : "Offer range € 12,900 – € 13,600"}</span>
+            <span>{locale === "nl" ? "Biedrange € 12.900 - € 13.600" : "Offer range € 12,900 - € 13,600"}</span>
             <span className={styles.mockLockTag}>
               <Lock size={9} /> PREMIUM
             </span>
@@ -236,7 +236,7 @@ export default function LandingPage() {
     ? [
         {
           q: "Wat is gratis en wat is betaald?",
-          a: "De basischeck is gratis en zonder account: voertuiggegevens, APK-status, NAP-tellerstandoordeel en open terugroepacties. Het volledige rapport — met APK-gebrekenhistorie, marktwaarde, vraagprijs-check, onderhandelcoach en PDF — ontgrendel je eenmalig per kenteken."
+          a: "De basischeck is gratis en zonder account: voertuiggegevens, APK-status, NAP-tellerstandoordeel en open terugroepacties. Het volledige rapport, met APK-gebrekenhistorie, marktwaarde, vraagprijs-check, onderhandelcoach en PDF, ontgrendel je eenmalig per kenteken."
         },
         {
           q: "Waar komt de data vandaan?",
@@ -244,7 +244,7 @@ export default function LandingPage() {
         },
         {
           q: "Kan ik de volledige kilometerhistorie zien?",
-          a: "Nee — en dat kan niemand. De RDW mag volledige tellerstanden aan geen enkele partij verstrekken, ook niet aan buitenlandse aanbieders. Wij tonen het officiële NAP-tellerstandoordeel en leggen uit hoe je via de verkoper het gratis RDW-tellerrapport opvraagt."
+          a: "Nee, en dat kan niemand. De RDW mag volledige tellerstanden aan geen enkele partij verstrekken, ook niet aan buitenlandse aanbieders. Wij tonen het officiële NAP-tellerstandoordeel en leggen uit hoe je via de verkoper het gratis RDW-tellerrapport opvraagt."
         },
         {
           q: "Hoe betaal ik?",
@@ -262,7 +262,7 @@ export default function LandingPage() {
     : [
         {
           q: "What is free and what is paid?",
-          a: "The basic check is free without an account: vehicle data, APK status, NAP odometer verdict and open recalls. The full report — defect history, market value, asking-price check, negotiation copilot and PDF — is a one-time unlock per plate."
+          a: "The basic check is free without an account: vehicle data, APK status, NAP odometer verdict and open recalls. The full report, with defect history, market value, asking-price check, negotiation copilot and PDF, is a one-time unlock per plate."
         },
         {
           q: "Where does the data come from?",
@@ -270,7 +270,7 @@ export default function LandingPage() {
         },
         {
           q: "Can I see the full mileage history?",
-          a: "No — and neither can anyone else. The RDW is not allowed to share full odometer readings with any party, including foreign providers. We show the official NAP verdict and explain how to request the free RDW odometer report via the seller."
+          a: "No, and neither can anyone else. The RDW is not allowed to share full odometer readings with any party, including foreign providers. We show the official NAP verdict and explain how to request the free RDW odometer report via the seller."
         },
         {
           q: "How do I pay?",
@@ -288,7 +288,7 @@ export default function LandingPage() {
 
   const compareRows: Array<{ label: string; us: string; carfax: string; cv: string }> = nl
     ? [
-        { label: "Prijs per rapport", us: `€ ${settings.payment.amount}`, carfax: "€ 19,99 – 39,99", cv: "± € 30" },
+        { label: "Prijs per rapport", us: `€ ${settings.payment.amount}`, carfax: "€ 19,99 - 39,99", cv: "± € 30" },
         { label: "Volledige RDW-data (NL)", us: "✓", carfax: "~", cv: "~" },
         { label: "NAP-tellerstandoordeel", us: "✓", carfax: "✓", cv: "✗" },
         { label: "APK-gebrekenhistorie + omschrijvingen", us: "✓", carfax: "~", cv: "✗" },
@@ -298,7 +298,7 @@ export default function LandingPage() {
         { label: "Nederlandstalig", us: "✓", carfax: "✓", cv: "✓" }
       ]
     : [
-        { label: "Price per report", us: `€ ${settings.payment.amount}`, carfax: "€ 19.99 – 39.99", cv: "± € 30" },
+        { label: "Price per report", us: `€ ${settings.payment.amount}`, carfax: "€ 19.99 - 39.99", cv: "± € 30" },
         { label: "Full RDW data (NL)", us: "✓", carfax: "~", cv: "~" },
         { label: "NAP odometer verdict", us: "✓", carfax: "✓", cv: "✗" },
         { label: "APK defect history + descriptions", us: "✓", carfax: "~", cv: "✗" },
@@ -329,6 +329,21 @@ export default function LandingPage() {
               <p className={styles.heroSubtitle}>{settings.content.landingHeroSubtitle}</p>
 
               <PlateSearch id="hero-plate-input" />
+
+              <div className={styles.sampleRow}>
+                <a
+                  href={`/api/vehicle/${SAMPLE_PLATE}?lang=${locale}&download=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.sampleBtn}
+                >
+                  <FileCheck size={16} />
+                  {nl ? "Bekijk voorbeeldrapport (PDF)" : "View sample report (PDF)"}
+                </a>
+                <Link href={`/search/${SAMPLE_PLATE}`} className={styles.sampleBtnGhost}>
+                  {nl ? "Of bekijk het online voorbeeld" : "Or view the online sample"}
+                </Link>
+              </div>
 
               <div className={styles.heroStats}>
                 <div className={styles.heroStat}>
@@ -362,8 +377,8 @@ export default function LandingPage() {
               </h2>
               <p className={styles.sectionIntro}>
                 {nl
-                  ? "Gratis zie je direct de basis. Het volledige rapport ontgrendelt elke sectie voor dit kenteken — eenmalig, zonder abonnement."
-                  : "The basics are free instantly. The full report unlocks every section for this plate — one-time, no subscription."}
+                  ? "Gratis zie je direct de basis. Het volledige rapport ontgrendelt elke sectie voor dit kenteken. Eenmalig, zonder abonnement."
+                  : "The basics are free instantly. The full report unlocks every section for this plate. One-time, no subscription."}
               </p>
             </div>
             <div className={styles.contentsGrid}>
@@ -439,8 +454,8 @@ export default function LandingPage() {
                 <div className={styles.riskCardTitle}>{nl ? "Verzwegen gebreken" : "Concealed defects"}</div>
                 <p className={styles.riskCardDesc}>
                   {nl
-                    ? "Elke afkeuring en elk geconstateerd gebrek uit de APK-historie, met officiële omschrijving — ook wat de verkoper niet vertelt."
-                    : "Every APK failure and recorded defect with its official description — including what the seller doesn't mention."}
+                    ? "Elke afkeuring en elk geconstateerd gebrek uit de APK-historie, met officiële omschrijving. Ook wat de verkoper niet vertelt."
+                    : "Every APK failure and recorded defect with its official description, including what the seller doesn't mention."}
                 </p>
               </div>
               <div className={styles.riskCard}>
@@ -486,8 +501,8 @@ export default function LandingPage() {
             </h2>
             <p className={styles.sectionIntro}>
               {nl
-                ? `Eenmalig € ${settings.payment.amount} per kenteken ontgrendelt het volledige rapport — een fractie van wat één verborgen gebrek je kost.`
-                : `A one-time € ${settings.payment.amount} per plate unlocks the full report — a fraction of what one hidden defect costs you.`}
+                ? `Eenmalig € ${settings.payment.amount} per kenteken ontgrendelt het volledige rapport. Een fractie van wat één verborgen gebrek je kost.`
+                : `A one-time € ${settings.payment.amount} per plate unlocks the full report. A fraction of what one hidden defect costs you.`}
             </p>
           </div>
 
@@ -580,8 +595,8 @@ export default function LandingPage() {
             </h2>
             <p className={styles.sectionIntro}>
               {nl
-                ? "Internationale checkers zijn sterk voor importauto's — maar voor een Nederlandse occasion missen ze de diepte van de officiële RDW-bronnen."
-                : "International checkers are strong for imports — but for a Dutch used car they miss the depth of official RDW sources."}
+                ? "Internationale checkers zijn sterk voor importauto's, maar voor een Nederlandse occasion missen ze de diepte van de officiële RDW-bronnen."
+                : "International checkers are strong for imports, but for a Dutch used car they miss the depth of official RDW sources."}
             </p>
           </div>
           <div className={styles.compareWrap}>

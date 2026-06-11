@@ -166,58 +166,6 @@ function usePlateUnlocked(plate: string, paymentEnabled: boolean) {
   return unlocked || !paymentEnabled || isSamplePlate(plate);
 }
 
-/* ── Sticky anchor navigation with scroll-spy ───────────────────────── */
-function ReportSectionNav({
-  sections,
-  isPremiumSection,
-  locale
-}: {
-  sections: SectionDef[];
-  isPremiumSection: (section: SectionDef) => boolean;
-  locale: "nl" | "en";
-}) {
-  const [activeId, setActiveId] = useState(sections[0]?.id ?? "");
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]?.target?.id) setActiveId(visible[0].target.id);
-      },
-      { rootMargin: "-140px 0px -60% 0px", threshold: 0 }
-    );
-    for (const section of sections) {
-      const el = document.getElementById(section.id);
-      if (el) observer.observe(el);
-    }
-    return () => observer.disconnect();
-  }, [sections]);
-
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  return (
-    <div className={styles.navWrap}>
-      <nav className={styles.nav} aria-label={locale === "nl" ? "Rapportsecties" : "Report sections"}>
-        {sections.map((section) => (
-          <button
-            key={section.id}
-            type="button"
-            onClick={() => scrollTo(section.id)}
-            className={`${styles.navPill} ${activeId === section.id ? styles.navPillActive : ""}`}
-          >
-            {locale === "nl" ? section.labelNl : section.labelEn}
-            {isPremiumSection(section) && <Lock size={10} className={styles.navLockIcon} />}
-          </button>
-        ))}
-      </nav>
-    </div>
-  );
-}
-
 /* ── "Records found" banner ─────────────────────────────────────────── */
 function RecordsSummary({
   plate,
@@ -446,8 +394,6 @@ export function FullReportScreen({ plate }: Props) {
       <ScanIntro plate={normalized} />
 
       <div className={styles.container}>
-        <ReportSectionNav sections={SECTIONS} isPremiumSection={isPremiumSection} locale={locale} />
-
         <SectionBlock section={sectionById("overzicht")} index={1} isPremium={false} locale={locale}>
           <VehicleResultScreen plate={plate} embedded />
         </SectionBlock>

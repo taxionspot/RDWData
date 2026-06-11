@@ -10,7 +10,7 @@ export const landingStats = [
 export const landingFeatures = [
   {
     title: "Instant Vehicle Snapshot",
-    description: "Enter any Dutch plate and receive a complete vehicle profile in under a second — brand, model, year, fuel type, and current road-legal status."
+    description: "Enter any Dutch plate and receive a complete vehicle profile in under a second: brand, model, year, fuel type, and current road-legal status."
   },
   {
     title: "Verified & Always Accurate",
@@ -25,7 +25,7 @@ export const landingFeatures = [
 export const landingSteps = [
   {
     title: "Enter your plate",
-    description: "Type or paste any Dutch license plate. Hyphens are optional — PlateIntel formats it automatically."
+    description: "Type or paste any Dutch license plate. Hyphens are optional, we format it automatically."
   },
   {
     title: "We verify it instantly",

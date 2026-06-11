@@ -14,6 +14,7 @@ import { applyMileageValuationOverride } from "@/lib/api/market-value";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
+import { isSamplePlate } from "@/lib/sample";
 
 type Params = { params: { plate: string } };
 
@@ -33,6 +34,9 @@ function parseUserMileage(input: string | null): number | null {
 }
 
 async function hasPaidReportAccess(plate: string): Promise<boolean> {
+  // The public sample report is always free, like carfax.eu's example report.
+  if (isSamplePlate(plate)) return true;
+
   const demoBypassEnabled =
     process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
   if (demoBypassEnabled) return true;
@@ -180,10 +184,14 @@ export async function GET(request: Request, { params }: Params) {
         aiValuation
       });
       await trackReportIfUserLoggedIn({ plate, locale, channel: "download" });
+      // Sample report opens inline in the browser; paid reports download.
+      const disposition = isSamplePlate(plate)
+        ? `inline; filename="voorbeeld-kentekenrapport-${plate}.pdf"`
+        : `attachment; filename="kentekenrapport-${plate}.pdf"`;
       return new NextResponse(new Uint8Array(pdf), {
         headers: {
           "content-type": "application/pdf",
-          "content-disposition": `attachment; filename="kentekenrapport-${plate}.pdf"`
+          "content-disposition": disposition
         }
       });
     }

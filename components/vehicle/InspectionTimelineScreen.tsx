@@ -286,8 +286,8 @@ export function InspectionTimelineScreen({ plate, embedded = false }: Props) {
                   <div className={styles.progressFill} />
                 </div>
                 <div className={styles.statusMeta}>
-                  <span>{locale === "nl" ? "Verkeersveiligheidsvertrouwen" : "Roadworthiness confidence"}</span>
-                  <span>84%</span>
+                  <span>{locale === "nl" ? "APK-slaagkans (geschat)" : "APK pass chance (estimated)"}</span>
+                  <span>{data.enriched?.apkPassChance != null ? `${data.enriched.apkPassChance}%` : "-"}</span>
                 </div>
               </div>
               <div className={styles.badgeRow}>

@@ -244,11 +244,31 @@ export function RiskOverviewScreen({ plate, embedded = false }: Props) {
               <div className={styles.heroSide}>
                 <div className={styles.spotlightCard}>
                   <div className={styles.spotlightLabel}>{locale === "nl" ? "Vertrouwenssnapshot" : "Vehicle trust snapshot"}</div>
-                  <div className={styles.spotlightValue}>{locale === "nl" ? "Laag risico" : "Low risk"}</div>
+                  <div className={styles.spotlightValue}>
+                    {v.wok
+                      ? locale === "nl" ? "Hoog risico" : "High risk"
+                      : v.hasOpenRecall || data.defects.length > 3 || (v.napVerdict ?? "").toLowerCase().includes("onlogisch")
+                      ? locale === "nl" ? "Controle nodig" : "Review needed"
+                      : positiveChecks === 3
+                      ? locale === "nl" ? "Geen rode vlaggen" : "No red flags"
+                      : locale === "nl" ? "Gemengd beeld" : "Mixed signals"}
+                  </div>
                   <div className={styles.spotlightNote}>
-                    {locale === "nl"
-                      ? "Historie oogt stabiel zonder grote rode vlaggen in de belangrijkste datasets."
-                      : "History looks stable with no major red flags in the key datasets."}
+                    {v.wok
+                      ? locale === "nl"
+                        ? "WOK-registratie aanwezig: dit voertuig wacht op keuring na zware schade."
+                        : "Salvage (WOK) registration present: this vehicle awaits inspection after serious damage."
+                      : v.hasOpenRecall
+                      ? locale === "nl"
+                        ? "Er staat een terugroepactie open. Controleer of deze is uitgevoerd."
+                        : "There is an open recall. Check whether it has been carried out."
+                      : data.defects.length > 0
+                      ? locale === "nl"
+                        ? `${data.defects.length} geconstateerde gebreken in de keuringshistorie verdienen aandacht.`
+                        : `${data.defects.length} recorded defects in the inspection history deserve attention.`
+                      : locale === "nl"
+                      ? "Geen grote rode vlaggen in de officiële datasets."
+                      : "No major red flags in the official datasets."}
                   </div>
                 </div>
                 <div className={styles.spotlightCard}>

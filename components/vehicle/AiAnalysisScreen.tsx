@@ -118,7 +118,7 @@ export function AiAnalysisScreen({ plate }: Props) {
               <div className={styles.valuationMeta}>
                 <span className={styles.valuationLabel}>{nl ? "Verwachte prijsrange" : "Expected price range"}</span>
                 <span className={styles.valuationRange}>
-                  {valueMin} – {valueMax}
+                  {valueMin} - {valueMax}
                 </span>
               </div>
             ) : null}
@@ -135,8 +135,8 @@ export function AiAnalysisScreen({ plate }: Props) {
 
         <p className={styles.disclaimer}>
           {nl
-            ? "Automatische analyse op basis van officiële RDW-data en onze rekenmodellen. Dit is informatie, geen aankoopadvies — laat bij twijfel altijd een aankoopkeuring uitvoeren."
-            : "Automated analysis based on official RDW data and our models. This is information, not purchase advice — when in doubt, get a professional inspection."}
+            ? "Automatische analyse op basis van officiële RDW-data en onze rekenmodellen. Dit is informatie, geen aankoopadvies. Laat bij twijfel altijd een aankoopkeuring uitvoeren."
+            : "Automated analysis based on official RDW data and our models. This is information, not purchase advice. When in doubt, get a professional inspection."}
         </p>
       </div>
     </PremiumLock>
