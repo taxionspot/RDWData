@@ -25,6 +25,7 @@ import {
 } from "@/lib/payments/access";
 import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
+import { SectionErrorBoundary } from "@/components/ui/SectionErrorBoundary";
 import { ScanIntro } from "./ScanIntro";
 import { VehicleResultScreen } from "./VehicleResultScreen";
 import { RiskOverviewScreen } from "./RiskOverviewScreen";
@@ -394,7 +395,7 @@ function SectionBlock({
           <span className={styles.sectionSub}>{nl ? section.subNl : section.subEn}</span>
         </div>
       </div>
-      {children}
+      <SectionErrorBoundary label={section.id}>{children}</SectionErrorBoundary>
     </section>
   );
 }
@@ -440,12 +441,14 @@ export function FullReportScreen({ plate }: Props) {
           <VehicleResultScreen plate={plate} embedded />
         </SectionBlock>
 
-        <RecordsSummary
-          plate={normalized}
-          unlocked={unlocked}
-          priceLabel={priceLabel}
-          onUnlockClick={() => setShowPayment(true)}
-        />
+        <SectionErrorBoundary label="records-summary">
+          <RecordsSummary
+            plate={normalized}
+            unlocked={unlocked}
+            priceLabel={priceLabel}
+            onUnlockClick={() => setShowPayment(true)}
+          />
+        </SectionErrorBoundary>
 
         <SectionBlock section={SECTIONS[1]} index={2} isPremium={isPremiumSection(SECTIONS[1])} locale={locale}>
           <RiskOverviewScreen plate={normalized} embedded />

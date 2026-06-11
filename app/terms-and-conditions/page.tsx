@@ -4,6 +4,7 @@ import { CmsPageModel } from "@/models/CmsPage";
 import { ensureLegalPages } from "@/lib/cms/legal-pages";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export default async function TermsAndConditionsPage() {
   await connectMongo();
