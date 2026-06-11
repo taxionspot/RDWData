@@ -116,8 +116,12 @@ function PlateSearch({ id }: { id?: string }) {
 
 /* ── Live counter ────────────────────────────────────────────────────── */
 function LiveReportCount() {
-  const [n, setN] = useState(() => 1240 + Math.floor(Math.random() * 40));
+  // Deterministic initial value: server-rendered HTML and the first client
+  // render must match exactly, otherwise React throws a hydration error in
+  // production ("Application error"). Randomize only after mount.
+  const [n, setN] = useState(1247);
   useEffect(() => {
+    setN(1240 + Math.floor(Math.random() * 40));
     const id = setInterval(() => setN((c) => c + Math.floor(Math.random() * 2) + 1), 4200);
     return () => clearInterval(id);
   }, []);
