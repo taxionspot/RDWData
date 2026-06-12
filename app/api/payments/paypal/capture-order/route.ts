@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { capturePaypalOrder } from "@/lib/payments/paypal";
 import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
+import { CheckoutLeadModel } from "@/models/CheckoutLead";
+import { sendEmail } from "@/lib/email/resend";
+import { buildThankYouEmail } from "@/lib/email/templates";
 
 export const runtime = "nodejs";
 
@@ -9,6 +12,7 @@ type CaptureBody = {
   orderId: string;
   plate: string;
   email?: string;
+  lang?: string;
 };
 
 function normalizePlate(plate: string): string {
@@ -48,6 +52,7 @@ export async function POST(request: Request) {
     const orderId = body.orderId?.trim();
     const plate = normalizePlate(body.plate ?? "");
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const locale = body.lang === "en" ? ("en" as const) : ("nl" as const);
 
     if (!orderId || !plate) {
       return NextResponse.json({ error: "Missing orderId or plate." }, { status: 400 });
@@ -97,13 +102,31 @@ export async function POST(request: Request) {
       { upsert: true }
     );
 
+    const amount = firstCapture?.amount?.value ?? "9.95";
+    const currency = firstCapture?.amount?.currency_code ?? "EUR";
+
+    if (email) {
+      // Post-payment extras must never fail the capture response.
+      try {
+        await CheckoutLeadModel.updateMany({ email, plate }, { $set: { status: "converted" } });
+      } catch {
+        // no-op
+      }
+      try {
+        const { subject, html } = buildThankYouEmail({ plate, amount, currency, orderId, locale });
+        await sendEmail({ to: email, subject, html });
+      } catch {
+        // no-op
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       plate,
       orderId,
       status: "COMPLETED",
-      amount: firstCapture?.amount?.value ?? "9.95",
-      currency: firstCapture?.amount?.currency_code ?? "EUR"
+      amount,
+      currency
     });
   } catch (error) {
     const mapped = mapCaptureError(error);

@@ -48,6 +48,31 @@ Beide IDs zijn te overschrijven via `NEXT_PUBLIC_GTM_ID` en `NEXT_PUBLIC_COOKIEB
 - Nieuwe pagina `/cookie-policy` toont de automatisch gegenereerde
   Cookiebot-cookieverklaring (in NL of EN, volgt de taalkeuze van de site).
 
+### E-mails (bedankmail & opvolgmail)
+
+Alle e-mails worden verstuurd via Resend met afzender
+`Anouk van Kentekenrapport <info@kentekenrapport.com>` (instelbaar via `EMAIL_FROM`).
+
+| Mail | Trigger | Inhoud |
+|---|---|---|
+| **Bedankmail** | Direct na een geslaagde PayPal-betaling (als er een e-mailadres is ingevuld) | Betaalbevestiging met bedrag, kenteken, ordernummer en knop naar het rapport |
+| **Opvolgmail** | Standaard 60 min. na de laatste checkout-activiteit zonder betaling (instelbaar via `ABANDONED_CHECKOUT_DELAY_MINUTES`) | Persoonlijke reminder van Anouk met knop om de betaling af te ronden |
+| **Rapportmail** (bestond al) | Na ontgrendeling met e-mailadres | Volledig rapport + PDF-bijlage, nu ook vanaf het Anouk-adres |
+
+Hoe de opvolgmail werkt:
+
+1. Zodra iemand in de betaalmodal een geldig e-mailadres invult, wordt dit (met
+   kenteken en taal) opgeslagen als *checkout lead* (`POST /api/checkout/lead`).
+2. Betaalt diegene, dan wordt de lead op "converted" gezet — geen opvolgmail.
+3. Een cron (`GET /api/cron/abandoned-checkout`, elke 30 min. via `vercel.json`)
+   zoekt leads ouder dan de ingestelde wachttijd zonder betaling en stuurt
+   **eenmalig** de opvolgmail. Links in de mails hebben UTM-tags
+   (`utm_campaign=thank_you` / `abandoned_checkout`) zodat je ze terugziet in GA4.
+4. Leads ouder dan 7 dagen worden niet meer gemaild.
+
+De cron-route is beveiligd met `CRON_SECRET` (Vercel stuurt die automatisch mee
+als `Authorization: Bearer …` wanneer de env-var is gezet).
+
 ## Nog te doen buiten de code
 
 ### 1. PayPal live zetten (productie-env)
@@ -62,7 +87,28 @@ PAYPAL_BASE_URL=https://api-m.paypal.com
 Maak de live-app aan op developer.paypal.com onder het zakelijke account en doe na
 deploy één echte testbetaling (laag bedrag kan via de admin-prijsinstelling).
 
-### 2. Cookiebot admin (admin.cookiebot.com)
+### 2. E-mail live zetten (Resend)
+
+- Verifieer het domein **kentekenrapport.com** in Resend (DNS: SPF + DKIM, en
+  stel ook DMARC in) zodat mails van `info@kentekenrapport.com` niet in spam komen.
+- Zet in de productie-env:
+  ```
+  RESEND_API_KEY=<live key>
+  EMAIL_FROM=Anouk van Kentekenrapport <info@kentekenrapport.com>
+  CRON_SECRET=<lang willekeurig geheim>
+  ABANDONED_CHECKOUT_DELAY_MINUTES=60
+  NEXT_PUBLIC_BASE_URL=https://kentekenrapport.com
+  ```
+  (`NEXT_PUBLIC_BASE_URL` wordt gebruikt voor de knoppen/links in de mails.)
+- De cron staat in `vercel.json` op elke 30 minuten. **Let op:** op een Vercel
+  Hobby-plan mogen crons maar 1× per dag draaien — zet de schedule dan op
+  bijv. `0 9 * * *`. Op Pro kan `*/30 * * * *` gewoon.
+- Test: vul in de betaalmodal een eigen e-mailadres in, sluit zonder te betalen,
+  en roep daarna handmatig de cron aan (met
+  `Authorization: Bearer <CRON_SECRET>`) of wacht op de schedule → opvolgmail.
+  Doe daarna een testbetaling → bedankmail.
+
+### 3. Cookiebot admin (admin.cookiebot.com)
 
 - Voeg het productiedomein toe aan de domeingroep van cbid `c95277a4-…`.
 - Zet "Google Consent Mode" aan in de banner-instellingen (Settings → Your scripts /
@@ -70,7 +116,7 @@ deploy één echte testbetaling (laag bedrag kan via de admin-prijsinstelling).
 - Kies bannertaal NL (+ EN) en publiceer.
 - Link in de bannerinstellingen naar `/cookie-policy` als cookieverklaring.
 
-### 3. GTM container `GTM-N4TS8CP9` (tagmanager.google.com)
+### 4. GTM container `GTM-N4TS8CP9` (tagmanager.google.com)
 
 1. **Variabelen**: maak Data Layer-variabelen aan voor `ecommerce.transaction_id`,
    `ecommerce.value`, `ecommerce.currency` en `plate`.
@@ -88,7 +134,7 @@ deploy één echte testbetaling (laag bedrag kan via de admin-prijsinstelling).
    Mode v2 regelt het).
 6. Test alles met **Preview/Tag Assistant** en publiceer de container.
 
-### 4. Google Ads
+### 5. Google Ads
 
 - Maak een conversieactie "Aankoop" aan (bron: website, via GTM) en gebruik het
   Conversion ID/Label in de GTM-tag hierboven.
@@ -96,7 +142,7 @@ deploy één echte testbetaling (laag bedrag kan via de admin-prijsinstelling).
   secundaire conversie (zet er maar één op "primair" om dubbel tellen te voorkomen).
 - Conversion Linker + Consent Mode v2 zijn vereist voor correcte attributie in de EU.
 
-### 5. End-to-end test vóór livegang
+### 6. End-to-end test vóór livegang
 
 1. Open de site in incognito → Cookiebot-banner verschijnt, geen marketing-cookies
    vóór toestemming (check DevTools → Application → Cookies).

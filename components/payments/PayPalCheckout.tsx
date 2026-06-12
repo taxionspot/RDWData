@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { trackPurchase } from "@/lib/analytics/gtm";
+import { useI18n } from "@/lib/i18n/context";
 
 declare global {
   interface Window {
@@ -63,6 +64,7 @@ export function PayPalCheckout({
   onSuccess,
   onError
 }: Props) {
+  const { locale } = useI18n();
   const [ready, setReady] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const renderedRef = useRef(false);
@@ -113,7 +115,7 @@ export function PayPalCheckout({
         const response = await fetch("/api/payments/paypal/capture-order", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId: orderID, plate, email })
+          body: JSON.stringify({ orderId: orderID, plate, email, lang: locale })
         });
 
         if (!response.ok) {
@@ -150,7 +152,7 @@ export function PayPalCheckout({
         // no-op
       }
     };
-  }, [ready, plate, email, amount, currency, onSuccess, onError]);
+  }, [ready, plate, email, amount, currency, locale, onSuccess, onError]);
 
   return <div ref={containerRef} />;
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
+import { CheckoutLeadModel } from "@/models/CheckoutLead";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,10 @@ export async function POST(request: Request, { params }: Params) {
       provider: "paypal",
       createdAt: new Date()
     });
+
+    if (email) {
+      await CheckoutLeadModel.updateMany({ email, plate }, { $set: { status: "converted" } }).catch(() => {});
+    }
 
     return NextResponse.json({ ok: true, paid: true, plate });
   } catch (error) {

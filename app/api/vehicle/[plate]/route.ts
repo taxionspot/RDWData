@@ -14,6 +14,7 @@ import { applyMileageValuationOverride } from "@/lib/api/market-value";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
+import { sendEmail } from "@/lib/email/resend";
 
 type Params = { params: { plate: string } };
 
@@ -110,43 +111,22 @@ async function sendReportEmail(args: {
   html: string;
   pdfBase64?: string;
 }): Promise<{ delivered: boolean; reason?: string }> {
-  const apiKey = process.env.RESEND_API_KEY ?? "";
-  const from = process.env.REPORT_EMAIL_FROM ?? "Kentekenrapport <noreply@kentekenrapport.nl>";
-  if (!apiKey) {
-    return { delivered: false, reason: "EMAIL_PROVIDER_NOT_CONFIGURED" };
-  }
-
   const subject = args.locale === "nl" ? `Kentekenrapport voor ${args.plate}` : `Vehicle report for ${args.plate}`;
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      from,
-      to: [args.to],
-      subject,
-      html: args.html,
-      ...(args.pdfBase64
-        ? {
-            attachments: [
-              {
-                filename: `kentekenrapport-${args.plate}.pdf`,
-                content: args.pdfBase64
-              }
-            ]
-          }
-        : {})
-    }),
-    cache: "no-store"
+  return sendEmail({
+    to: args.to,
+    subject,
+    html: args.html,
+    ...(args.pdfBase64
+      ? {
+          attachments: [
+            {
+              filename: `kentekenrapport-${args.plate}.pdf`,
+              content: args.pdfBase64
+            }
+          ]
+        }
+      : {})
   });
-
-  if (!response.ok) {
-    const details = await response.text();
-    return { delivered: false, reason: `EMAIL_SEND_FAILED:${response.status}:${details}` };
-  }
-  return { delivered: true };
 }
 
 export async function GET(request: Request, { params }: Params) {

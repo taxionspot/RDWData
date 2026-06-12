@@ -56,6 +56,23 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
     });
   }, [isOpen, plate, settings.payment.amount, settings.payment.currency]);
 
+  // Save the email as a checkout lead so an abandoned checkout can get a follow-up email.
+  useEffect(() => {
+    if (!isOpen || !plate) return;
+    const trimmed = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return;
+    const timer = setTimeout(() => {
+      void fetch("/api/checkout/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed, plate, lang: locale })
+      }).catch(() => {
+        // Lead capture must never block checkout.
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [email, isOpen, plate, locale]);
+
   if (!isMounted || !isOpen) return null;
 
   return (
