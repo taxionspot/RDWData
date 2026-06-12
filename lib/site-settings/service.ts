@@ -1,6 +1,7 @@
 import { connectMongo } from "@/lib/db/mongodb";
 import { SiteSettingsModel } from "@/models/SiteSettings";
 import { defaultSiteSettings, type PublicSiteSettings } from "./defaults";
+import { sanitizeSiteSettings } from "./sanitize";
 
 // Old shipped defaults that may still live in the database. When a stored value
 // is byte-identical to one of these, the admin never changed it, so the new
@@ -52,32 +53,9 @@ function applyLegacyDefaults(settings: PublicSiteSettings): PublicSiteSettings {
 }
 
 function mergedSettings(doc: Record<string, unknown>): PublicSiteSettings {
-  const merged: PublicSiteSettings = {
-    paymentEnabled: (doc.paymentEnabled as boolean) ?? defaultSiteSettings.paymentEnabled,
-    payment: { ...defaultSiteSettings.payment, ...((doc.payment ?? {}) as object) },
-    lockSections: { ...defaultSiteSettings.lockSections, ...((doc.lockSections ?? {}) as object) },
-    ui: { ...defaultSiteSettings.ui, ...((doc.ui ?? {}) as object) },
-    content: { ...defaultSiteSettings.content, ...((doc.content ?? {}) as object) },
-    landing: (() => {
-      const l = (doc.landing ?? {}) as Record<string, unknown>;
-      return {
-        ...defaultSiteSettings.landing,
-        ...l,
-        sectionVisibility: {
-          ...defaultSiteSettings.landing.sectionVisibility,
-          ...((l.sectionVisibility ?? {}) as object)
-        },
-        footer: {
-          ...defaultSiteSettings.landing.footer,
-          ...((l.footer ?? {}) as object)
-        }
-      };
-    })(),
-    seo: { ...defaultSiteSettings.seo, ...((doc.seo ?? {}) as object) },
-    appearance: { ...defaultSiteSettings.appearance, ...((doc.appearance ?? {}) as object) },
-    email: { ...defaultSiteSettings.email, ...((doc.email ?? {}) as object) }
-  };
-  return applyLegacyDefaults(merged);
+  // Validate every stored field against the defaults (the database can hold
+  // shapes written by older app versions), then migrate untouched legacy values.
+  return applyLegacyDefaults(sanitizeSiteSettings(doc));
 }
 
 export async function getSiteSettings(): Promise<PublicSiteSettings> {
