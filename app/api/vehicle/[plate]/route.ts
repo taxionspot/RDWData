@@ -7,10 +7,10 @@ import type { Locale } from "@/lib/i18n/messages";
 import { buildFallbackVehicleAiReport, generateVehicleAiReport } from "@/lib/api/claude";
 import { getSiteSettings } from "@/lib/site-settings/service";
 import { connectMongo } from "@/lib/db/mongodb";
-import { PlatePaymentModel } from "@/models/PlatePayment";
 import { generateVehicleReportHtml } from "@/lib/api/report-template";
 import { generateVehicleReportPdf } from "@/lib/api/pdf-report";
-import { applyMileageValuationOverride } from "@/lib/api/market-value";
+import { alignValuationWithFormula, applyMileageValuationOverride } from "@/lib/api/market-value";
+import { hasPaidPlateAccess } from "@/lib/payments/server-access";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
@@ -35,19 +35,11 @@ function parseUserMileage(input: string | null): number | null {
 }
 
 async function hasPaidReportAccess(plate: string): Promise<boolean> {
-  // The public sample report is always free, like carfax.eu's example report.
-  if (isSamplePlate(plate)) return true;
-
-  const demoBypassEnabled =
-    process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
-  if (demoBypassEnabled) return true;
-
+  // Report download honours the admin lock toggle; everything else
+  // (sample plate, demo mode, real payment) lives in hasPaidPlateAccess.
   const settings = await getSiteSettings();
-  const paymentRequired = settings.paymentEnabled && settings.lockSections.reportDownload;
-  if (!paymentRequired) return true;
-  await connectMongo();
-  const hasPaid = await PlatePaymentModel.exists({ plate, status: "COMPLETED", provider: "paypal" });
-  return Boolean(hasPaid);
+  if (settings.paymentEnabled && !settings.lockSections.reportDownload) return true;
+  return hasPaidPlateAccess(plate);
 }
 
 const AI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -59,7 +51,9 @@ const AI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
  */
 function aiCacheKey(plate: string, locale: Locale, userMileage: number | null): string {
   const bucket = userMileage === null ? "" : String(Math.round(userMileage / 5000) * 5000);
-  return `${plate}|${locale}|${bucket}`;
+  // v2: invalidates entries from before the valuation was forced to follow
+  // our own formula (old explanations could mention AI-invented amounts).
+  return `v2|${plate}|${locale}|${bucket}`;
 }
 
 async function readAiCache(key: string): Promise<{ insights: unknown; valuation: unknown } | null> {
@@ -114,7 +108,12 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
     return {
       localized,
       aiInsights: cached.insights as ReturnType<typeof buildFallbackVehicleAiReport>["insights"],
-      aiValuation: cached.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
+      // Cached valuations also get the formula amounts forced in, so stale
+      // cache entries can never show AI-invented values.
+      aiValuation: alignValuationWithFormula(
+        localized,
+        cached.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
+      )
     };
   }
 
@@ -221,13 +220,13 @@ export async function GET(request: Request, { params }: Params) {
       return NextResponse.json(localized);
     }
 
-    const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
-
     if (downloadReport) {
+      // Access first: unpaid download attempts must not trigger AI calls.
       const hasAccess = await hasPaidReportAccess(plate);
       if (!hasAccess) {
         return NextResponse.json({ error: "Payment required for report download.", code: "PAYMENT_REQUIRED" }, { status: 402 });
       }
+      const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
       const pdf = await generateVehicleReportPdf({
         plate,
         locale,
@@ -249,6 +248,23 @@ export async function GET(request: Request, { params }: Params) {
       });
     }
 
+    // AI insights and valuation are paid content: without access the JSON
+    // only carries the open data plus our own formula values (server-side
+    // gating, the UI blur is no longer the only protection). This also
+    // avoids Claude costs for visitors who never pay.
+    const hasAiAccess = await hasPaidPlateAccess(plate);
+    if (!hasAiAccess) {
+      const profile = await getVehicleProfile(plate);
+      let localized = localizeVehicleProfile(profile, locale) as Record<string, unknown>;
+      localized = applyMileageValuationOverride(localized, userMileage);
+      return NextResponse.json({
+        ...localized,
+        aiInsights: null,
+        aiValuation: null
+      });
+    }
+
+    const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
     return NextResponse.json({
       ...localized,
       aiInsights,

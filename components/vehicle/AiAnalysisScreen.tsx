@@ -111,7 +111,7 @@ export function AiAnalysisScreen({ plate }: Props) {
           <div className={styles.valuationRow}>
             <BadgeEuro size={26} color="#1d4ed8" />
             <div className={styles.valuationMeta}>
-              <span className={styles.valuationLabel}>{nl ? "AI-waardering" : "AI valuation"}</span>
+              <span className={styles.valuationLabel}>{nl ? "Geschatte marktwaarde" : "Estimated market value"}</span>
               <span className={styles.valuationValue}>{valueNow}</span>
             </div>
             {valueMin && valueMax ? (

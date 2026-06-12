@@ -13,6 +13,40 @@ function parseFirstRegistration(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+type ValuationLike = {
+  estimatedValueNow: number;
+  estimatedValueMin: number;
+  estimatedValueMax: number;
+  confidence: "LOW" | "MEDIUM" | "HIGH";
+};
+
+/**
+ * The market value shown anywhere (web, PDF, e-mail, negotiation coach) is
+ * ALWAYS our own formula (computeMarketValueV3 via enriched.estimatedValue*).
+ * AI may only explain that value, never invent its own amounts. AI numbers
+ * survive only when the formula has no value (e.g. missing catalogue price).
+ */
+export function alignValuationWithFormula<T extends ValuationLike>(
+  localized: Record<string, unknown>,
+  valuation: T | null | undefined
+): T | null {
+  if (!valuation) return null;
+  const enriched = (localized.enriched ?? {}) as Record<string, unknown>;
+  const now = Number(enriched.estimatedValueNow);
+  if (!Number.isFinite(now) || now <= 0) return valuation;
+  const min = Number(enriched.estimatedValueMin);
+  const max = Number(enriched.estimatedValueMax);
+  const confidence = enriched.marketValueConfidence;
+  return {
+    ...valuation,
+    estimatedValueNow: Math.round(now),
+    estimatedValueMin: Number.isFinite(min) && min > 0 ? Math.round(min) : Math.round(now * 0.9),
+    estimatedValueMax: Number.isFinite(max) && max > 0 ? Math.round(max) : Math.round(now * 1.1),
+    confidence:
+      confidence === "HIGH" || confidence === "MEDIUM" || confidence === "LOW" ? confidence : valuation.confidence
+  };
+}
+
 export function applyMileageValuationOverride(localized: Record<string, unknown>, mileage: number | null): Record<string, unknown> {
   if (mileage === null) return localized;
   const vehicle = (localized.vehicle ?? {}) as Record<string, unknown>;

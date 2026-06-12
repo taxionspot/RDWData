@@ -132,7 +132,7 @@ export function generateVehicleReportHtml(args: {
 
   const aiValuationSection = aiValuation
     ? `
-  <h2>${escape(locale === "nl" ? "AI voertuigwaardering" : "AI vehicle valuation")}</h2>
+  <h2>${escape(locale === "nl" ? "Marktwaardering" : "Market valuation")}</h2>
   <table>
     <tr><th>${escape(locale === "nl" ? "Onderdeel" : "Section")}</th><th>${escape(locale === "nl" ? "Waarde" : "Value")}</th></tr>
     <tr><td>${escape(locale === "nl" ? "Huidige waarde" : "Estimated value now")}</td><td>${escape(aiValuation.currency)} ${escape(aiValuation.estimatedValueNow.toLocaleString("nl-NL"))}</td></tr>

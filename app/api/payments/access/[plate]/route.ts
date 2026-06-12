@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
 import { CheckoutLeadModel } from "@/models/CheckoutLead";
+import { hasCompletedPlatePayment, isDemoAccessEnabled } from "@/lib/payments/server-access";
 
 export const runtime = "nodejs";
 
@@ -18,9 +19,9 @@ export async function GET(_: Request, { params }: Params) {
       return NextResponse.json({ paid: false }, { status: 400 });
     }
 
-    await connectMongo();
-    const exists = await PlatePaymentModel.exists({ plate, status: "COMPLETED", provider: "paypal" });
-    return NextResponse.json({ paid: Boolean(exists) });
+    // Old demo records in the database must not unlock plates for everyone.
+    const paid = await hasCompletedPlatePayment(plate);
+    return NextResponse.json({ paid });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to check access.";
     return NextResponse.json({ paid: false, error: message }, { status: 500 });
@@ -31,9 +32,7 @@ export async function POST(request: Request, { params }: Params) {
   try {
     // Demo grant: free access without payment. Never available in production
     // unless explicitly enabled, otherwise anyone could unlock reports for free.
-    const demoEnabled =
-      process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
-    if (!demoEnabled) {
+    if (!isDemoAccessEnabled()) {
       return NextResponse.json({ ok: false, error: "Demo access is disabled." }, { status: 403 });
     }
 

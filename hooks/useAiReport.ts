@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
+import { onPlateAccessChanged } from "@/lib/payments/access";
 
 export type AiInsights = {
   summary: string;
@@ -66,8 +67,23 @@ export function useAiReport(plate: string, mileage: number | null = null) {
       setReport(result);
       setLoading(false);
     });
+    // The server only returns AI content for paid plates. After an unlock the
+    // cached "empty" response is stale, so refetch once access is granted.
+    const unsubscribe = onPlateAccessChanged(plate, (paid) => {
+      if (!paid) return;
+      reportCache.delete(key);
+      const fresh = fetchAiReport(plate, locale, mileage);
+      reportCache.set(key, fresh);
+      setLoading(true);
+      void fresh.then((result) => {
+        if (!active) return;
+        setReport(result);
+        setLoading(false);
+      });
+    });
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [plate, locale, mileage]);
 

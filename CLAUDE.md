@@ -119,26 +119,48 @@ draait wordt op het Hobby-plan geweigerd en blokkeert dan STIL alle
 deployments (geen deployment verschijnt, geen foutmelding bij push). Beide
 crons staan nu op dagelijks (07:00 watch-check, 08:00 abandoned-checkout).
 
-## URGENTE issues (door Sabur gemeld op 12 juni, eerst oppakken!)
-1. **Betaalmuur werkt niet: alle data is gratis zichtbaar.** Diagnose al
-   BEVESTIGD: `GET /api/payments/access/H223JZ` geeft live `{"paid":true}`.
-   De productiedatabase bevat oude demo-PlatePayment-records (orderId
-   "demo-<PLATE>-<ts>", amount "0.00") uit de periode dat de demo-skip-knop
-   altijd aanstond; lib/payments/access.ts ensurePaidAccessChecked ontgrendelt
-   die kentekens daardoor voor ALLE bezoekers. Fix: (a) demo-records opruimen
-   (PlatePayment.deleteMany({ orderId: /^demo-/ }) of amount "0.00") via
-   een admin-beschermd opruim-endpoint of mongosh; (b) overweeg de
-   server-check demo-records te laten negeren; (c) daarna oude TODO
-   "server-side gating premium-velden" doen (de vehicle-API levert nu nog
-   alle premium data in de JSON, alleen UI-blur beschermt). NB: RG513T is
-   BEWUST overal gratis (SAMPLE_PLATE) en dus geen bug.
-2. **Marktwaarde klopt niet**: moet de EIGEN formule gebruiken
-   (computeMarketValueV3 in lib/rdw/heuristics.ts met het formule-
-   kilometerverloop), niet een AI-schatting. Controleer wat het rapport en
-   de PDF tonen (aiValuation vs enriched.estimatedValueNow), of
-   applyMileageValuationOverride goed doorwerkt en of een oude
-   AiReportCache-entry verkeerde waardes vasthoudt (cache 7 dagen).
-   Getest door Sabur met RG513T en H223JZ.
+## URGENTE issues van 12 juni: GEFIXT (branch claude/serene-feynman-kj410m)
+Beide issues zijn opgelost en geverifieerd met Playwright (productie-build,
+echte productie-payloads, desktop 1380 + mobiel 390, gratis en betaald,
+26 checks groen, geen pageerrors). Merge naar main deployt de fix.
+
+1. **Betaalmuur** (oorzaak: oude demo-PlatePayment-records, orderId
+   "demo-<PLATE>-<ts>", amount "0.00", ontgrendelden elk getest kenteken
+   voor iedereen):
+   - lib/payments/server-access.ts (nieuw): hasCompletedPlatePayment negeert
+     demo-records tenzij demo-modus expliciet aanstaat; hasPaidPlateAccess
+     bundelt sample/demo/paymentEnabled/betaald-check. Gebruikt in
+     GET /api/payments/access/[plate] en de vehicle-API.
+   - Opruim-endpoint (admin-cookie vereist): GET
+     /api/admin/payments/cleanup-demo toont count+kentekens, POST verwijdert
+     de demo-records definitief. NA DEPLOY NOG UITVOEREN (eerst inloggen op
+     /admin). Lek is door de servercheck al dicht, opruimen is hygiëne.
+   - Server-side gating AI-content: /api/vehicle/[plate]?include_ai=1 geeft
+     aiInsights/aiValuation alleen nog bij betaald/sample/demo (scheelt ook
+     Claude-kosten); negotiation-copilot-endpoint geeft 402 zonder betaling.
+     hooks/useAiReport.ts refetcht na unlock (onPlateAccessChanged), anders
+     bleef de lege pre-betaling-respons in de client-cache hangen.
+   - NOG OPEN (vervolgstap, bewust niet in deze fix): de basis-JSON van de
+     vehicle-API bevat nog steeds alle RDW-/enriched-data; per-sectie
+     veldgating vergt een audit van welke velden het gratis overzicht nodig
+     heeft (risico: gratis funnel breken). AI-content is wel al gegated.
+   - NB: RG513T blijft BEWUST overal gratis (SAMPLE_PLATE).
+2. **Marktwaarde**: overal de EIGEN formule (computeMarketValueV3):
+   - lib/api/market-value.ts: alignValuationWithFormula overschrijft
+     AI-bedragen hard met enriched.estimatedValueNow/Min/Max + confidence
+     (AI-bedragen alleen als de formule geen waarde heeft, bv. geen
+     catalogusprijs). Toegepast in generateVehicleAiReport zelf (claude.ts,
+     geldt dus ook voor copilot/PDF/mail) én op AiReportCache-reads.
+   - Prompt (claude.ts) instrueert Claude expliciet de formulewaarden uit
+     enriched te kopiëren; factors/explanation blijven AI-werk.
+   - AiReportCache-key gebumpt naar "v2|..." zodat oude entries met
+     AI-verzonnen bedragen/toelichtingen vervallen.
+   - Web toont formulewaarde eerst (VehicleResultScreen), PDF-hero en
+     "Waarde nu"-kaart lezen enriched eerst; labels hernoemd van
+     "AI-waardering" naar "Geschatte marktwaarde"/"Marktwaardering".
+   - Onderhandelcoach rekent met formulewaarden (mileage werkt door via
+     applyMileageValuationOverride); bij AI-failure formule-fallback i.p.v.
+     client-bedragen.
 
 ## Overige openstaande punten
 1. Vercel env vars (Production) zetten + redeploy: live PayPal-keys,

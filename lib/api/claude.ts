@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { alignValuationWithFormula } from "@/lib/api/market-value";
 
 export type ClaudeInsightResult = {
   summary: string;
@@ -177,6 +178,7 @@ Regels:
 - Baseer analyse op alle data (identiteit, APK/defecten, recalls, onderhoudsrisico, kilometrage-signalen, markt/fuel/gewicht).
 - summary 120-220 woorden, concreet en overtuigend
 - positives max 6, risks max 6, recommendations max 8, factors max 12
+- GEBRUIK voor estimatedValueNow, estimatedValueMin en estimatedValueMax EXACT de waarden uit enriched.estimatedValueNow, enriched.estimatedValueMin en enriched.estimatedValueMax in DATA (onze eigen taxatieformule). Verzin NOOIT eigen bedragen. Leg in explanation en factors uit welke factoren deze waarde verklaren.
 - estimatedValueMin <= estimatedValueNow <= estimatedValueMax
 - waardes als gehele EUR getallen
 - recommendation moet expliciet advies geven: kopen/wachten/onderhandelen/extra inspectie
@@ -210,6 +212,7 @@ Rules:
 - Use all available data (identity, inspections/defects, recalls, maintenance risk, mileage signals, market/fuel/weight indicators).
 - summary 120-220 words, concrete and convincing
 - positives max 6, risks max 6, recommendations max 8, factors max 12
+- USE the exact values from enriched.estimatedValueNow, enriched.estimatedValueMin and enriched.estimatedValueMax in DATA (our own valuation formula) for estimatedValueNow/Min/Max. NEVER invent your own amounts. Use explanation and factors to explain what drives this value.
 - estimatedValueMin <= estimatedValueNow <= estimatedValueMax
 - integer EUR values
 - recommendation must explicitly guide buy/wait/negotiate/inspect
@@ -251,6 +254,16 @@ async function callAnthropic(args: {
   }
 }
 
+/**
+ * Hard guarantee that the valuation amounts equal our own formula, whatever
+ * the model returned: the prompt instructs Claude to copy them, this enforces
+ * it. See alignValuationWithFormula.
+ */
+function withFormulaValuation(report: ClaudeVehicleReportResult, vehicleData: unknown): ClaudeVehicleReportResult {
+  const aligned = alignValuationWithFormula((vehicleData ?? {}) as Record<string, unknown>, report.valuation);
+  return aligned ? { ...report, valuation: aligned } : report;
+}
+
 export async function generateVehicleAiReport(args: {
   plate: string;
   locale: "nl" | "en";
@@ -269,7 +282,7 @@ export async function generateVehicleAiReport(args: {
     console.info(`[anthropic] request_id=${response.requestId} model=${model} pass=1`);
   }
   const parsed = parseClaudeJson(extractTextContent(response.content));
-  if (parsed) return parsed;
+  if (parsed) return withFormulaValuation(parsed, args.vehicleData);
 
   const retryResponse = await callAnthropic({
     apiKey,
@@ -283,7 +296,7 @@ export async function generateVehicleAiReport(args: {
   }
   const retryParsed = parseClaudeJson(extractTextContent(retryResponse.content));
   if (!retryParsed) throw new Error("Anthropic response was not valid JSON in expected format.");
-  return retryParsed;
+  return withFormulaValuation(retryParsed, args.vehicleData);
 }
 
 export async function generateVehicleAiInsights(args: {
@@ -482,6 +495,8 @@ export function buildFallbackVehicleAiReport(args: {
   const year = readNestedNumber(vehicle, ["year"]);
 
   const directEstimate = readNestedNumber(enriched, ["estimatedValueNow"]);
+  const directMin = readNestedNumber(enriched, ["estimatedValueMin"]);
+  const directMax = readNestedNumber(enriched, ["estimatedValueMax"]);
   const maintenanceRisk = readNestedNumber(enriched, ["maintenanceRiskScore"]) ?? 6;
   const apkPassChance = readNestedNumber(enriched, ["apkPassChance"]) ?? 70;
   const cataloguePrice = readNestedNumber(vehicle, ["cataloguePrice"]);
@@ -495,8 +510,9 @@ export function buildFallbackVehicleAiReport(args: {
   const recallPenalty = recalls > 0 ? 0.04 : 0;
   const riskPenalty = maintenanceRisk * 0.01;
   const uncertainty = clamp(0.14 + defectPenalty + recallPenalty + riskPenalty, 0.14, 0.38);
-  const estimatedValueMin = Math.max(1000, Math.round(estimatedValueNow * (1 - uncertainty)));
-  const estimatedValueMax = Math.round(estimatedValueNow * (1 + uncertainty));
+  // Prefer the formula range from enriched data; only derive one when missing.
+  const estimatedValueMin = Math.max(1000, Math.round(directMin ?? estimatedValueNow * (1 - uncertainty)));
+  const estimatedValueMax = Math.round(directMax ?? estimatedValueNow * (1 + uncertainty));
   const confidence: "LOW" | "MEDIUM" | "HIGH" = uncertainty > 0.28 ? "LOW" : uncertainty > 0.2 ? "MEDIUM" : "HIGH";
 
   const positives: string[] = [];

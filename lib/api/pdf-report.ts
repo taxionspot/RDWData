@@ -465,10 +465,12 @@ function drawHeroVisuals(args: {
       });
     });
 
-  const vNow = valuation?.estimatedValueNow ?? toNumber(asRow(args.data.enriched).estimatedValueNow);
-  const vMin = valuation?.estimatedValueMin ?? toNumber(asRow(args.data.enriched).estimatedValueMin);
-  const vMax = valuation?.estimatedValueMax ?? toNumber(asRow(args.data.enriched).estimatedValueMax);
-  args.page.drawText(args.locale === "nl" ? "Marktwaarde (AI)" : "Market value (AI)", {
+  // Our own formula (enriched) is the source of truth for market value;
+  // the AI valuation is only a fallback when the formula has no value.
+  const vNow = toNumber(asRow(args.data.enriched).estimatedValueNow) ?? valuation?.estimatedValueNow;
+  const vMin = toNumber(asRow(args.data.enriched).estimatedValueMin) ?? valuation?.estimatedValueMin;
+  const vMax = toNumber(asRow(args.data.enriched).estimatedValueMax) ?? valuation?.estimatedValueMax;
+  args.page.drawText(args.locale === "nl" ? "Marktwaarde" : "Market value", {
     x: leftX + 10,
     y: cardY + 45,
     font: args.bold,
@@ -601,7 +603,12 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     },
     {
       title: locale === "nl" ? "Waarde nu" : "Value now",
-      value: args.aiValuation ? `${args.aiValuation.currency} ${args.aiValuation.estimatedValueNow.toLocaleString("nl-NL")}` : currency(enriched.estimatedValueNow),
+      value:
+        toNumber(enriched.estimatedValueNow) !== null
+          ? currency(enriched.estimatedValueNow)
+          : args.aiValuation
+          ? `${args.aiValuation.currency} ${args.aiValuation.estimatedValueNow.toLocaleString("nl-NL")}`
+          : currency(enriched.estimatedValueNow),
       accent: rgb(0.08, 0.2, 0.45)
     }
   ]);
@@ -681,7 +688,9 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   );
 
   if (aiValuation) {
-    layout.section(locale === "nl" ? "AI waardering" : "AI Valuation");
+    // Amounts come from our own formula; the AI only supplies the factors
+    // and plain-language explanation.
+    layout.section(locale === "nl" ? "Marktwaardering" : "Market Valuation");
     layout.keyValue(locale === "nl" ? "Waarde nu" : "Value now", `${aiValuation.currency} ${aiValuation.estimatedValueNow.toLocaleString("nl-NL")}`);
     layout.keyValue(locale === "nl" ? "Bandbreedte" : "Range", `${aiValuation.currency} ${aiValuation.estimatedValueMin.toLocaleString("nl-NL")} - ${aiValuation.currency} ${aiValuation.estimatedValueMax.toLocaleString("nl-NL")}`);
     layout.keyValue(locale === "nl" ? "Confidence" : "Confidence", aiValuation.confidence);
