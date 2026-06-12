@@ -37,8 +37,8 @@ export function getVehicleImageUrl(
   options: ImageOptions = {}
 ): string {
   // Fallback image if make is missing
-  const fallback = "https://storage.googleapis.com/banani-generated-images/generated-images/e0649eef-2848-49b1-a352-34ec7d23ba0c.jpg";
-  
+  const fallback = "/car-silver.png";
+
   if (!make) return fallback;
 
   const {

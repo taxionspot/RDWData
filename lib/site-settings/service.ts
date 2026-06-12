@@ -2,8 +2,57 @@ import { connectMongo } from "@/lib/db/mongodb";
 import { SiteSettingsModel } from "@/models/SiteSettings";
 import { defaultSiteSettings, type PublicSiteSettings } from "./defaults";
 
+// Old shipped defaults that may still live in the database. When a stored value
+// is byte-identical to one of these, the admin never changed it, so the new
+// default is applied instead. Admin-customized values are left untouched.
+const LEGACY_HERO_IMAGE =
+  "https://storage.googleapis.com/banani-generated-images/generated-images/ad953e96-ea70-4d4d-ab60-fc21c7b01fb4.jpg";
+const LEGACY_CTA_SUBTITLE = "Sluit je aan bij meer dan 1.000.000 slimme kopers die hun auto checkten voor de deal.";
+const LEGACY_BADGE_TOP = "Het #1 beoordeelde voertuiggeschiedenisplatform";
+const LEGACY_FOOTER_DESCRIPTION = "Het meest complete en transparante voertuiggeschiedenisplatform voor kopers en dealers.";
+const LEGACY_PRODUCT_LINKS = ["Sample Report", "Pricing", "Features", "For Dealers"];
+const LEGACY_COMPANY_LINKS = ["About Us", "Careers", "Contact", "Partners"];
+const LEGACY_LEGAL_LINKS = ["Terms of Service", "Privacy Policy", "Cookie Policy", "Data Sources"];
+const LEGACY_FROM_ADDRESS = "noreply@kentekenrapport.nl";
+
+function sameArray(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+
+function applyLegacyDefaults(settings: PublicSiteSettings): PublicSiteSettings {
+  if (settings.content.landingHeroImageUrl === LEGACY_HERO_IMAGE) {
+    settings.content.landingHeroImageUrl = defaultSiteSettings.content.landingHeroImageUrl;
+  }
+  if (settings.content.landingCtaSubtitle === LEGACY_CTA_SUBTITLE) {
+    settings.content.landingCtaSubtitle = defaultSiteSettings.content.landingCtaSubtitle;
+  }
+  if (settings.content.footerDescription === LEGACY_FOOTER_DESCRIPTION) {
+    settings.content.footerDescription = defaultSiteSettings.content.footerDescription;
+  }
+  if (settings.landing.badgeTop === LEGACY_BADGE_TOP) {
+    settings.landing.badgeTop = defaultSiteSettings.landing.badgeTop;
+  }
+  const footer = settings.landing.footer;
+  if (sameArray(footer.productLinks, LEGACY_PRODUCT_LINKS)) {
+    footer.productLinks = defaultSiteSettings.landing.footer.productLinks;
+  }
+  if (sameArray(footer.companyLinks, LEGACY_COMPANY_LINKS)) {
+    footer.companyLinks = defaultSiteSettings.landing.footer.companyLinks;
+  }
+  if (sameArray(footer.legalLinks, LEGACY_LEGAL_LINKS)) {
+    footer.legalLinks = defaultSiteSettings.landing.footer.legalLinks;
+  }
+  if (footer.companyTitle === "Company") footer.companyTitle = defaultSiteSettings.landing.footer.companyTitle;
+  if (footer.legalTitle === "Legal") footer.legalTitle = defaultSiteSettings.landing.footer.legalTitle;
+  if (settings.email.fromAddress === LEGACY_FROM_ADDRESS) {
+    settings.email.fromAddress = defaultSiteSettings.email.fromAddress;
+    settings.email.fromName = defaultSiteSettings.email.fromName;
+  }
+  return settings;
+}
+
 function mergedSettings(doc: Record<string, unknown>): PublicSiteSettings {
-  return {
+  const merged: PublicSiteSettings = {
     paymentEnabled: (doc.paymentEnabled as boolean) ?? defaultSiteSettings.paymentEnabled,
     payment: { ...defaultSiteSettings.payment, ...((doc.payment ?? {}) as object) },
     lockSections: { ...defaultSiteSettings.lockSections, ...((doc.lockSections ?? {}) as object) },
@@ -28,6 +77,7 @@ function mergedSettings(doc: Record<string, unknown>): PublicSiteSettings {
     appearance: { ...defaultSiteSettings.appearance, ...((doc.appearance ?? {}) as object) },
     email: { ...defaultSiteSettings.email, ...((doc.email ?? {}) as object) }
   };
+  return applyLegacyDefaults(merged);
 }
 
 export async function getSiteSettings(): Promise<PublicSiteSettings> {

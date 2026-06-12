@@ -110,15 +110,14 @@ export const defaultSiteSettings: PublicSiteSettings = {
       "Ontdek direct verborgen schade, kilometerfraude, marktwaarde en eigendomsgeschiedenis met alleen een kenteken.",
     landingCtaTitle: "Klaar om met vertrouwen te kopen?",
     landingCtaSubtitle:
-      "Sluit je aan bij meer dan 1.000.000 slimme kopers die hun auto checkten voor de deal.",
+      "Check je auto vóór de koop en onderhandel met vertrouwen, direct op basis van officiële RDW-data.",
     landingCtaButton: "Start je check nu",
-    landingHeroImageUrl:
-      "https://storage.googleapis.com/banani-generated-images/generated-images/ad953e96-ea70-4d4d-ab60-fc21c7b01fb4.jpg",
+    landingHeroImageUrl: "/hero-car.png",
     footerDescription:
-      "Het meest complete en transparante voertuiggeschiedenisplatform voor kopers en dealers."
+      "Complete en transparante voertuighistorie voor autokopers, op basis van officiële RDW-data."
   },
   landing: {
-    badgeTop: "Het #1 beoordeelde voertuiggeschiedenisplatform",
+    badgeTop: "Direct inzicht via officiële RDW-data",
     trustedSourcesLabel: "Vertrouwde databronnen",
     featureSectionLabel: "Volledige data",
     featureSectionTitle: "Alles wat je nodig hebt voor een veilige aankoop",
@@ -186,11 +185,11 @@ export const defaultSiteSettings: PublicSiteSettings = {
     ],
     footer: {
       productTitle: "Product",
-      companyTitle: "Company",
-      legalTitle: "Legal",
-      productLinks: ["Sample Report", "Pricing", "Features", "For Dealers"],
-      companyLinks: ["About Us", "Careers", "Contact", "Partners"],
-      legalLinks: ["Terms of Service", "Privacy Policy", "Cookie Policy", "Data Sources"]
+      companyTitle: "Bedrijf",
+      legalTitle: "Juridisch",
+      productLinks: ["Kentekencheck", "Functies", "Voorbeeldrapport", "Prijzen"],
+      companyLinks: ["Contact", "Account"],
+      legalLinks: ["Algemene voorwaarden", "Privacybeleid", "Cookieverklaring"]
     }
   },
   seo: {
@@ -208,8 +207,8 @@ export const defaultSiteSettings: PublicSiteSettings = {
     logoText: "Kentekenrapport"
   },
   email: {
-    fromName: "Kentekenrapport",
-    fromAddress: "noreply@kentekenrapport.nl",
+    fromName: "Anouk van Kentekenrapport",
+    fromAddress: "info@kentekenrapport.com",
     reportSubjectNl: "Jouw kentekenrapport",
     reportSubjectEn: "Your vehicle report",
     welcomeBodyNl: "Bedankt voor het gebruiken van Kentekenrapport. Uw rapport is bijgevoegd.",

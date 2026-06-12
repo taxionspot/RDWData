@@ -2,12 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { normalizePlate, validateDutchPlate } from "@/lib/rdw/normalize";
 import { useI18n } from "@/lib/i18n/context";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { useCmsPages } from "@/hooks/useCmsPages";
 import {
   Building2,
   Briefcase,
@@ -20,9 +18,6 @@ import {
   FileCheck,
   FileSpreadsheet,
   Sparkles,
-  Twitter,
-  Linkedin,
-  Facebook,
   ShieldCheck
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -38,17 +33,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Sparkles,
   ShieldCheck
 };
-
-function resolveLegalHref(label: string): string | null {
-  const normalized = label.trim().toLowerCase();
-  if (normalized === "privacy policy" || normalized === "privacybeleid") {
-    return "/privacy-policy";
-  }
-  if (normalized === "terms of service" || normalized === "terms and conditions" || normalized === "algemene voorwaarden") {
-    return "/terms-and-conditions";
-  }
-  return null;
-}
 
 function PlateSearch() {
   const [value, setValue] = useState("");
@@ -66,7 +50,7 @@ function PlateSearch() {
   };
 
   return (
-    <div className={styles["search-wrapper"]}>
+    <div id="plate-search" className={styles["search-wrapper"]}>
       <small>{t("landing.example")}</small>
       <div className={styles["search-row"]}>
         <input
@@ -89,12 +73,7 @@ function PlateSearch() {
 }
 
 export default function LandingPage() {
-  const { t } = useI18n();
   const { settings } = useSiteSettings();
-  const cmsPages = useCmsPages();
-  const footerPages = cmsPages.filter(
-    (page) => page.showInFooter && page.slug !== "privacy-policy" && page.slug !== "terms-and-conditions"
-  );
 
   return (
     <div className={styles.page}>
@@ -120,7 +99,7 @@ export default function LandingPage() {
               src={settings.content.landingHeroImageUrl}
               width={1200}
               height={675}
-              alt="Platform dashboard"
+              alt="Kentekenrapport voertuigcheck"
               priority
               className="w-full h-auto"
             />
@@ -172,87 +151,12 @@ export default function LandingPage() {
           <section id="pricing" className={styles.cta}>
             <h2 className={styles["cta-title"]}>{settings.content.landingCtaTitle}</h2>
             <p className={styles["cta-subtitle"]}>{settings.content.landingCtaSubtitle}</p>
-            <button className={styles["cta-btn"]} data-media-type="banani-button">
+            <a href="#plate-search" className={styles["cta-btn"]}>
               {settings.content.landingCtaButton}
-            </button>
+            </a>
           </section>
         ) : null}
       </main>
-
-      <footer className={styles.footer}>
-        <div className={styles["footer-grid"]}>
-          <div>
-            <div className={styles["nav-brand"]}>
-              <div className={styles["brand-icon"]}>
-                <ShieldCheck size={16} />
-              </div>
-              {settings.content.platformName}
-            </div>
-            <p className={styles["footer-desc"]}>{settings.content.footerDescription}</p>
-          </div>
-          <div>
-            <div className={styles["footer-title"]}>{settings.landing.footer.productTitle}</div>
-            <div className={styles["footer-links"]}>
-              {settings.landing.footer.productLinks.map((item) => (
-                <div key={item} className={styles["footer-link"]}>
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className={styles["footer-title"]}>{settings.landing.footer.companyTitle}</div>
-            <div className={styles["footer-links"]}>
-              {settings.landing.footer.companyLinks.map((item) => (
-                <div key={item} className={styles["footer-link"]}>
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className={styles["footer-title"]}>{settings.landing.footer.legalTitle}</div>
-            <div className={styles["footer-links"]}>
-              {settings.landing.footer.legalLinks.map((item) => (
-                (() => {
-                  const href = resolveLegalHref(item);
-                  if (href) {
-                    return (
-                      <Link key={item} href={href} className={styles["footer-link"]}>
-                        {item}
-                      </Link>
-                    );
-                  }
-                  return (
-                    <div key={item} className={styles["footer-link"]}>
-                      {item}
-                    </div>
-                  );
-                })()
-              ))}
-              {footerPages.map((page) => (
-                <Link key={page._id} href={`/p/${page.slug}`} className={styles["footer-link"]}>
-                  {page.title}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className={styles["footer-bottom"]}>
-          <div>© {new Date().getFullYear()} {settings.content.platformName} {t("landing.footerRights")}</div>
-          <div className={styles["social-icons"]}>
-            <a className={styles["social-icon"]} href="https://twitter.com" aria-label="Twitter">
-              <Twitter size={16} />
-            </a>
-            <a className={styles["social-icon"]} href="https://linkedin.com" aria-label="LinkedIn">
-              <Linkedin size={16} />
-            </a>
-            <a className={styles["social-icon"]} href="https://facebook.com" aria-label="Facebook">
-              <Facebook size={16} />
-            </a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -24,6 +24,7 @@ import {
   User,
   Zap,
 } from "lucide-react";
+import { useI18n } from "@/lib/i18n/context";
 
 // ─── Types ───
 type SavedVehicle = {
@@ -44,32 +45,37 @@ type ReportItem = {
 
 type Tab = "overview" | "garage" | "apk" | "reports" | "settings";
 
+type VehicleLiveInfo = {
+  apkExpiryDate: string | null;
+  valueNow: number | null;
+  valueNextYear: number | null;
+};
+
 // ─── Helpers ───
 function formatPlate(plate: string) {
   return plate.toUpperCase();
 }
 
-function daysUntil(dateStr: string) {
-  const diff = new Date(dateStr).getTime() - Date.now();
+function parseRdwDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const raw = String(value);
+  if (/^\d{8}$/.test(raw)) {
+    return new Date(`${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`);
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function daysUntil(date: Date) {
+  const diff = date.getTime() - Date.now();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-/** Deterministic fake APK expiry based on plate hash */
-function estimateApkExpiry(plate: string): string {
-  let hash = 0;
-  for (const c of plate) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;
-  const daysFromNow = 30 + Math.abs(hash % 335); // 30–365 days
-  const d = new Date();
-  d.setDate(d.getDate() + daysFromNow);
-  return d.toISOString();
-}
-
-/** Deterministic fake value trend from plate */
-function estimateValueTrend(plate: string): "up" | "down" | "flat" {
-  let hash = 0;
-  for (const c of plate) hash = (hash * 17 + c.charCodeAt(0)) & 0xffffffff;
-  const r = Math.abs(hash) % 3;
-  return r === 0 ? "up" : r === 1 ? "down" : "flat";
+function valueTrend(info: VehicleLiveInfo | undefined): "up" | "down" | "flat" | null {
+  if (!info || info.valueNow === null || info.valueNextYear === null) return null;
+  const delta = info.valueNextYear - info.valueNow;
+  if (Math.abs(delta) < info.valueNow * 0.02) return "flat";
+  return delta > 0 ? "up" : "down";
 }
 
 function apkStatusColor(days: number) {
@@ -90,10 +96,10 @@ function TabButton({ id, active, icon: Icon, label, onClick }: { id: Tab; active
   );
 }
 
-function VehicleCard({ vehicle }: { vehicle: SavedVehicle }) {
-  const apkDate = estimateApkExpiry(vehicle.plate);
-  const apkDays = daysUntil(apkDate);
-  const trend = estimateValueTrend(vehicle.plate);
+function VehicleCard({ vehicle, info }: { vehicle: SavedVehicle; info?: VehicleLiveInfo }) {
+  const apkDate = parseRdwDate(info?.apkExpiryDate);
+  const apkDays = apkDate ? daysUntil(apkDate) : null;
+  const trend = valueTrend(info);
   const trendColor = trend === "up" ? "text-emerald-400" : trend === "down" ? "text-red-400" : "text-slate-400";
   const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Gauge;
 
@@ -108,10 +114,12 @@ function VehicleCard({ vehicle }: { vehicle: SavedVehicle }) {
           </div>
           {vehicle.title && <div className="mt-1.5 text-sm font-medium text-slate-300">{vehicle.title}</div>}
         </div>
-        <div className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${trendColor} border-current/30`}>
-          <TrendIcon className="h-3 w-3" />
-          {trend === "up" ? "Rising" : trend === "down" ? "Falling" : "Stable"}
-        </div>
+        {trend !== null && (
+          <div className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${trendColor} border-current/30`}>
+            <TrendIcon className="h-3 w-3" />
+            {trend === "up" ? "Rising" : trend === "down" ? "Falling" : "Stable"}
+          </div>
+        )}
       </div>
 
       {/* Stats row */}
@@ -128,14 +136,16 @@ function VehicleCard({ vehicle }: { vehicle: SavedVehicle }) {
         </div>
       </div>
 
-      {/* APK countdown */}
-      <div className={`mb-4 flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm ${apkStatusColor(apkDays)}`}>
-        <CalendarDays className="h-4 w-4 flex-shrink-0" />
-        <div>
-          <span className="font-semibold">{apkDays <= 0 ? "APK Expired" : `APK in ${apkDays} days`}</span>
-          <span className="ml-2 text-xs opacity-70">Est. {new Date(apkDate).toLocaleDateString("nl-NL")}</span>
+      {/* APK countdown (real RDW expiry date) */}
+      {apkDate && apkDays !== null && (
+        <div className={`mb-4 flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm ${apkStatusColor(apkDays)}`}>
+          <CalendarDays className="h-4 w-4 flex-shrink-0" />
+          <div>
+            <span className="font-semibold">{apkDays <= 0 ? "APK Expired" : `APK in ${apkDays} days`}</span>
+            <span className="ml-2 text-xs opacity-70">{apkDate.toLocaleDateString("nl-NL")}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Actions */}
       <div className="mt-auto flex gap-2">
@@ -146,7 +156,7 @@ function VehicleCard({ vehicle }: { vehicle: SavedVehicle }) {
           <Search className="h-3.5 w-3.5" /> View Report
         </Link>
         <Link
-          href={`/search/${vehicle.plate}/watch${typeof vehicle.mileageInput === "number" ? `?mileage=${vehicle.mileageInput}` : ""}`}
+          href={`/search/${vehicle.plate}/post-purchase-watch${typeof vehicle.mileageInput === "number" ? `?mileage=${vehicle.mileageInput}` : ""}`}
           className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-300 hover:border-white/20 hover:text-white transition"
         >
           <Bell className="h-3.5 w-3.5" />
@@ -158,13 +168,13 @@ function VehicleCard({ vehicle }: { vehicle: SavedVehicle }) {
 
 // ─── Main ───
 export default function AccountPage() {
+  const { locale, setLocale } = useI18n();
   const [email, setEmail] = useState<string | null>(null);
   const [savedVehicles, setSavedVehicles] = useState<SavedVehicle[]>([]);
+  const [vehicleInfo, setVehicleInfo] = useState<Record<string, VehicleLiveInfo>>({});
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const [emailPref, setEmailPref] = useState(true);
-  const [langPref, setLangPref] = useState<"nl" | "en">("nl");
 
   useEffect(() => {
     let active = true;
@@ -196,16 +206,56 @@ export default function AccountPage() {
     return () => { active = false; };
   }, []);
 
+  // Fetch real RDW data (APK expiry, market value) for saved vehicles.
+  useEffect(() => {
+    if (savedVehicles.length === 0) return;
+    let active = true;
+    void (async () => {
+      const entries = await Promise.allSettled(
+        savedVehicles.slice(0, 24).map(async (v) => {
+          const response = await fetch(`/api/vehicle/${encodeURIComponent(v.plate)}?lang=nl`, { cache: "no-store" });
+          if (!response.ok) throw new Error("lookup failed");
+          const payload = (await response.json()) as {
+            vehicle?: { apkExpiryDate?: string | null };
+            enriched?: { estimatedValueNow?: number | null; estimatedValueNextYear?: number | null };
+          };
+          return [
+            v.plate,
+            {
+              apkExpiryDate: payload.vehicle?.apkExpiryDate ?? null,
+              valueNow: payload.enriched?.estimatedValueNow ?? null,
+              valueNextYear: payload.enriched?.estimatedValueNextYear ?? null
+            }
+          ] as const;
+        })
+      );
+      if (!active) return;
+      const next: Record<string, VehicleLiveInfo> = {};
+      for (const entry of entries) {
+        if (entry.status === "fulfilled") next[entry.value[0]] = entry.value[1];
+      }
+      setVehicleInfo(next);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [savedVehicles]);
+
   const logout = async () => {
     await fetch("/api/user/logout", { method: "POST" });
     window.location.reload();
   };
 
-  const apkAlerts = useMemo(() =>
-    savedVehicles
-      .map((v) => ({ ...v, apkDate: estimateApkExpiry(v.plate), apkDays: daysUntil(estimateApkExpiry(v.plate)) }))
-      .sort((a, b) => a.apkDays - b.apkDays),
-    [savedVehicles]
+  const apkAlerts = useMemo(
+    () =>
+      savedVehicles
+        .map((v) => {
+          const date = parseRdwDate(vehicleInfo[v.plate]?.apkExpiryDate);
+          return { ...v, apkDate: date, apkDays: date ? daysUntil(date) : null };
+        })
+        .filter((v): v is typeof v & { apkDate: Date; apkDays: number } => v.apkDate !== null && v.apkDays !== null)
+        .sort((a, b) => a.apkDays - b.apkDays),
+    [savedVehicles, vehicleInfo]
   );
 
   const urgentCount = apkAlerts.filter((v) => v.apkDays <= 90).length;
@@ -335,7 +385,7 @@ export default function AccountPage() {
                   <button onClick={() => setActiveTab("garage")} className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition">View all <ChevronRight className="h-3 w-3" /></button>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {savedVehicles.slice(0, 3).map((v) => <VehicleCard key={v._id} vehicle={v} />)}
+                  {savedVehicles.slice(0, 3).map((v) => <VehicleCard key={v._id} vehicle={v} info={vehicleInfo[v.plate]} />)}
                 </div>
               </div>
             )}
@@ -370,7 +420,7 @@ export default function AccountPage() {
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {savedVehicles.map((v) => <VehicleCard key={v._id} vehicle={v} />)}
+                {savedVehicles.map((v) => <VehicleCard key={v._id} vehicle={v} info={vehicleInfo[v.plate]} />)}
               </div>
             )}
           </div>
@@ -411,7 +461,7 @@ export default function AccountPage() {
                         <div className={`mt-0.5 text-sm font-semibold ${statusColor}`}>
                           {v.apkDays <= 0 ? "APK EXPIRED" : `APK expires in ${v.apkDays} day${v.apkDays !== 1 ? "s" : ""}`}
                         </div>
-                        <div className="text-xs text-slate-500">Estimated expiry: {new Date(v.apkDate).toLocaleDateString("nl-NL")}</div>
+                        <div className="text-xs text-slate-500">Expiry date (RDW): {v.apkDate.toLocaleDateString("nl-NL")}</div>
                       </div>
                       <Link href={`/search/${v.plate}`} className="flex items-center gap-2 rounded-xl bg-white/8 px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-white/12 hover:text-white transition flex-shrink-0">
                         <ChevronRight className="h-4 w-4" />
@@ -422,16 +472,6 @@ export default function AccountPage() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-blue-500/20 bg-blue-950/30 p-5">
-              <div className="flex items-start gap-3">
-                <Bell className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-400" />
-                <div>
-                  <div className="text-sm font-semibold text-white">APK reminder emails</div>
-                  <p className="mt-0.5 text-xs text-slate-400">Enable email reminders to get notified 90, 30, and 7 days before your APK expires. Go to Settings to configure this.</p>
-                  <button onClick={() => setActiveTab("settings")} className="mt-2 text-xs font-semibold text-blue-400 hover:text-blue-300 transition">Configure notifications →</button>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -489,19 +529,10 @@ export default function AccountPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-4 rounded-xl border border-white/8 bg-white/4 px-4 py-3">
                   <div>
-                    <div className="text-sm font-medium text-white">Email notifications</div>
-                    <div className="text-xs text-slate-400">APK reminders and price alerts</div>
-                  </div>
-                  <div className={`relative h-6 w-11 cursor-pointer rounded-full transition-colors ${emailPref ? "bg-blue-600" : "bg-slate-600"}`} onClick={() => setEmailPref(!emailPref)}>
-                    <div className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-all ${emailPref ? "left-6" : "left-1"}`} />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-white/8 bg-white/4 px-4 py-3">
-                  <div>
                     <div className="text-sm font-medium text-white">Language</div>
-                    <div className="text-xs text-slate-400">Report language preference</div>
+                    <div className="text-xs text-slate-400">Site and report language</div>
                   </div>
-                  <select className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white outline-none" value={langPref} onChange={(e) => setLangPref(e.target.value as "nl" | "en")}>
+                  <select className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white outline-none" value={locale} onChange={(e) => setLocale(e.target.value as "nl" | "en")}>
                     <option value="nl" className="bg-slate-800">Nederlands</option>
                     <option value="en" className="bg-slate-800">English</option>
                   </select>

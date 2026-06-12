@@ -73,6 +73,21 @@ Hoe de opvolgmail werkt:
 De cron-route is beveiligd met `CRON_SECRET` (Vercel stuurt die automatisch mee
 als `Authorization: Bearer …` wanneer de env-var is gezet).
 
+### Pagina's & juridisch
+
+- Elke pagina heeft een globale footer met werkende links naar algemene
+  voorwaarden, privacybeleid en cookieverklaring.
+- `/privacy-policy` en `/terms-and-conditions` bevatten volwaardige Nederlandse
+  juridische teksten (AVG, herroepingsrecht digitale levering, betaalmethodes,
+  contact via info@kentekenrapport.com). Bestaande databases met de oude Engelse
+  standaardteksten worden automatisch gemigreerd; door de admin aangepaste
+  teksten blijven staan. Bewerken kan via /admin/legal.
+- In de betaalmodal staat de wettelijk vereiste instemming met directe levering
+  (afstand van herroepingsrecht) met links naar voorwaarden en privacybeleid.
+- `/pricing` toont het echte prijsmodel (eenmalig per kenteken, prijs uit de
+  admin-instellingen) in plaats van de oude demo-abonnementen.
+- `robots.txt` en `sitemap.xml` worden automatisch geserveerd.
+
 ## Nog te doen buiten de code
 
 ### 1. PayPal live zetten (productie-env)
@@ -162,7 +177,15 @@ Apple Pay en Google Pay (alles loopt via het PayPal-account):
   secundaire conversie (zet er maar één op "primair" om dubbel tellen te voorkomen).
 - Conversion Linker + Consent Mode v2 zijn vereist voor correcte attributie in de EU.
 
-### 6. End-to-end test vóór livegang
+### 6. Direct na de eerste deploy
+
+- **Maak meteen het eerste admin-account aan** via `/admin/signup`. De eerste
+  registratie is open (first-run setup); daarna is aanmelden alleen mogelijk
+  voor ingelogde admins. Doe dit vóórdat je de URL deelt.
+- Open `/privacy-policy`, `/terms-and-conditions` en `/cookie-policy` één keer
+  zodat de juridische teksten in de database staan.
+
+### 7. End-to-end test vóór livegang
 
 1. Open de site in incognito → Cookiebot-banner verschijnt, geen marketing-cookies
    vóór toestemming (check DevTools → Application → Cookies).

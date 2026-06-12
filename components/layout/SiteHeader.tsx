@@ -17,9 +17,9 @@ export function SiteHeader() {
   const { settings } = useSiteSettings();
   const cmsPages = useCmsPages();
   const navLinks = [
-    settings.ui.showFeaturesLink ? { href: "#features", label: t("header.features") } : null,
-    settings.ui.showSampleLink ? { href: "#sample", label: t("header.sample") } : null,
-    settings.ui.showPricingLink ? { href: "#pricing", label: t("header.pricing") } : null
+    settings.ui.showFeaturesLink ? { href: "/#features", label: t("header.features") } : null,
+    settings.ui.showSampleLink ? { href: "/#sample", label: t("header.sample") } : null,
+    settings.ui.showPricingLink ? { href: "/pricing", label: t("header.pricing") } : null
   ].filter(Boolean) as Array<{ href: string; label: string }>;
   const pageLinks = cmsPages.filter((page) => page.showInHeader).map((page) => ({ href: `/p/${page.slug}`, label: page.title }));
   const allLinks = [...navLinks, ...pageLinks];

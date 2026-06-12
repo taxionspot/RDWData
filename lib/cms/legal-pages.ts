@@ -12,10 +12,112 @@ export type LegalPageTemplate = {
 export const LEGAL_PAGE_TEMPLATES: LegalPageTemplate[] = [
   {
     slug: "privacy-policy",
-    title: "Privacy Policy",
+    title: "Privacybeleid",
     published: true,
     showInHeader: false,
     showInFooter: true,
+    content: `Privacybeleid
+
+Laatst bijgewerkt: 12 juni 2026
+
+1. Wie zijn wij
+Kentekenrapport (kentekenrapport.com) biedt voertuigrapporten op basis van open data van de RDW. Kentekenrapport is verwerkingsverantwoordelijke voor de persoonsgegevens die via deze website worden verwerkt. Contact: info@kentekenrapport.com.
+
+2. Welke gegevens verwerken wij
+- Kentekens die je opzoekt. Een kenteken is een voertuiggegeven; wij koppelen het niet aan jouw identiteit, tenzij je een rapport koopt of een account aanmaakt.
+- E-mailadres: wanneer je dit invult bij het afrekenen (voor rapportlevering en betaalbevestiging) of bij het aanmaken van een account.
+- Betaalgegevens: betalingen verlopen volledig via PayPal (inclusief iDEAL, creditcard, Apple Pay en Google Pay). Wij ontvangen alleen een transactiereferentie, het bedrag en de betaalstatus. Wij slaan nooit kaart- of rekeninggegevens op.
+- Accountgegevens: e-mailadres, opgeslagen voertuigen en rapportgeschiedenis, als je een account gebruikt.
+- Technische gegevens: IP-adres, browsertype en gebruiksstatistieken, uitsluitend volgens jouw cookievoorkeuren.
+
+3. Waarvoor gebruiken wij deze gegevens
+- Het leveren van voertuigrapporten en platformfuncties.
+- Het verwerken van betalingen en het ontgrendelen van betaalde content.
+- Het versturen van je rapport, een betaalbevestiging en, als je je e-mailadres invulde bij het afrekenen maar de betaling niet afrondde, eenmalig een herinneringsmail.
+- Beveiliging van het platform en het voorkomen van misbruik.
+- Statistieken en verbetering van de dienst (alleen met jouw toestemming voor analytische cookies).
+
+4. Grondslagen (AVG)
+Wij verwerken gegevens op basis van: uitvoering van de overeenkomst (rapportlevering en betaling), gerechtvaardigd belang (beveiliging, fraudepreventie en beperkte service-e-mails), wettelijke verplichtingen (administratie) en jouw toestemming (analytische en marketingcookies; deze kun je altijd intrekken via de cookie-instellingen).
+
+5. Met wie delen wij gegevens
+Wij delen gegevens alleen met dienstverleners die nodig zijn om de dienst te leveren:
+- PayPal (betalingsverwerking, inclusief iDEAL, creditcard, Apple Pay en Google Pay);
+- Resend (verzending van e-mails);
+- Hostingproviders en databasediensten voor het draaien van het platform;
+- Google (Tag Manager, Analytics en advertentiediensten, uitsluitend na jouw cookietoestemming);
+- Cookiebot (beheer van cookietoestemming).
+Voertuiggegevens zijn afkomstig uit openbare bronnen van de RDW. Wij verkopen geen persoonsgegevens.
+
+6. Bewaartermijnen
+Wij bewaren gegevens niet langer dan nodig: betaal- en ordergegevens conform de wettelijke (fiscale) bewaarplicht, accountgegevens zolang je account bestaat, en checkout-gegevens van niet-afgeronde betalingen maximaal enkele maanden.
+
+7. Doorgifte buiten de EER
+Sommige dienstverleners (zoals Google en PayPal) kunnen gegevens buiten de Europese Economische Ruimte verwerken. In dat geval gelden passende waarborgen, zoals door de Europese Commissie goedgekeurde standaardcontractbepalingen.
+
+8. Jouw rechten
+Je hebt het recht op inzage, correctie, verwijdering, beperking van de verwerking, bezwaar en gegevensoverdraagbaarheid. Stuur je verzoek naar info@kentekenrapport.com. Je hebt ook het recht een klacht in te dienen bij de Autoriteit Persoonsgegevens (autoriteitpersoonsgegevens.nl).
+
+9. Beveiliging
+Wij nemen passende technische en organisatorische maatregelen om gegevens te beschermen, waaronder versleutelde verbindingen (HTTPS) en beveiligde betaalverwerking via PayPal.
+
+10. Cookies
+Wij gebruiken cookies voor essentiële functionaliteit en, alleen na jouw toestemming, voor statistieken en marketing. Een volledig en actueel overzicht vind je in onze cookieverklaring op /cookie-policy. Je kunt je voorkeuren op elk moment aanpassen via de cookiebanner.
+
+11. Contact
+Voor privacyvragen of -verzoeken: info@kentekenrapport.com.`
+  },
+  {
+    slug: "terms-and-conditions",
+    title: "Algemene voorwaarden",
+    published: true,
+    showInHeader: false,
+    showInFooter: true,
+    content: `Algemene voorwaarden
+
+Laatst bijgewerkt: 12 juni 2026
+
+1. Toepasselijkheid
+Deze algemene voorwaarden zijn van toepassing op elk gebruik van kentekenrapport.com en op elke aankoop van een voertuigrapport via deze website. Door de website te gebruiken of een rapport te kopen, ga je akkoord met deze voorwaarden. Contact: info@kentekenrapport.com.
+
+2. De dienst
+Kentekenrapport levert digitale voertuigrapporten over Nederlandse kentekens, op basis van open data van de RDW (zoals voertuiggegevens, APK-historie, tellerstandoordeel en terugroepacties), aangevuld met indicatieve analyses en schattingen die deels met AI-modellen worden gegenereerd.
+
+3. Prijs en betaling
+- De prijs per rapport wordt vóór het afrekenen duidelijk getoond en geldt per kenteken.
+- Betalen kan met iDEAL, creditcard, Apple Pay, Google Pay en PayPal. De betaalverwerking verloopt via PayPal.
+- Na een geslaagde betaling worden alle premium onderdelen voor het betreffende kenteken direct ontgrendeld.
+
+4. Levering en herroepingsrecht
+Het rapport is digitale inhoud die direct na betaling wordt geleverd. Door te betalen stem je er uitdrukkelijk mee in dat de levering direct begint en verklaar je afstand te doen van je wettelijke herroepingsrecht (artikel 6:230p Burgerlijk Wetboek). Is er iets misgegaan met de levering of betaling, neem dan contact op via info@kentekenrapport.com; we lossen het op.
+
+5. Gegevens en aansprakelijkheid
+- De rapporten zijn gebaseerd op openbare bronnen en geautomatiseerde analyses. Wij streven naar hoge kwaliteit, maar garanderen niet dat alle gegevens op elk moment volledig, actueel of foutloos zijn.
+- Marktwaarde, kostenindicaties, kansen en aankoopadviezen zijn indicatieve schattingen en geen taxatie, keuring of bindend advies. Controleer vóór aankoop van een voertuig altijd de fysieke staat en de officiële documenten.
+- Aan de inhoud van een rapport kunnen geen rechten worden ontleend. Voor zover wettelijk toegestaan is Kentekenrapport niet aansprakelijk voor indirecte schade of gevolgschade door het gebruik van de dienst. De totale aansprakelijkheid is in elk geval beperkt tot het bedrag dat je voor het betreffende rapport hebt betaald.
+
+6. Toegestaan gebruik
+Het is niet toegestaan de dienst te misbruiken, op grote schaal geautomatiseerd te bevragen (scrapen), te proberen ongeautoriseerde toegang te krijgen of de werking van het platform te verstoren.
+
+7. Intellectueel eigendom
+Het ontwerp, de software, de huisstijl en de originele content van het platform zijn eigendom van Kentekenrapport of haar licentiegevers en worden beschermd door intellectuele-eigendomsrechten. Het gekochte rapport is voor eigen gebruik.
+
+8. Account
+Als je een account aanmaakt, ben je verantwoordelijk voor het vertrouwelijk houden van je inloggegevens en voor activiteiten die via je account plaatsvinden.
+
+9. Wijzigingen
+Wij kunnen deze voorwaarden van tijd tot tijd aanpassen. De versie die geldt op het moment van jouw aankoop is van toepassing op die aankoop.
+
+10. Klachten en toepasselijk recht
+Klachten kun je sturen naar info@kentekenrapport.com; we reageren zo snel mogelijk. Op deze voorwaarden is Nederlands recht van toepassing. Geschillen worden voorgelegd aan de bevoegde rechter in Nederland, tenzij dwingend consumentenrecht anders bepaalt.`
+  }
+];
+
+// Previously shipped English defaults. Pages whose content still equals one of
+// these were never edited by an admin and are safe to migrate to the new copy.
+const LEGACY_LEGAL_CONTENT: Record<LegalPageTemplate["slug"], { title: string; content: string }> = {
+  "privacy-policy": {
+    title: "Privacy Policy",
     content: `Privacy Policy
 
 Last updated: April 3, 2026
@@ -64,12 +166,8 @@ We use cookies and similar technologies for essential functionality, preferences
 11. Contact
 For privacy requests, contact: privacy@kentekenrapport.nl`
   },
-  {
-    slug: "terms-and-conditions",
+  "terms-and-conditions": {
     title: "Terms and Conditions",
-    published: true,
-    showInHeader: false,
-    showInFooter: true,
     content: `Terms and Conditions
 
 Last updated: April 3, 2026
@@ -110,12 +208,18 @@ These terms are governed by the laws of the Netherlands, unless mandatory local 
 12. Contact
 For legal questions, contact: legal@kentekenrapport.nl`
   }
-];
+};
 
 export async function ensureLegalPages(): Promise<void> {
   await Promise.all(
-    LEGAL_PAGE_TEMPLATES.map((page) =>
-      CmsPageModel.updateOne(
+    LEGAL_PAGE_TEMPLATES.map(async (page) => {
+      // Migrate pages that still contain the old shipped default text.
+      const legacy = LEGACY_LEGAL_CONTENT[page.slug];
+      await CmsPageModel.updateOne(
+        { slug: page.slug, content: legacy.content },
+        { $set: { title: page.title, content: page.content } }
+      );
+      await CmsPageModel.updateOne(
         { slug: page.slug },
         {
           $setOnInsert: {
@@ -128,8 +232,8 @@ export async function ensureLegalPages(): Promise<void> {
           }
         },
         { upsert: true }
-      )
-    )
+      );
+    })
   );
 }
 

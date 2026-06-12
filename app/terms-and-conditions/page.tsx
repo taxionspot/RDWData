@@ -4,6 +4,8 @@ import { CmsPageModel } from "@/models/CmsPage";
 import { ensureLegalPages } from "@/lib/cms/legal-pages";
 
 export const runtime = "nodejs";
+// Render at request time so admin edits to legal pages are live immediately.
+export const dynamic = "force-dynamic";
 
 export default async function TermsAndConditionsPage() {
   await connectMongo();

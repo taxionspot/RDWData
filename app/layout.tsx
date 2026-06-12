@@ -3,6 +3,7 @@ import { Inter, Outfit } from "next/font/google";
 import { StoreProvider } from "@/lib/store/provider";
 import { I18nProvider } from "@/lib/i18n/context";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 import { COOKIEBOT_CBID, GTM_ID } from "@/lib/analytics/config";
 import "./globals.css";
 
@@ -41,15 +42,24 @@ const headingFont = Outfit({
   display: "swap"
 });
 
+const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL ?? "https://kentekenrapport.com").replace(/\/+$/, "");
+
 export const metadata: Metadata = {
-  title: "PlateIntel - Nederlandse Kentekeninzichten",
+  metadataBase: new URL(BASE_URL),
+  title: {
+    default: "Kentekenrapport - Kentekencheck & voertuighistorie",
+    template: "%s | Kentekenrapport"
+  },
   description:
-    "Directe Nederlandse kentekencheck. Krijg voertuigprofiel, APK-status, inspectiehistorie en terugroepmeldingen op basis van RDW open data.",
-  keywords: ["kenteken", "RDW", "license plate", "Netherlands", "APK", "vehicle lookup"],
+    "Directe Nederlandse kentekencheck. Voertuigprofiel, APK-status, kilometerhistorie, terugroepacties, marktwaarde en AI-aankoopadvies op basis van officiële RDW-data.",
+  keywords: ["kenteken", "kentekencheck", "RDW", "APK", "kilometerstand", "voertuighistorie", "kenteken rapport"],
   openGraph: {
-    title: "PlateIntel - Nederlandse Voertuiginzichten",
-    description: "Directe Nederlandse voertuigchecks op basis van RDW open data.",
-    type: "website"
+    title: "Kentekenrapport - Kentekencheck & voertuighistorie",
+    description:
+      "Check elk Nederlands kenteken: APK-status, kilometerhistorie, terugroepacties, marktwaarde en AI-aankoopadvies.",
+    type: "website",
+    url: BASE_URL,
+    siteName: "Kentekenrapport"
   }
 };
 
@@ -87,6 +97,7 @@ export default function RootLayout({
           <I18nProvider>
             <SiteHeader />
             <div className="min-h-screen">{children}</div>
+            <SiteFooter />
           </I18nProvider>
         </StoreProvider>
       </body>

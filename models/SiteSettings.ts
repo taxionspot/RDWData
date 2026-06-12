@@ -83,7 +83,7 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>(
       landingCtaSubtitle: {
         type: String,
         required: true,
-        default: "Sluit je aan bij meer dan 1.000.000 slimme kopers die hun auto checkten voor de deal."
+        default: "Check je auto vóór de koop en onderhandel met vertrouwen, direct op basis van officiële RDW-data."
       },
       landingCtaButton: {
         type: String,
@@ -93,14 +93,13 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>(
       landingHeroImageUrl: {
         type: String,
         required: true,
-        default:
-          "https://storage.googleapis.com/banani-generated-images/generated-images/ad953e96-ea70-4d4d-ab60-fc21c7b01fb4.jpg"
+        default: "/hero-car.png"
       },
       footerDescription: {
         type: String,
         required: true,
         default:
-          "Het meest complete en transparante voertuiggeschiedenisplatform voor kopers en dealers."
+          "Complete en transparante voertuighistorie voor autokopers, op basis van officiële RDW-data."
       }
     },
     landing: {

@@ -30,7 +30,7 @@ async function geocode(garage: Garage): Promise<GeoGarage | null> {
     try {
         const res = await fetch(
             `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
-            { headers: { "User-Agent": "PlateIntel/1.0" } }
+            { headers: { "User-Agent": "Kentekenrapport/1.0" } }
         );
         const data = await res.json();
         if (data?.[0]) return { ...garage, lat: Number(data[0].lat), lng: Number(data[0].lon) };
@@ -102,7 +102,7 @@ export function MapPanel(): React.ReactElement {
                 try {
                     const res = await fetch(
                         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-                        { headers: { "User-Agent": "PlateIntel/1.0" } }
+                        { headers: { "User-Agent": "Kentekenrapport/1.0" } }
                     );
                     const data = await res.json();
                     const c = data?.address?.city ?? data?.address?.town ?? data?.address?.village ?? "";

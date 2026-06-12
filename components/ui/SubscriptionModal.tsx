@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { X, Check, ShieldCheck, Zap, Sparkles } from "lucide-react";
 import styles from "./SubscriptionModal.module.css";
 import { useI18n } from "@/lib/i18n/context";
@@ -158,6 +159,33 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
                 onError={(message) => setError(mapCheckoutErrorToFriendly(message, locale))}
               />
             </div>
+            <p className={styles.subtitle} style={{ marginTop: 10, fontSize: 11, lineHeight: 1.5 }}>
+              {locale === "nl" ? (
+                <>
+                  Door te betalen ga je akkoord met de{" "}
+                  <Link href="/terms-and-conditions" className={styles.bold} target="_blank">
+                    algemene voorwaarden
+                  </Link>{" "}
+                  en stem je in met directe levering van het rapport, waarmee je afstand doet van je herroepingsrecht. Zie ook ons{" "}
+                  <Link href="/privacy-policy" className={styles.bold} target="_blank">
+                    privacybeleid
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>
+                  By paying you agree to the{" "}
+                  <Link href="/terms-and-conditions" className={styles.bold} target="_blank">
+                    terms and conditions
+                  </Link>{" "}
+                  and consent to immediate delivery of the report, waiving your right of withdrawal. See also our{" "}
+                  <Link href="/privacy-policy" className={styles.bold} target="_blank">
+                    privacy policy
+                  </Link>
+                  .
+                </>
+              )}
+            </p>
             {error ? (
               <p className={styles.subtitle} style={{ marginTop: 12 }}>
                 {error}
