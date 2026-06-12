@@ -52,8 +52,24 @@ export function generateVehicleReportHtml(args: {
   const defectDescriptions = (d.defectDescriptions ?? {}) as Record<string, string>;
 
   const escape = (value: unknown) => escapeHtml(String(value ?? "-"));
+  const platformName = process.env.NEXT_PUBLIC_PLATFORM_NAME ?? "Kentekenrapport";
   const reportTitle = locale === "nl" ? "Voertuigrapport" : "Vehicle Report";
   const generatedLabel = locale === "nl" ? "Gegenereerd op" : "Generated at";
+  const replyLine = locale === "nl" ? "Vragen? Beantwoord deze e-mail." : "Questions? Just reply to this email.";
+  const disclaimerLines =
+    locale === "nl"
+      ? [
+          "De getoonde marktwaarde is een indicatieve schatting en geen aankoopadvies.",
+          "Dit rapport is een automatische analyse op basis van officiële RDW-data en kan onvolledig of verouderd zijn.",
+          "Dit rapport is digitale content. Na levering vervalt het herroepingsrecht.",
+          "Bronvermelding: RDW open data."
+        ]
+      : [
+          "The market value shown is an indicative estimate and not purchase advice.",
+          "This report is an automated analysis based on official RDW data and may be incomplete or outdated.",
+          "This report is digital content. The right of withdrawal lapses after delivery.",
+          "Source attribution: RDW open data."
+        ];
 
   const inspectionsRows = inspections
     .map(
@@ -146,10 +162,20 @@ export function generateVehicleReportHtml(args: {
     th,td { border:1px solid #e2e8f0; text-align:left; padding:6px; vertical-align:top; }
     th { background:#f8fafc; }
     pre { white-space:pre-wrap; word-break:break-word; border:1px solid #e2e8f0; border-radius:8px; padding:12px; background:#f8fafc; font-size:11px; }
+    .brand-header { background:#0d3373; color:#ffffff; border-radius:10px; padding:18px 20px; margin-bottom:16px; }
+    .brand-name { font-size:20px; font-weight:700; letter-spacing:.02em; }
+    .brand-subtitle { font-size:12px; color:#cdd9f2; margin-top:4px; }
+    .footer { margin-top:28px; border-top:1px solid #e2e8f0; padding-top:12px; }
+    .reply-line { font-size:13px; color:#0f172a; font-weight:600; margin:0 0 10px; }
+    .disclaimer { font-size:10px; color:#64748b; line-height:1.5; margin:0; }
     @page { size:A4; margin:14mm; }
   </style>
 </head>
 <body>
+  <div class="brand-header">
+    <div class="brand-name">${escape(platformName)}</div>
+    <div class="brand-subtitle">${escape(reportTitle)} - ${escape(formatDisplayPlate(plate))}</div>
+  </div>
   <h1>${escape(reportTitle)} - ${escape(formatDisplayPlate(plate))}</h1>
   <div class="meta">${escape(generatedLabel)}: ${escape(generatedAt.toLocaleString(locale === "nl" ? "nl-NL" : "en-US"))}</div>
 
@@ -213,6 +239,11 @@ export function generateVehicleReportHtml(args: {
   </table>
   ${aiValuationSection}
   ${aiSummarySection}
+
+  <div class="footer">
+    <p class="reply-line">${escape(replyLine)}</p>
+    <p class="disclaimer">${disclaimerLines.map((line) => escape(line)).join("<br />")}</p>
+  </div>
 </body>
 </html>`;
 }

@@ -61,6 +61,7 @@ export type PublicSiteSettings = {
     ogImage: string;
     googleAnalyticsId: string;
     faviconUrl: string;
+    microsoftClarityId: string;
   };
   appearance: {
     primaryColor: string;
@@ -197,7 +198,8 @@ export const defaultSiteSettings: PublicSiteSettings = {
     metaDescription: "Directe Nederlandse kentekencheck. Voertuigprofiel, APK-status, inspectiehistorie en marktwaarde.",
     ogImage: "",
     googleAnalyticsId: "",
-    faviconUrl: ""
+    faviconUrl: "",
+    microsoftClarityId: ""
   },
   appearance: {
     primaryColor: "#2563eb",

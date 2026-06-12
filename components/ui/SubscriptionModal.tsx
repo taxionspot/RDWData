@@ -11,6 +11,8 @@ import { GooglePayButton } from "@/components/payments/GooglePayButton";
 import { grantPaidAccessForPlate } from "@/lib/payments/access";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { trackBeginCheckout } from "@/lib/analytics/gtm";
+import { track } from "@/lib/analytics";
+import { CheckCircle2, Download } from "lucide-react";
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -43,7 +45,9 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
   const [isMounted, setIsMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
-  const canSkipPaymentForDemo = process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
+  const [view, setView] = useState<"checkout" | "success">("checkout");
+  const canSkipPaymentForDemo =
+    process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
 
   useEffect(() => {
     setIsMounted(true);
@@ -51,6 +55,9 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
 
   useEffect(() => {
     if (!isOpen) return;
+    setView("checkout");
+    setError(null);
+    track("checkout_opened", { plate });
     const value = Number.parseFloat(settings.payment.amount);
     trackBeginCheckout({
       plate,
@@ -76,6 +83,15 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
     return () => clearTimeout(timer);
   }, [email, isOpen, plate, locale]);
 
+  const emailLooksInvalid = email.trim().length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  const handleUnlocked = () => {
+    track("payment_success", { plate });
+    grantPaidAccessForPlate(plate);
+    onUnlocked?.({ email: email.trim().toLowerCase() || undefined });
+    setView("success");
+  };
+
   if (!isMounted || !isOpen) return null;
 
   return (
@@ -97,6 +113,39 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
           </p>
         </div>
 
+        {view === "success" ? (
+          <div className={styles.successView}>
+            <CheckCircle2 size={44} className={styles.successIcon} />
+            <h3 className={styles.successTitle}>{locale === "nl" ? "Betaling gelukt" : "Payment successful"}</h3>
+            <p className={styles.successText}>
+              {locale === "nl"
+                ? "Het volledige rapport is ontgrendeld voor dit kenteken."
+                : "The full report is unlocked for this plate."}
+              {email.trim()
+                ? locale === "nl"
+                  ? ` Een bevestiging is onderweg naar ${email.trim()}.`
+                  : ` A confirmation is on its way to ${email.trim()}.`
+                : ""}
+            </p>
+            <div className={styles.successActions}>
+              <button type="button" className={styles.successPrimary} onClick={onClose}>
+                {locale === "nl" ? "Bekijk het rapport" : "View the report"}
+              </button>
+              <a
+                className={styles.successSecondary}
+                href={`/api/vehicle/${encodeURIComponent(plate)}?lang=${locale}&download=1`}
+                onClick={() => track("pdf_download", { plate })}
+              >
+                <Download size={15} /> {locale === "nl" ? "Download PDF" : "Download PDF"}
+              </a>
+            </div>
+            <Link href={`/search/${encodeURIComponent(plate)}/vehicle-comparison`} className={styles.successUpsell} onClick={onClose}>
+              {locale === "nl"
+                ? "Twijfel je tussen meerdere auto's? Vergelijk dit kenteken met een tweede auto."
+                : "Comparing several cars? Compare this plate with a second vehicle."}
+            </Link>
+          </div>
+        ) : (
         <div className={styles.plans}>
           <div className={`${styles.planCard} ${styles.planActive}`}>
             <div className={styles.planHeader}>
@@ -121,42 +170,54 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
                 onChange={(event) => setEmail(event.target.value)}
               />
             </label>
+            {emailLooksInvalid ? (
+              <p className={styles.emailHint}>{locale === "nl" ? "Controleer het e-mailadres." : "Please check the email address."}</p>
+            ) : email.trim() ? (
+              <p className={styles.emailNote}>
+                {locale === "nl" ? `We sturen het rapport naar ${email.trim()}` : `We will send the report to ${email.trim()}`}
+              </p>
+            ) : null}
+            <div className={styles.payMethodsRow}>
+              <span>iDEAL</span><span>Apple Pay</span><span>Google Pay</span><span>PayPal</span><span>Visa/MC</span>
+            </div>
+            <p className={styles.guaranteeLine}>
+              {locale === "nl"
+                ? "14 dagen niet-goed-geld-terug. Veilig betalen via PayPal, geen account nodig."
+                : "14-day money-back guarantee. Secure checkout via PayPal, no account needed."}
+            </p>
             <div className={styles.planBtn}>
               <ApplePayButton
                 plate={plate}
                 email={email}
                 amount={settings.payment.amount}
                 currency={settings.payment.currency}
-                onSuccess={() => {
-                  grantPaidAccessForPlate(plate);
-                  onUnlocked?.({ email: email.trim().toLowerCase() || undefined });
-                  onClose();
+                onSuccess={handleUnlocked}
+                onError={(message) => {
+                  track("payment_failed", { plate });
+                  setError(mapCheckoutErrorToFriendly(message, locale));
                 }}
-                onError={(message) => setError(mapCheckoutErrorToFriendly(message, locale))}
               />
               <GooglePayButton
                 plate={plate}
                 email={email}
                 amount={settings.payment.amount}
                 currency={settings.payment.currency}
-                onSuccess={() => {
-                  grantPaidAccessForPlate(plate);
-                  onUnlocked?.({ email: email.trim().toLowerCase() || undefined });
-                  onClose();
+                onSuccess={handleUnlocked}
+                onError={(message) => {
+                  track("payment_failed", { plate });
+                  setError(mapCheckoutErrorToFriendly(message, locale));
                 }}
-                onError={(message) => setError(mapCheckoutErrorToFriendly(message, locale))}
               />
               <PayPalCheckout
                 plate={plate}
                 email={email}
                 amount={settings.payment.amount}
                 currency={settings.payment.currency}
-                onSuccess={() => {
-                  grantPaidAccessForPlate(plate);
-                  onUnlocked?.({ email: email.trim().toLowerCase() || undefined });
-                  onClose();
+                onSuccess={handleUnlocked}
+                onError={(message) => {
+                  track("payment_failed", { plate });
+                  setError(mapCheckoutErrorToFriendly(message, locale));
                 }}
-                onError={(message) => setError(mapCheckoutErrorToFriendly(message, locale))}
               />
             </div>
             <p className={styles.subtitle} style={{ marginTop: 10, fontSize: 11, lineHeight: 1.5 }}>
@@ -187,9 +248,12 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
               )}
             </p>
             {error ? (
-              <p className={styles.subtitle} style={{ marginTop: 12 }}>
-                {error}
-              </p>
+              <div className={styles.errorBox}>
+                <p>{error}</p>
+                <button type="button" className={styles.retryBtn} onClick={() => setError(null)}>
+                  {locale === "nl" ? "Probeer opnieuw" : "Try again"}
+                </button>
+              </div>
             ) : null}
             {canSkipPaymentForDemo ? (
               <button
@@ -205,9 +269,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
                   } catch {
                     // Keep demo UX non-blocking even if backend grant fails.
                   }
-                  grantPaidAccessForPlate(plate);
-                  onUnlocked?.({ email: email.trim().toLowerCase() || undefined });
-                  onClose();
+                  handleUnlocked();
                 }}
               >
                 {locale === "nl" ? "Demo: betaling overslaan" : "Demo: Skip payment"}
@@ -215,6 +277,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
             ) : null}
           </div>
         </div>
+        )}
 
         <div className={styles.footer}>
           <div className={styles.trustItem}>

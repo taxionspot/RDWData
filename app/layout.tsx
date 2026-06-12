@@ -4,6 +4,7 @@ import { StoreProvider } from "@/lib/store/provider";
 import { I18nProvider } from "@/lib/i18n/context";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
+import { AnalyticsScripts } from "@/components/layout/AnalyticsScripts";
 import { COOKIEBOT_CBID, GTM_ID } from "@/lib/analytics/config";
 import "./globals.css";
 
@@ -95,6 +96,7 @@ export default function RootLayout({
         {/* End Google Tag Manager */}
         <StoreProvider>
           <I18nProvider>
+            <AnalyticsScripts />
             <SiteHeader />
             <div className="min-h-screen">{children}</div>
             <SiteFooter />

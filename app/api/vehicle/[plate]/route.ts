@@ -14,7 +14,8 @@ import { applyMileageValuationOverride } from "@/lib/api/market-value";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
-import { sendEmail } from "@/lib/email/resend";
+import { getEmailFrom } from "@/lib/email/resend";
+import { isSamplePlate } from "@/lib/sample";
 
 type Params = { params: { plate: string } };
 
@@ -34,6 +35,9 @@ function parseUserMileage(input: string | null): number | null {
 }
 
 async function hasPaidReportAccess(plate: string): Promise<boolean> {
+  // The public sample report is always free, like carfax.eu's example report.
+  if (isSamplePlate(plate)) return true;
+
   const demoBypassEnabled =
     process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
   if (demoBypassEnabled) return true;
@@ -44,6 +48,46 @@ async function hasPaidReportAccess(plate: string): Promise<boolean> {
   await connectMongo();
   const hasPaid = await PlatePaymentModel.exists({ plate, status: "COMPLETED", provider: "paypal" });
   return Boolean(hasPaid);
+}
+
+const AI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * AI output is cached per plate+locale (mileage rounded to 5.000 km buckets)
+ * and shared across all visitors: the same car yields the same analysis, so
+ * one Claude call serves everyone for a week.
+ */
+function aiCacheKey(plate: string, locale: Locale, userMileage: number | null): string {
+  const bucket = userMileage === null ? "" : String(Math.round(userMileage / 5000) * 5000);
+  return `${plate}|${locale}|${bucket}`;
+}
+
+async function readAiCache(key: string): Promise<{ insights: unknown; valuation: unknown } | null> {
+  try {
+    await connectMongo();
+    const { AiReportCacheModel } = await import("@/models/AiReportCache");
+    const doc = await AiReportCacheModel.findById(key).lean();
+    if (doc && doc.expiresAt && new Date(doc.expiresAt).getTime() > Date.now() && doc.insights) {
+      return { insights: doc.insights, valuation: doc.valuation };
+    }
+  } catch {
+    // cache unavailable: fall through to live generation
+  }
+  return null;
+}
+
+async function writeAiCache(key: string, insights: unknown, valuation: unknown): Promise<void> {
+  try {
+    await connectMongo();
+    const { AiReportCacheModel } = await import("@/models/AiReportCache");
+    await AiReportCacheModel.findByIdAndUpdate(
+      key,
+      { _id: key, insights, valuation, createdAt: new Date(), expiresAt: new Date(Date.now() + AI_CACHE_TTL_MS) },
+      { upsert: true }
+    );
+  } catch {
+    // best effort
+  }
 }
 
 async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: number | null) {
@@ -63,6 +107,17 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
           : null
     };
   }
+
+  const cacheKey = aiCacheKey(plate, locale, userMileage);
+  const cached = await readAiCache(cacheKey);
+  if (cached) {
+    return {
+      localized,
+      aiInsights: cached.insights as ReturnType<typeof buildFallbackVehicleAiReport>["insights"],
+      aiValuation: cached.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
+    };
+  }
+
   try {
     const aiReport = await generateVehicleAiReport({
       plate,
@@ -72,6 +127,7 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
         userContext: userMileage !== null ? { mileageInput: userMileage } : undefined
       }
     });
+    await writeAiCache(cacheKey, aiReport.insights, aiReport.valuation);
     return {
       localized,
       aiInsights: aiReport.insights,
@@ -111,22 +167,43 @@ async function sendReportEmail(args: {
   html: string;
   pdfBase64?: string;
 }): Promise<{ delivered: boolean; reason?: string }> {
+  const apiKey = process.env.RESEND_API_KEY ?? "";
+  const from = getEmailFrom();
+  if (!apiKey) {
+    return { delivered: false, reason: "EMAIL_PROVIDER_NOT_CONFIGURED" };
+  }
+
   const subject = args.locale === "nl" ? `Kentekenrapport voor ${args.plate}` : `Vehicle report for ${args.plate}`;
-  return sendEmail({
-    to: args.to,
-    subject,
-    html: args.html,
-    ...(args.pdfBase64
-      ? {
-          attachments: [
-            {
-              filename: `kentekenrapport-${args.plate}.pdf`,
-              content: args.pdfBase64
-            }
-          ]
-        }
-      : {})
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from,
+      to: [args.to],
+      subject,
+      html: args.html,
+      ...(args.pdfBase64
+        ? {
+            attachments: [
+              {
+                filename: `kentekenrapport-${args.plate}.pdf`,
+                content: args.pdfBase64
+              }
+            ]
+          }
+        : {})
+    }),
+    cache: "no-store"
   });
+
+  if (!response.ok) {
+    const details = await response.text();
+    return { delivered: false, reason: `EMAIL_SEND_FAILED:${response.status}:${details}` };
+  }
+  return { delivered: true };
 }
 
 export async function GET(request: Request, { params }: Params) {
@@ -160,10 +237,14 @@ export async function GET(request: Request, { params }: Params) {
         aiValuation
       });
       await trackReportIfUserLoggedIn({ plate, locale, channel: "download" });
+      // Sample report opens inline in the browser; paid reports download.
+      const disposition = isSamplePlate(plate)
+        ? `inline; filename="voorbeeld-kentekenrapport-${plate}.pdf"`
+        : `attachment; filename="kentekenrapport-${plate}.pdf"`;
       return new NextResponse(new Uint8Array(pdf), {
         headers: {
           "content-type": "application/pdf",
-          "content-disposition": `attachment; filename="kentekenrapport-${plate}.pdf"`
+          "content-disposition": disposition
         }
       });
     }

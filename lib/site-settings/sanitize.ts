@@ -169,7 +169,8 @@ export function sanitizeSiteSettings(payload: unknown): PublicSiteSettings {
       metaDescription: str(seo.metaDescription, d.seo.metaDescription),
       ogImage: typeof seo.ogImage === "string" ? seo.ogImage : d.seo.ogImage,
       googleAnalyticsId: typeof seo.googleAnalyticsId === "string" ? seo.googleAnalyticsId : d.seo.googleAnalyticsId,
-      faviconUrl: typeof seo.faviconUrl === "string" ? seo.faviconUrl : d.seo.faviconUrl
+      faviconUrl: typeof seo.faviconUrl === "string" ? seo.faviconUrl : d.seo.faviconUrl,
+      microsoftClarityId: typeof seo.microsoftClarityId === "string" ? seo.microsoftClarityId : d.seo.microsoftClarityId
     },
     appearance: {
       primaryColor: str(appearance.primaryColor, d.appearance.primaryColor),

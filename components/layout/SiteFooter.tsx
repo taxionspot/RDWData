@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useCmsPages } from "@/hooks/useCmsPages";
+import { SAMPLE_PLATE } from "@/lib/sample";
 
 const CONTACT_EMAIL = "info@kentekenrapport.com";
 
@@ -15,10 +17,10 @@ const ROUTE_BY_LABEL: Record<string, string> = {
   "plate check": "/",
   functies: "/#features",
   features: "/#features",
-  voorbeeldrapport: "/#sample",
-  "sample report": "/#sample",
-  prijzen: "/pricing",
-  pricing: "/pricing",
+  voorbeeldrapport: `/search/${SAMPLE_PLATE}`,
+  "sample report": `/search/${SAMPLE_PLATE}`,
+  prijzen: "/#pricing",
+  pricing: "/#pricing",
   contact: `mailto:${CONTACT_EMAIL}`,
   account: "/account",
   inloggen: "/account",
@@ -33,7 +35,7 @@ const ROUTE_BY_LABEL: Record<string, string> = {
   cookies: "/cookie-policy"
 };
 
-function resolveFooterHref(label: string): string | null {
+export function resolveFooterHref(label: string): string | null {
   return ROUTE_BY_LABEL[label.trim().toLowerCase()] ?? null;
 }
 
@@ -57,9 +59,13 @@ function FooterLink({ label }: { label: string }) {
 }
 
 export function SiteFooter() {
+  const pathname = usePathname();
   const { t } = useI18n();
   const { settings } = useSiteSettings();
   const cmsPages = useCmsPages();
+
+  // The landing page renders its own styled footer.
+  if (pathname === "/") return null;
   const footerPages = cmsPages.filter(
     (page) => page.showInFooter && page.slug !== "privacy-policy" && page.slug !== "terms-and-conditions"
   );

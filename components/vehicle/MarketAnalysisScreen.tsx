@@ -20,6 +20,7 @@ import { computeMarketValueV3 } from "@/lib/rdw/heuristics";
 
 type Props = {
   plate: string;
+  embedded?: boolean;
 };
 
 function formatCurrency(value: number | null) {
@@ -40,7 +41,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-export function MarketAnalysisScreen({ plate }: Props) {
+export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
@@ -204,36 +205,62 @@ export function MarketAnalysisScreen({ plate }: Props) {
 
   const v = data.vehicle;
   const enriched = data.enriched;
+  const nl = locale === "nl";
+  const confidenceLabel =
+    marketConfidence === "HIGH"
+      ? nl ? "Hoog" : "High"
+      : marketConfidence === "MEDIUM"
+      ? nl ? "Gemiddeld" : "Medium"
+      : marketConfidence === "LOW"
+      ? nl ? "Laag" : "Low"
+      : null;
+  const mileageSignalLabel =
+    enriched.mileageVerdict === "LOGISCH"
+      ? nl ? "Kilometerstand logisch" : "Mileage plausible"
+      : enriched.mileageVerdict === "TWIJFELACHTIG"
+      ? nl ? "Kilometerstand twijfelachtig" : "Mileage questionable"
+      : enriched.mileageVerdict === "ONLOGISCH"
+      ? nl ? "Kilometerstand onlogisch" : "Mileage implausible"
+      : enriched.estimatedMileageNow
+      ? nl ? "Schatting via formule" : "Formula estimate"
+      : null;
   const estimateRows = [
-    { label: locale === "nl" ? "Geschatte waarde" : "Estimated value", value: formatCurrency(marketValue) },
+    { label: nl ? "Geschatte waarde" : "Estimated value", value: formatCurrency(marketValue) },
     {
-      label: locale === "nl" ? "Waardebandbreedte" : "Value range",
+      label: nl ? "Verwachte prijsrange" : "Expected price range",
       value:
         marketValueMin && marketValueMax
           ? `${formatCurrency(marketValueMin)} - ${formatCurrency(marketValueMax)}`
-          : "-"
+          : null
     },
-    { label: locale === "nl" ? "Marktbetrouwbaarheid" : "Market confidence", value: marketConfidence ?? "UNKNOWN" },
-    { label: locale === "nl" ? "Marktsignaal" : "Market signal", value: enriched.mileageVerdict ?? "UNKNOWN" },
-    { label: locale === "nl" ? "APK slagingskans" : "APK pass chance", value: `${enriched.apkPassChance}%` },
+    { label: nl ? "Betrouwbaarheid schatting" : "Estimate confidence", value: confidenceLabel },
     {
-      label: locale === "nl" ? "Wegenbelasting (per kwartaal)" : "Road tax (per quarter)",
+      label: nl ? "Geschatte kilometerstand" : "Estimated mileage",
+      value: enriched.estimatedMileageNow ? `${enriched.estimatedMileageNow.toLocaleString("nl-NL")} km` : null
+    },
+    { label: nl ? "Kilometersignaal" : "Mileage signal", value: mileageSignalLabel },
+    { label: nl ? "APK slagingskans" : "APK pass chance", value: `${enriched.apkPassChance}%` },
+    {
+      label: nl ? "Wegenbelasting (per kwartaal)" : "Road tax (per quarter)",
       value:
         enriched.roadTaxEstQuarter
           ? `${formatCurrency(enriched.roadTaxEstQuarter.min)} - ${formatCurrency(enriched.roadTaxEstQuarter.max)}`
-          : "-"
+          : null
     },
-    { label: locale === "nl" ? "Brandstofschatting / maand" : "Fuel est. / month", value: formatCurrency(enriched.fuelEstMonth) },
-    { label: locale === "nl" ? "Verzekering schatting / maand" : "Insurance est. / month", value: formatCurrency(enriched.insuranceEstMonth) },
-    { label: locale === "nl" ? "Onderhoudsrisico" : "Maintenance risk", value: `${enriched.maintenanceRiskScore.toFixed(1)} / 10` }
-  ];
+    { label: nl ? "Brandstofschatting / maand" : "Fuel est. / month", value: formatCurrency(enriched.fuelEstMonth) },
+    { label: nl ? "Verzekering schatting / maand" : "Insurance est. / month", value: formatCurrency(enriched.insuranceEstMonth) },
+    { label: nl ? "Onderhoudsrisico" : "Maintenance risk", value: `${enriched.maintenanceRiskScore.toFixed(1)} / 10` }
+    // Hide rows without real data instead of showing dashes.
+  ].filter((row) => row.value && row.value !== "-");
   const displayPlate = formatDisplayPlate(normalized);
   const title = [v.brand, v.tradeName, v.year].filter(Boolean).join(" ");
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.contentContainer}>
-        <VehicleNavBar plate={normalized} subtitle={`${locale === "nl" ? "Marktanalyse" : "Market analysis"} · ${displayPlate}`} />
+    <div className={embedded ? undefined : styles.pageContainer}>
+      <div className={embedded ? undefined : styles.contentContainer}>
+        {!embedded && (
+          <VehicleNavBar plate={normalized} subtitle={`${locale === "nl" ? "Marktanalyse" : "Market analysis"} · ${displayPlate}`} />
+        )}
 
         <PremiumLock featureName={locale === "nl" ? "Marktanalyse" : "Market Analysis"} isLocked={true} plate={normalized} sectionKey="marketAnalysis">
           <div className={styles.dashboardHeader}>
