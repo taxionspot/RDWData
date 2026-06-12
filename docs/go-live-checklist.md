@@ -135,9 +135,11 @@ Apple Pay en Google Pay (alles loopt via het PayPal-account):
   NEXT_PUBLIC_BASE_URL=https://kentekenrapport.com
   ```
   (`NEXT_PUBLIC_BASE_URL` wordt gebruikt voor de knoppen/links in de mails.)
-- De cron staat in `vercel.json` op elke 30 minuten. **Let op:** op een Vercel
-  Hobby-plan mogen crons maar 1× per dag draaien — zet de schedule dan op
-  bijv. `0 9 * * *`. Op Pro kan `*/30 * * * *` gewoon.
+- De cron staat in `vercel.json` op 1× per dag (08:00 UTC, ±10:00 NL) omdat het
+  Vercel Hobby-plan alleen dagelijkse crons toestaat. Opvolgmails gaan dus
+  maximaal één keer per dag uit. Op het Pro-plan kun je de schedule verkorten
+  naar bijv. `*/30 * * * *` zodat de opvolgmail al ~1 uur na het afhaken
+  binnenkomt.
 - Test: vul in de betaalmodal een eigen e-mailadres in, sluit zonder te betalen,
   en roep daarna handmatig de cron aan (met
   `Authorization: Bearer <CRON_SECRET>`) of wacht op de schedule → opvolgmail.
