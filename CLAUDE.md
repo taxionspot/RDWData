@@ -1,7 +1,7 @@
 # CLAUDE.md — projectgeheugen Kentekenrapport
 
 ## Wat dit is
-Nederlandse kentekencheck (kentekenrapport.nl): gratis RDW-basisdata, volledig
+Nederlandse kentekencheck (kentekenrapport.com): gratis RDW-basisdata, volledig
 rapport eenmalig betaald per kenteken (prijs uit site-settings, nu € 6,95),
 AI-analyse via Claude. Next.js 14 App Router + TypeScript + MongoDB (Mongoose),
 deploy op Vercel (project "kentekenrapport", team sabur-s-projects). Eigenaar
@@ -75,26 +75,93 @@ SSR-rooktests missen client-crashes. Altijd testen met headless Chromium:
 - docs/sectie-reviews-bestelmenu.md — agent-reviews per sectie; alle 10
   bestellingen daaruit zijn gebouwd (commit d1330ae).
 
-## Openstaande punten (volgende sessies)
-1. **Beveiliging**: `data/0000202250Taxionspot02_20260311.pfx` staat nog in
-   git (certificaat → verwijderen + roteren); onbeveiligd demo-endpoint
-   `POST /api/payments/access/[plate]` geeft gratis toegang → dichtzetten.
-2. **Cookie-consent banner** (tracking laadt nu zonder toestemming; AVG).
-3. **Bundel-checkout** 3 rapporten € 19,95 (landing toont "binnenkort").
-4. **Branch-merge**: parallelle branch `claude/determined-fermi-D5uBD` heeft
-   eigen features (multi-agent rapport, betaalmethode-kiezer, PDF-redesign)
-   en schrijft naar dezelfde database → reconciliatie nodig.
-5. Vercel env vars zetten: CRON_SECRET, RESEND_API_KEY, NEXT_PUBLIC_BASE_URL.
-6. Marktprijzen-bron regelen (AutoScout24/Marktplaats/Indicata/Autotelex) voor
-   echte comparables; importhistorie via autoDNA (alleen bij import-vlag).
-7. Tellerrapport-upload-feature (verkoper vraagt gratis RDW-rapport op; wij
-   toetsen consistentie) — uniek, geen API nodig.
-8. Server-side gating premium-velden in de vehicle-API (data zit nu volledig
-   in de JSON-response, alleen UI-blur beschermt).
-9. Layout-metadata zegt nog "PlateIntel" (app/layout.tsx) → rebranden.
+## Sessie 12 juni 2026: merge + livegang (kentekenrapport.com)
+De branches `claude/charming-bohr-7xou44` (redesign) en
+`claude/clever-einstein-v0nx1b` (go-live werk) zijn volledig gemerged en LIVE
+op kentekenrapport.com en www.kentekenrapport.com (apex 308 naar www).
+Productie deployt automatisch bij push naar `main`.
+
+Toegevoegd in die sessie (bovenop de redesign):
+- **Consent & tracking**: Cookiebot banner (cbid c95277a4-b000-4684-910e-
+  1490969d79b1, auto-blocking) + Google Consent Mode v2 defaults + GTM
+  container GTM-N4TS8CP9, in die volgorde bovenaan body (app/layout.tsx).
+  GA4-schema dataLayer-events: plate_search, begin_checkout, purchase (met
+  PayPal order-id en echt bedrag) in lib/analytics/gtm.ts. Daarnaast draait
+  hun lib/analytics.ts track() + AnalyticsScripts (GA4/Clarity uit settings)
+  nog parallel; Cookiebot blokkeert die tot consent. PayPal SDK heeft
+  data-cookieconsent="ignore" zodat betalen altijd werkt.
+- **E-mails** (afzender "Anouk van Kentekenrapport <info@kentekenrapport.com>",
+  EMAIL_FROM env): bedankmail na capture, eenmalige opvolgmail bij
+  niet-afgeronde checkout (models/CheckoutLead + /api/checkout/lead +
+  dagelijkse cron /api/cron/abandoned-checkout). UTM-tags op alle mail-links.
+- **Betaalmethodes**: PayPal-stack met enable-funding=ideal,card + aparte
+  ApplePayButton/GooglePayButton (eligibility-gated) via lib/payments/
+  paypal-sdk.ts en checkout-client.ts. Apple Pay-verificatiebestand op
+  /.well-known/. Prijs komt ALTIJD server-side uit settings (create-order
+  negeert client-bedragen); sanitizer normaliseert "6,95" naar "6.95".
+- **Juridisch**: NL privacybeleid + algemene voorwaarden templates
+  (lib/cms/legal-pages.ts, migreert alleen onbewerkte oude defaults),
+  /cookie-policy met Cookiebot-verklaring, herroepingsrecht-regel in de
+  betaalmodal, globale SiteFooter (verbergt zichzelf op "/", landing heeft
+  eigen footer; gedeelde resolveFooterHref maakt labels klikbaar).
+- **Settings-sanitizer**: lib/site-settings/sanitize.ts valideert elke
+  DB-payload veld-voor-veld (client én server) tegen defaults; lost de
+  object-footer-links-crash structureel op.
+- **Beveiliging**: PFX-cert uit de tree (HISTORIE bevat hem nog: certificaat
+  laten intrekken/roteren!); POST /api/payments/access/[plate] geeft 403 in
+  productie tenzij NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT=true.
+- Metadata gerebrand naar Kentekenrapport, robots.txt + sitemap.xml,
+  /pricing-pagina met echt prijsmodel, account-dashboard gebruikt echte
+  RDW APK-data i.p.v. hash-nepdata.
+
+**Geleerde les 3 (deploy)**: een vercel.json-cron die vaker dan dagelijks
+draait wordt op het Hobby-plan geweigerd en blokkeert dan STIL alle
+deployments (geen deployment verschijnt, geen foutmelding bij push). Beide
+crons staan nu op dagelijks (07:00 watch-check, 08:00 abandoned-checkout).
+
+## URGENTE issues (door Sabur gemeld op 12 juni, eerst oppakken!)
+1. **Betaalmuur werkt niet: alle data is gratis zichtbaar.** Diagnose al
+   BEVESTIGD: `GET /api/payments/access/H223JZ` geeft live `{"paid":true}`.
+   De productiedatabase bevat oude demo-PlatePayment-records (orderId
+   "demo-<PLATE>-<ts>", amount "0.00") uit de periode dat de demo-skip-knop
+   altijd aanstond; lib/payments/access.ts ensurePaidAccessChecked ontgrendelt
+   die kentekens daardoor voor ALLE bezoekers. Fix: (a) demo-records opruimen
+   (PlatePayment.deleteMany({ orderId: /^demo-/ }) of amount "0.00") via
+   een admin-beschermd opruim-endpoint of mongosh; (b) overweeg de
+   server-check demo-records te laten negeren; (c) daarna oude TODO
+   "server-side gating premium-velden" doen (de vehicle-API levert nu nog
+   alle premium data in de JSON, alleen UI-blur beschermt). NB: RG513T is
+   BEWUST overal gratis (SAMPLE_PLATE) en dus geen bug.
+2. **Marktwaarde klopt niet**: moet de EIGEN formule gebruiken
+   (computeMarketValueV3 in lib/rdw/heuristics.ts met het formule-
+   kilometerverloop), niet een AI-schatting. Controleer wat het rapport en
+   de PDF tonen (aiValuation vs enriched.estimatedValueNow), of
+   applyMileageValuationOverride goed doorwerkt en of een oude
+   AiReportCache-entry verkeerde waardes vasthoudt (cache 7 dagen).
+   Getest door Sabur met RG513T en H223JZ.
+
+## Overige openstaande punten
+1. Vercel env vars (Production) zetten + redeploy: live PayPal-keys,
+   PAYPAL_BASE_URL=https://api-m.paypal.com, NEXT_PUBLIC_PAYPAL_ENV=live,
+   RESEND_API_KEY, EMAIL_FROM, CRON_SECRET, NEXT_PUBLIC_BASE_URL=
+   https://kentekenrapport.com.
+2. Eerste admin-account aanmaken via /admin/signup (eerste registratie open).
+3. PayPal-dashboard: domein registreren voor Apple Pay (bestand staat al
+   live), Google Pay aanzetten; Cookiebot admin: domein toevoegen + banner
+   publiceren; GTM: GA4-tag + Ads-conversietag op purchase-event.
+4. Resend: kentekenrapport.com verifiëren (SPF/DKIM/DMARC).
+5. Bundel-checkout 3 rapporten € 19,95 (landing toont "binnenkort").
+6. Branch `claude/determined-fermi-D5uBD` (multi-agent rapport) is NIET
+   gemerged; beoordeel later of daar nog iets waardevols in zit.
+7. Marktprijzen-bron regelen (AutoScout24/Marktplaats/Indicata/Autotelex);
+   importhistorie via autoDNA (alleen bij import-vlag).
+8. Tellerrapport-upload-feature (uniek, geen API nodig).
+9. Juridische teksten: in de DB staat een eigen NL-versie van 7 juni; de
+   uitgebreidere templates uit lib/cms/legal-pages.ts kunnen desgewenst via
+   /admin/legal worden overgenomen.
 
 ## Branch & deploy
-Werkbranch: `claude/charming-bohr-7xou44` (push → automatische Vercel-preview,
-SSO-beschermd). Laatste stand: commit d1330ae. Build vereist force-dynamic op
-CMS-pagina's (gedaan); `npm run build` faalt lokaal alleen op ontbrekende
-MongoDB bij 3 routes als die force-dynamic ooit wegvalt.
+Productie = `main` op kentekenrapport.com; push naar main deployt automatisch.
+Laatste stand: merge-commit 4e7be55 (12 juni). Volledige go-live-stappen staan
+in docs/go-live-checklist.md. Build vereist force-dynamic op CMS-pagina's
+(gedaan); `npm run build` slaagt lokaal volledig zonder MongoDB.
