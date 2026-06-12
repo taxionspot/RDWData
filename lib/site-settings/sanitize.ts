@@ -13,6 +13,14 @@ function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+// PayPal requires amounts like "6.95"; admins may type "6,95" in the dashboard.
+function amount(value: unknown, fallback: string): string {
+  if (typeof value !== "string" && typeof value !== "number") return fallback;
+  const parsed = Number.parseFloat(String(value).trim().replace(",", "."));
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed.toFixed(2);
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
@@ -102,7 +110,7 @@ export function sanitizeSiteSettings(payload: unknown): PublicSiteSettings {
   return {
     paymentEnabled: bool(raw.paymentEnabled, d.paymentEnabled),
     payment: {
-      amount: str(payment.amount, d.payment.amount),
+      amount: amount(payment.amount, d.payment.amount),
       currency: str(payment.currency, d.payment.currency)
     },
     lockSections: {

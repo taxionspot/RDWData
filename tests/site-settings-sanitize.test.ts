@@ -45,6 +45,13 @@ test("sanitizeSiteSettings rejects hero images from non-whitelisted hosts", () =
   assert.equal(blocked.content.landingHeroImageUrl, defaultSiteSettings.content.landingHeroImageUrl);
 });
 
+test("sanitizeSiteSettings normalizes comma-decimal payment amounts for PayPal", () => {
+  assert.equal(sanitizeSiteSettings({ payment: { amount: "6,95" } }).payment.amount, "6.95");
+  assert.equal(sanitizeSiteSettings({ payment: { amount: "12.5" } }).payment.amount, "12.50");
+  assert.equal(sanitizeSiteSettings({ payment: { amount: "gratis" } }).payment.amount, defaultSiteSettings.payment.amount);
+  assert.equal(sanitizeSiteSettings({ payment: { amount: "-3" } }).payment.amount, defaultSiteSettings.payment.amount);
+});
+
 test("sanitizeSiteSettings keeps valid values and fixes invalid types in one payload", () => {
   const result = sanitizeSiteSettings({
     paymentEnabled: false,
