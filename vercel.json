@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/watch-check",
+      "schedule": "0 7 * * *"
+    },
+    {
       "path": "/api/cron/abandoned-checkout",
       "schedule": "0 8 * * *"
     }

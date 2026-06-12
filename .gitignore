@@ -15,3 +15,7 @@ coverage
 
 # Vercel
 .vercel
+
+# Certificates
+data/*.pfx
+*.pfx

@@ -9,7 +9,7 @@ GTM, Cookiebot, Google Ads) moet configureren om live te gaan en advertenties te
 
 Geladen in deze volgorde, bovenaan elke pagina:
 
-1. **Google Consent Mode v2 defaults** — alles `denied` (behalve `security_storage`)
+1. **Google Consent Mode v2 defaults**, alles `denied` (behalve `security_storage`)
    totdat de bezoeker toestemming geeft. Inclusief `ads_data_redaction`.
 2. **Cookiebot banner** (`uc.js`, cbid `c95277a4-b000-4684-910e-1490969d79b1`) met
    `data-blockingmode="auto"`. Cookiebot stuurt consent-updates automatisch door naar
@@ -18,7 +18,7 @@ Geladen in deze volgorde, bovenaan elke pagina:
 
 Beide IDs zijn te overschrijven via `NEXT_PUBLIC_GTM_ID` en `NEXT_PUBLIC_COOKIEBOT_CBID`.
 
-> **Let op:** voeg in GTM **niet** ook nog de "Cookiebot CMP" template-tag toe — de
+> **Let op:** voeg in GTM **niet** ook nog de "Cookiebot CMP" template-tag toe, de
 > banner wordt al direct vanaf de site geladen. Dubbel laden geeft conflicten.
 
 ### DataLayer-events (conversion tracking)
@@ -63,7 +63,7 @@ Hoe de opvolgmail werkt:
 
 1. Zodra iemand in de betaalmodal een geldig e-mailadres invult, wordt dit (met
    kenteken en taal) opgeslagen als *checkout lead* (`POST /api/checkout/lead`).
-2. Betaalt diegene, dan wordt de lead op "converted" gezet — geen opvolgmail.
+2. Betaalt diegene, dan wordt de lead op "converted" gezet, geen opvolgmail.
 3. Een cron (`GET /api/cron/abandoned-checkout`, elke 30 min. via `vercel.json`)
    zoekt leads ouder dan de ingestelde wachttijd zonder betaling en stuurt
    **eenmalig** de opvolgmail. Links in de mails hebben UTM-tags
@@ -103,7 +103,7 @@ NEXT_PUBLIC_PAYPAL_ENV=live
 Maak de live-app aan op developer.paypal.com onder het zakelijke account en doe na
 deploy één echte testbetaling (laag bedrag kan via de admin-prijsinstelling).
 
-**Betaalmethodes** — de checkout ondersteunt PayPal, iDEAL, creditcard/debitcard,
+**Betaalmethodes**, de checkout ondersteunt PayPal, iDEAL, creditcard/debitcard,
 Apple Pay en Google Pay (alles loopt via het PayPal-account):
 
 - **iDEAL & kaarten**: staan aan via de PayPal-knoppenstack (`enable-funding=ideal,card`).

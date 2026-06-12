@@ -38,8 +38,8 @@ export default function PricingPage() {
         </h1>
         <p className="mx-auto mt-3 max-w-md text-slate-500">
           {nl
-            ? "Gratis basischeck voor elk kenteken. Betaal alleen voor het volledige rapport — geen abonnement."
-            : "Free basic check for every plate. Pay only for the full report — no subscription."}
+            ? "Gratis basischeck voor elk kenteken. Betaal alleen voor het volledige rapport, geen abonnement."
+            : "Free basic check for every plate. Pay only for the full report, no subscription."}
         </p>
       </div>
 

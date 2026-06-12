@@ -20,6 +20,7 @@ import { useI18n } from "@/lib/i18n/context";
 
 type Props = {
   plate?: string;
+  embedded?: boolean;
 };
 
 function buildPlateHref(plate: string | undefined, suffix = "") {
@@ -98,31 +99,33 @@ function RiskCard({
   );
 }
 
-export function RiskOverviewScreen({ plate }: Props) {
+export function RiskOverviewScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate ?? "");
 
-  if (!plate || !isValid || isError) {
-    return (
+  const wrap = (content: React.ReactNode) =>
+    embedded ? (
+      <>{content}</>
+    ) : (
       <div className={styles.page}>
         <div className={styles.pageContainer}>
           <div className={styles.contentContainer}>
-            <div className={styles.glassPanel}>{locale === "nl" ? "Voertuig niet gevonden." : "Vehicle not found."}</div>
+            <VehicleNavBar plate={plate ?? ""} subtitle={locale === "nl" ? "Risico-overzicht" : "Risk overview"} />
+            {content}
           </div>
         </div>
       </div>
     );
+
+  if (!plate || !isValid || isError) {
+    return wrap(
+      <div className={styles.glassPanel}>{locale === "nl" ? "Voertuig niet gevonden." : "Vehicle not found."}</div>
+    );
   }
 
   if (isLoading || !data) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.pageContainer}>
-          <div className={styles.contentContainer}>
-            <div className={styles.glassPanel}>{locale === "nl" ? "Risico-overzicht laden..." : "Loading risk overview..."}</div>
-          </div>
-        </div>
-      </div>
+    return wrap(
+      <div className={styles.glassPanel}>{locale === "nl" ? "Risico-overzicht laden..." : "Loading risk overview..."}</div>
     );
   }
 
@@ -194,6 +197,42 @@ export function RiskOverviewScreen({ plate }: Props) {
       link: "/ownership-history"
     },
     {
+      id: "insurance",
+      title: locale === "nl" ? "Verzekering (WAM)" : "Insurance (WAM)",
+      status: v.insured ? (locale === "nl" ? "Geregistreerd verzekerd" : "Registered insured") : (locale === "nl" ? "Geen WAM-registratie" : "No WAM registration"),
+      description:
+        locale === "nl"
+          ? "Zonder WAM-verzekering mag een voertuig de openbare weg niet op."
+          : "Without WAM insurance a vehicle is not allowed on public roads.",
+      badge: v.insured ? (locale === "nl" ? "In orde" : "OK") : (locale === "nl" ? "Let op" : "Warning"),
+      trend: v.insured ? (locale === "nl" ? "Actief verzekerd" : "Actively insured") : (locale === "nl" ? "Controleer status" : "Check status"),
+      icon: ShieldCheck,
+      tone: v.insured ? "success" : "warning",
+      link: "/ownership-history"
+    },
+    {
+      id: "usage",
+      title: locale === "nl" ? "Gebruikshistorie" : "Usage history",
+      status: v.isTaxi
+        ? (locale === "nl" ? "Taxi-verleden" : "Taxi history")
+        : v.exportIndicator
+        ? (locale === "nl" ? "Exportmarkering" : "Export flag")
+        : (locale === "nl" ? "Geen bijzonderheden" : "No special flags"),
+      description:
+        locale === "nl"
+          ? "Taxi-gebruik en exportmarkeringen uit het RDW-register."
+          : "Taxi use and export flags from the RDW register.",
+      badge: v.isTaxi || v.exportIndicator ? (locale === "nl" ? "Controleren" : "Review") : (locale === "nl" ? "Schoon" : "Clear"),
+      trend: v.isTaxi
+        ? (locale === "nl" ? "Intensief gebruik waarschijnlijk" : "Intensive use likely")
+        : v.exportIndicator
+        ? (locale === "nl" ? "Voor export gemarkeerd" : "Marked for export")
+        : (locale === "nl" ? "Regulier gebruik" : "Regular use"),
+      icon: Users,
+      tone: v.isTaxi || v.exportIndicator ? "warning" : "success",
+      link: "/ownership-history"
+    },
+    {
       id: "apk",
       title: locale === "nl" ? "APK-keuring" : "APK Inspection",
       status: v.apkExpiryDate
@@ -216,13 +255,8 @@ export function RiskOverviewScreen({ plate }: Props) {
     link: buildPlateHref(plate, card.link)
   }));
 
-  return (
-    <div className={styles.page}>
-      <div className={styles.pageContainer}>
-        <div className={styles.contentContainer}>
-          <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Risico-overzicht" : "Risk overview"} />
-
-          <PremiumLock featureName={locale === "nl" ? "Risico-overzicht" : "Risk Overview"} isLocked={true} plate={plate} sectionKey="riskOverview">
+  return wrap(
+    <PremiumLock featureName={locale === "nl" ? "Risico-overzicht" : "Risk Overview"} isLocked={true} plate={plate} sectionKey="riskOverview">
             <div className={`${styles.heroPanel} ${styles.glassPanel}`}>
               <div className={styles.heroCopy}>
                 <div className={styles.eyebrow}>
@@ -246,11 +280,31 @@ export function RiskOverviewScreen({ plate }: Props) {
               <div className={styles.heroSide}>
                 <div className={styles.spotlightCard}>
                   <div className={styles.spotlightLabel}>{locale === "nl" ? "Vertrouwenssnapshot" : "Vehicle trust snapshot"}</div>
-                  <div className={styles.spotlightValue}>{locale === "nl" ? "Laag risico" : "Low risk"}</div>
+                  <div className={styles.spotlightValue}>
+                    {v.wok
+                      ? locale === "nl" ? "Hoog risico" : "High risk"
+                      : v.hasOpenRecall || data.defects.length > 3 || (v.napVerdict ?? "").toLowerCase().includes("onlogisch")
+                      ? locale === "nl" ? "Controle nodig" : "Review needed"
+                      : positiveChecks === 3
+                      ? locale === "nl" ? "Geen rode vlaggen" : "No red flags"
+                      : locale === "nl" ? "Gemengd beeld" : "Mixed signals"}
+                  </div>
                   <div className={styles.spotlightNote}>
-                    {locale === "nl"
-                      ? "Historie oogt stabiel zonder grote rode vlaggen in de belangrijkste datasets."
-                      : "History looks stable with no major red flags in the key datasets."}
+                    {v.wok
+                      ? locale === "nl"
+                        ? "WOK-registratie aanwezig: dit voertuig wacht op keuring na zware schade."
+                        : "Salvage (WOK) registration present: this vehicle awaits inspection after serious damage."
+                      : v.hasOpenRecall
+                      ? locale === "nl"
+                        ? "Er staat een terugroepactie open. Controleer of deze is uitgevoerd."
+                        : "There is an open recall. Check whether it has been carried out."
+                      : data.defects.length > 0
+                      ? locale === "nl"
+                        ? `${data.defects.length} geconstateerde gebreken in de keuringshistorie verdienen aandacht.`
+                        : `${data.defects.length} recorded defects in the inspection history deserve attention.`
+                      : locale === "nl"
+                      ? "Geen grote rode vlaggen in de officiële datasets."
+                      : "No major red flags in the official datasets."}
                   </div>
                 </div>
                 <div className={styles.spotlightCard}>
@@ -285,11 +339,7 @@ export function RiskOverviewScreen({ plate }: Props) {
                 ))}
               </div>
             </div>
-          </PremiumLock>
-
-        </div>
-      </div>
-    </div>
+    </PremiumLock>
   );
 }
 

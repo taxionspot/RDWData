@@ -1,5 +1,6 @@
-import { VehicleProfile } from "@/lib/rdw/types";
+import { VehicleProfile } from "./types";
 import { parseISO, differenceInMonths, differenceInYears } from "date-fns";
+import { computeMrbQuarter } from "../tax/mrb";
 
 export type MarketValueConfidence = "HIGH" | "MEDIUM" | "LOW";
 export type MileageVerdict = "LOGISCH" | "TWIJFELACHTIG" | "ONLOGISCH" | "UNKNOWN";
@@ -219,8 +220,30 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function getMileagePoints(profile: VehicleProfile, registrationDate: Date | null): MileagePoint[] {
-  const points: MileagePoint[] = [];
+/** Expected annual km from usage signals; 13,500 is the value model's own benchmark. */
+function estimateAnnualKm(v: VehicleProfile["vehicle"]): number {
+  let annual = 13500;
+  const fuel = (v.fuelType ?? "").toLowerCase();
+  if (fuel.includes("diesel")) annual = 22000;
+  else if (fuel.includes("lpg") || fuel.includes("cng") || fuel.includes("aardgas")) annual = 25000;
+  else if (fuel.includes("hybr")) annual = 16000;
+  else if (fuel.includes("elektr")) annual = 15000;
+
+  const body = (v.bodyType ?? "").toLowerCase();
+  if (body.includes("bestel") || body.includes("van")) annual = Math.round(annual * 1.25);
+  if (v.isTaxi) annual = 45000;
+  return annual;
+}
+
+function usageProfileForSlope(kmPerYear: number): string {
+  if (kmPerYear < 8000) return "Recreational";
+  if (kmPerYear < 15000) return "Average";
+  if (kmPerYear < 25000) return "Above average";
+  if (kmPerYear < 45000) return "Intensive";
+  return "Very intensive";
+}
+
+function getMileagePoints(profile: VehicleProfile, registrationDate: Date | null): MileagePoint[] {  const points: MileagePoint[] = [];
   if (!registrationDate) return points;
 
   for (const record of profile.inspections ?? []) {
@@ -244,12 +267,30 @@ function estimateMileage(profile: VehicleProfile, registrationDate: Date | null)
   const dataPoints = [...basePoints, ...points];
 
   if (dataPoints.length < 2) {
+    // RDW open data publishes no per-inspection odometer readings, so this is
+    // the common case. Fall back to our own formula: expected annual km from
+    // usage signals (fuel, body type, taxi history) times vehicle age.
     const latest = points.length ? points[points.length - 1].km : null;
+    if (registrationDate) {
+      const ageYears = Math.max((Date.now() - registrationDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25), 0);
+      const annualKm = estimateAnnualKm(profile.vehicle);
+      const estimated = Math.max(0, roundTo(ageYears * annualKm, 500));
+      return {
+        estimatedMileageNow: estimated,
+        estimatedMileageMin: Math.max(0, roundTo(estimated * 0.75, 500)),
+        estimatedMileageMax: Math.max(0, roundTo(estimated * 1.25, 500)),
+        mileageVerdict: "UNKNOWN" as MileageVerdict,
+        mileageUsageProfile: usageProfileForSlope(annualKm),
+        mileageSlopeKmPerYear: annualKm,
+        mileageAnomalies: [] as MileageAnomaly[],
+        latestMileage: latest
+      };
+    }
     return {
       estimatedMileageNow: latest,
       estimatedMileageMin: null,
       estimatedMileageMax: null,
-      mileageVerdict: latest != null ? "UNKNOWN" : "UNKNOWN" as MileageVerdict,
+      mileageVerdict: "UNKNOWN" as MileageVerdict,
       mileageUsageProfile: null,
       mileageSlopeKmPerYear: null,
       mileageAnomalies: [] as MileageAnomaly[],
@@ -593,32 +634,13 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
   if (ageInMonths && ageInMonths > 120) passChance -= 15;
   if (isImported) passChance -= 5;
 
-  // 6. Repair Chances (Mocked for UI testing, would need B2B data for real)
+  // 6. Repair chances: bewust leeg. We tonen geen verzonnen kansen of
+  // kostenbanden meer; echte modelstatistieken komen uit lib/stats/modelStats.
   const repairChances = [] as { name: string; chance: number; estMin: number; estMax: number }[];
-  if (ageInMonths && ageInMonths > 80) {
-    repairChances.push({ name: "Brakes (discs/pads)", chance: 75, estMin: 350, estMax: 600 });
-    repairChances.push({ name: "Battery replacement", chance: 40, estMin: 100, estMax: 250 });
-  }
-  if (ageInMonths && ageInMonths > 140) {
-    repairChances.push({ name: "Timing belt/chain", chance: 65, estMin: 400, estMax: 800 });
-    repairChances.push({ name: "Shock absorbers", chance: 55, estMin: 300, estMax: 500 });
-  }
 
-  // 7. Road Tax Estimate (Extremely simplified)
-  let taxMin = 0; let taxMax = 0;
-  if (v.weight?.empty) {
-    const w = v.weight.empty;
-    if (v.fuelType === "Benzine") {
-      taxMin = Math.floor(w * 0.05); taxMax = taxMin + 15;
-    } else if (v.fuelType === "Diesel") {
-      taxMin = Math.floor(w * 0.09); taxMax = taxMin + 25;
-    } else if (v.fuelType === "Elektriciteit") {
-      taxMin = 0; taxMax = 0; // temporary exemption
-    } else {
-      taxMin = Math.floor(w * 0.05); taxMax = taxMin + 20;
-    }
-  }
-  const tax = taxMin > 0 ? { min: taxMin, max: taxMax } : null;
+  // 7. Road Tax (MRB): Belastingdienst-structuur, bandbreedte over provincies.
+  const mrb = computeMrbQuarter(v.weight?.empty ?? null, v.fuelType);
+  const tax = mrb ? { min: mrb.min, max: mrb.max } : null;
 
   // 8. Insurance Estimate (Heuristic based on Value & Weight)
   // Very rough heuristic: Base 25 + (Value * 0.0015) + (Weight * 0.01)
@@ -648,24 +670,9 @@ export function enrichVehicleData(profile: VehicleProfile): EnrichedData {
     fuelEst = Math.round((1000 / 100) * consumptionAvg * pricePerUnit);
   }
 
-  // 10. Known Issues (Mocked heuristics)
+  // 10. Known issues: bewust leeg. Generieke merk-templates zijn verwijderd;
+  // echte gebrekstatistieken per model komen uit lib/stats/modelStats.
   const knownIssues = [] as { title: string; severity: string; target: string; advice: string }[];
-  const brand = (v.brand || "").toUpperCase();
-  if (ageInMonths && ageInMonths > (10 * 12)) {
-    if (brand.includes("TOYOTA")) {
-      knownIssues.push({
-        title: "Timing chain wear", severity: "Moderate", target: "Older VVT-i engines", advice: "Check for rattling noises during cold start."
-      });
-    }
-    if (brand.includes("VOLKSWAGEN") || brand.includes("AUDI")) {
-      knownIssues.push({
-        title: "Oil consumption TFSI", severity: "High", target: "1.8 and 2.0 engines (2008-2012)", advice: "Ask for oil consumption history."
-      });
-    }
-    knownIssues.push({
-      title: "Clutch issues", severity: "Common", target: "All years", advice: "Check for wear during test drive."
-    });
-  }
 
   return {
     ageInMonths,

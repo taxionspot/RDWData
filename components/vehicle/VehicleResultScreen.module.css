@@ -812,3 +812,37 @@
   }
 }
 
+
+/* Score breakdown */
+.scoreBreakdown {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.scoreBreakdown summary {
+  cursor: pointer;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  list-style: none;
+}
+
+.scoreBreakdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.scoreBreakdown ul {
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scoreBreakdown li {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}

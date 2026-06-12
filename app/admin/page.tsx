@@ -91,7 +91,7 @@ const emptySettings: PublicSiteSettings = {
   ui: { showFeaturesLink: true, showSampleLink: true, showPricingLink: true, showLoginButton: true },
   content: { platformName: "Kentekenrapport", landingHeroTitleA: "", landingHeroTitleB: "", landingHeroSubtitle: "", landingCtaTitle: "", landingCtaSubtitle: "", landingCtaButton: "", landingHeroImageUrl: "", footerDescription: "" },
   landing: { badgeTop: "", trustedSourcesLabel: "", featureSectionLabel: "", featureSectionTitle: "", howSectionLabel: "", howSectionTitle: "", sectionVisibility: { features: true, workflow: true, cta: true }, features: [], workflow: [], footer: { productTitle: "Product", companyTitle: "Company", legalTitle: "Legal", productLinks: [], companyLinks: [], legalLinks: [] } },
-  seo: { metaTitle: "", metaDescription: "", ogImage: "", googleAnalyticsId: "", faviconUrl: "" },
+  seo: { metaTitle: "", metaDescription: "", ogImage: "", googleAnalyticsId: "", faviconUrl: "", microsoftClarityId: "" },
   appearance: { primaryColor: "#2563eb", accentColor: "#dbeafe", fontFamily: "Inter", logoUrl: "", logoText: "Kentekenrapport" },
   email: { fromName: "Kentekenrapport", fromAddress: "noreply@kentekenrapport.nl", reportSubjectNl: "", reportSubjectEn: "", welcomeBodyNl: "", welcomeBodyEn: "" },
 };
@@ -552,6 +552,7 @@ export default function AdminPage() {
                   <div className="md:col-span-2"><Textarea label="Meta Description" value={settings.seo.metaDescription} onChange={(v) => setSettings((p) => ({ ...p, seo: { ...p.seo, metaDescription: v } }))} rows={2} /></div>
                   <Input label="OG Image URL" value={settings.seo.ogImage} onChange={(v) => setSettings((p) => ({ ...p, seo: { ...p.seo, ogImage: v } }))} placeholder="https://..." />
                   <Input label="Google Analytics ID" value={settings.seo.googleAnalyticsId} onChange={(v) => setSettings((p) => ({ ...p, seo: { ...p.seo, googleAnalyticsId: v } }))} placeholder="G-XXXXXXXXXX" />
+                  <Input label="Microsoft Clarity ID" value={settings.seo.microsoftClarityId} onChange={(v) => setSettings((p) => ({ ...p, seo: { ...p.seo, microsoftClarityId: v } }))} placeholder="abcdefghij" />
                   <div className="md:col-span-2"><Input label="Favicon URL" value={settings.seo.faviconUrl} onChange={(v) => setSettings((p) => ({ ...p, seo: { ...p.seo, faviconUrl: v } }))} placeholder="https://..." /></div>
                 </div>
               </Card>

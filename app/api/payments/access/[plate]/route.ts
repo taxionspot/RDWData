@@ -29,6 +29,14 @@ export async function GET(_: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   try {
+    // Demo grant: free access without payment. Never available in production
+    // unless explicitly enabled, otherwise anyone could unlock reports for free.
+    const demoEnabled =
+      process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
+    if (!demoEnabled) {
+      return NextResponse.json({ ok: false, error: "Demo access is disabled." }, { status: 403 });
+    }
+
     const plate = normalizePlate(params.plate ?? "");
     if (!plate) {
       return NextResponse.json({ ok: false, error: "Invalid plate." }, { status: 400 });

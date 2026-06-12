@@ -5,6 +5,7 @@ import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { PlateWatchModel } from "@/models/PlateWatch";
 import { parsePlateOrThrow } from "@/lib/api/plate";
 import { getVehicleProfile } from "@/lib/rdw/service";
+import { buildWatchSnapshot, diffWatchSnapshots } from "@/lib/watch/checkWatches";
 
 export const runtime = "nodejs";
 
@@ -13,19 +14,6 @@ function requireUser() {
   const session = verifyUserSession(token);
   if (!session) throw new Error("UNAUTHORIZED");
   return session;
-}
-
-function normalizeScore(value: unknown): number | null {
-  const num = Number(value);
-  return Number.isFinite(num) ? Number(num.toFixed(1)) : null;
-}
-
-function buildSnapshot(profile: Awaited<ReturnType<typeof getVehicleProfile>>) {
-  return {
-    hasOpenRecall: Boolean(profile.vehicle.hasOpenRecall),
-    apkExpiryDate: profile.vehicle.apkExpiryDate ?? null,
-    maintenanceRiskScore: normalizeScore(profile.enriched?.maintenanceRiskScore ?? null)
-  };
 }
 
 export async function GET(request: Request) {
@@ -69,8 +57,7 @@ export async function POST(request: Request) {
     }
 
     const profile = await getVehicleProfile(plate);
-    const snapshot = buildSnapshot(profile);
-    const currentRisk = snapshot.maintenanceRiskScore ?? 0;
+    const snapshot = buildWatchSnapshot(profile);
 
     if (action === "follow") {
       await PlateWatchModel.updateOne(
@@ -97,33 +84,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Plate is not followed yet." }, { status: 404 });
     }
 
-    const previous = existing.snapshot;
-    const alerts: Array<{ type: "RECALL_CHANGED" | "APK_CHANGED" | "RISK_CHANGED"; message: string; createdAt: Date }> = [];
-
-    if (previous.hasOpenRecall !== snapshot.hasOpenRecall) {
-      alerts.push({
-        type: "RECALL_CHANGED",
-        message: snapshot.hasOpenRecall
-          ? "Recall status changed: open recall detected."
-          : "Recall status changed: no open recall now.",
-        createdAt: new Date()
-      });
-    }
-    if ((previous.apkExpiryDate ?? null) !== (snapshot.apkExpiryDate ?? null)) {
-      alerts.push({
-        type: "APK_CHANGED",
-        message: `APK status changed: ${previous.apkExpiryDate ?? "unknown"} -> ${snapshot.apkExpiryDate ?? "unknown"}.`,
-        createdAt: new Date()
-      });
-    }
-    const prevRisk = normalizeScore(previous.maintenanceRiskScore);
-    if (prevRisk !== null && Math.abs(currentRisk - prevRisk) >= 0.5) {
-      alerts.push({
-        type: "RISK_CHANGED",
-        message: `Maintenance risk shifted from ${prevRisk.toFixed(1)} to ${currentRisk.toFixed(1)}.`,
-        createdAt: new Date()
-      });
-    }
+    const alerts = diffWatchSnapshots(existing.snapshot, snapshot);
 
     existing.snapshot = snapshot;
     existing.lastCheckedAt = new Date();

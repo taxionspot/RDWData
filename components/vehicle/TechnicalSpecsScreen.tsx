@@ -22,6 +22,7 @@ import { PremiumLock } from "../ui/PremiumLock";
 
 type Props = {
   plate?: string;
+  embedded?: boolean;
 };
 
 function buildPlateHref(plate: string | undefined, suffix = "") {
@@ -160,7 +161,7 @@ function ErrorScreen({ plate }: { plate?: string }) {
   );
 }
 
-export function TechnicalSpecsScreen({ plate }: Props) {
+export function TechnicalSpecsScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const backHref = buildPlateHref(plate, "/risk-overview");
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate ?? "");
@@ -264,10 +265,10 @@ export function TechnicalSpecsScreen({ plate }: Props) {
   if (isLoading || !data) return <LoadingScreen />;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.pageContainer}>
-        <div className={styles.contentContainer}>
-          <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Technische specificaties" : "Technical specifications"} />
+    <div className={embedded ? undefined : styles.page}>
+      <div className={embedded ? undefined : styles.pageContainer}>
+        <div className={embedded ? undefined : styles.contentContainer}>
+          {!embedded && <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Technische specificaties" : "Technical specifications"} />}
 
           <div className={styles.pageHeader}>
             <Link href={backHref} className={styles.backLink}>

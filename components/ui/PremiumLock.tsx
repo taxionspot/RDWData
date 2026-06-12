@@ -4,8 +4,10 @@ import { Button } from "./Button";
 import { Lock } from "lucide-react";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { useI18n } from "@/lib/i18n/context";
-import { hasPaidAccessForPlate } from "@/lib/payments/access";
+import { hasPaidAccessForPlate, ensurePaidAccessChecked, onPlateAccessChanged } from "@/lib/payments/access";
+import { isSamplePlate } from "@/lib/sample";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { track } from "@/lib/analytics";
 import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
 
 
@@ -26,18 +28,28 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
 
   useEffect(() => {
     if (!plate) return;
-    const localPaid = hasPaidAccessForPlate(plate);
-    setIsUnlockedForPlate(localPaid);
+    setIsUnlockedForPlate(hasPaidAccessForPlate(plate));
+    // Restore paid access after refresh (server is source of truth) and stay
+    // in sync when another section on the page unlocks this plate.
+    void ensurePaidAccessChecked(plate).then((paid) => {
+      if (paid) setIsUnlockedForPlate(true);
+    });
+    const unsubscribe = onPlateAccessChanged(plate, (paid) => setIsUnlockedForPlate(paid));
+    return unsubscribe;
   }, [plate]);
 
   const lockByAdmin = sectionKey ? settings.lockSections[sectionKey] : isLocked;
   const shouldLock = settings.paymentEnabled && lockByAdmin && isLocked;
 
-  if (!shouldLock || isUnlockedForPlate) return <>{children}</>;
+  // The public sample plate is always fully open so visitors can see the product.
+  if (!shouldLock || isUnlockedForPlate || isSamplePlate(plate)) return <>{children}</>;
 
 
 
-  const openModal = () => setShowModal(true);
+  const openModal = () => {
+    track("lock_clicked", { feature: featureName, section: sectionKey ?? "generic" });
+    setShowModal(true);
+  };
 
   return (
     <div className={styles.lockContainer}>

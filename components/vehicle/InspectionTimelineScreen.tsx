@@ -20,6 +20,7 @@ import { PremiumLock } from "../ui/PremiumLock";
 
 type Props = {
   plate: string;
+  embedded?: boolean;
 };
 
 type InspectionEvent = {
@@ -115,7 +116,7 @@ function statusBadge(result: InspectionEvent["result"], locale: "nl" | "en") {
   return { label: locale === "nl" ? "Goedgekeurd" : "Pass", className: "badgePass" };
 }
 
-export function InspectionTimelineScreen({ plate }: Props) {
+export function InspectionTimelineScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const { isValid, data, isLoading, isError } = useVehicleLookup(plate);
   const [filter, setFilter] = useState<"all" | "pass" | "advisory" | "fail">("all");
@@ -229,9 +230,9 @@ export function InspectionTimelineScreen({ plate }: Props) {
   }
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.contentContainer}>
-        <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Inspectietijdlijn" : "Inspection timeline"} />
+    <div className={embedded ? undefined : styles.pageContainer}>
+      <div className={embedded ? undefined : styles.contentContainer}>
+        {!embedded && <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Inspectietijdlijn" : "Inspection timeline"} />}
 
         <PremiumLock
           featureName={locale === "nl" ? "Inspectietijdlijn" : "Inspection timeline"}
@@ -285,8 +286,8 @@ export function InspectionTimelineScreen({ plate }: Props) {
                   <div className={styles.progressFill} />
                 </div>
                 <div className={styles.statusMeta}>
-                  <span>{locale === "nl" ? "Verkeersveiligheidsvertrouwen" : "Roadworthiness confidence"}</span>
-                  <span>84%</span>
+                  <span>{locale === "nl" ? "APK-slaagkans (geschat)" : "APK pass chance (estimated)"}</span>
+                  <span>{data.enriched?.apkPassChance != null ? `${data.enriched.apkPassChance}%` : "-"}</span>
                 </div>
               </div>
               <div className={styles.badgeRow}>
@@ -470,45 +471,43 @@ export function InspectionTimelineScreen({ plate }: Props) {
           </div>
         </div>
 
+        {(repairChances.length > 0 || knownIssues.length > 0) ? (
         <div className={styles.repairDeck}>
+          {repairChances.length > 0 ? (
           <div className={styles.repairCard}>
             <div className={styles.repairHeader}>{locale === "nl" ? "Reparatiekansen" : "Repair chances"}</div>
-            {repairChances.length ? (
-              <div className={styles.repairList}>
-                {repairChances.map((item) => (
-                  <div key={item.name} className={styles.repairRow}>
-                    <div>
-                      <div className={styles.repairTitle}>{item.name}</div>
-                      <div className={styles.repairMeta}>{locale === "nl" ? "Kans" : "Chance"}: {item.chance}%</div>
-                    </div>
-                    <div className={styles.repairRange}>EUR {item.estMin.toLocaleString()} - EUR {item.estMax.toLocaleString()}</div>
+            <div className={styles.repairList}>
+              {repairChances.map((item) => (
+                <div key={item.name} className={styles.repairRow}>
+                  <div>
+                    <div className={styles.repairTitle}>{item.name}</div>
+                    <div className={styles.repairMeta}>{locale === "nl" ? "Kans" : "Chance"}: {item.chance}%</div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.repairEmpty}>{locale === "nl" ? "Geen reparatiekansen gerapporteerd." : "No repair chances reported."}</div>
-            )}
+                  <div className={styles.repairRange}>EUR {item.estMin.toLocaleString()} - EUR {item.estMax.toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
           </div>
+          ) : null}
 
+          {knownIssues.length > 0 ? (
           <div className={styles.repairCard}>
             <div className={styles.repairHeader}>{locale === "nl" ? "Bekende issues" : "Known issues"}</div>
-            {knownIssues.length ? (
-              <div className={styles.repairList}>
-                {knownIssues.map((issue) => (
-                  <div key={issue.title} className={styles.repairRow}>
-                    <div>
-                      <div className={styles.repairTitle}>{issue.title}</div>
-                      <div className={styles.repairMeta}>{issue.target} - {issue.severity}</div>
-                    </div>
-                    <div className={styles.issueAdvice}>{issue.advice}</div>
+            <div className={styles.repairList}>
+              {knownIssues.map((issue) => (
+                <div key={issue.title} className={styles.repairRow}>
+                  <div>
+                    <div className={styles.repairTitle}>{issue.title}</div>
+                    <div className={styles.repairMeta}>{issue.target} - {issue.severity}</div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.repairEmpty}>{locale === "nl" ? "Geen bekende issues opgeslagen." : "No known issues stored."}</div>
-            )}
+                  <div className={styles.issueAdvice}>{issue.advice}</div>
+                </div>
+              ))}
+            </div>
           </div>
+          ) : null}
         </div>
+        ) : null}
         </PremiumLock>
       </div>
     </div>

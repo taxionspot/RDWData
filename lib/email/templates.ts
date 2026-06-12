@@ -51,7 +51,7 @@ export function buildThankYouEmail(args: {
 
   if (args.locale === "en") {
     return {
-      subject: `Thank you for your purchase – vehicle report ${displayPlate}`,
+      subject: `Thank you for your purchase: vehicle report ${displayPlate}`,
       html: renderLayout({
         bodyHtml: `
           <p>Hi!</p>
@@ -66,7 +66,7 @@ export function buildThankYouEmail(args: {
   }
 
   return {
-    subject: `Bedankt voor je aankoop – kentekenrapport ${displayPlate}`,
+    subject: `Bedankt voor je aankoop: kentekenrapport ${displayPlate}`,
     html: renderLayout({
       bodyHtml: `
         <p>Hoi!</p>
@@ -90,7 +90,7 @@ export function buildFollowUpEmail(args: { plate: string; locale: Locale }): Ema
       html: renderLayout({
         bodyHtml: `
           <p>Hi!</p>
-          <p>I noticed you wanted to view the vehicle report for license plate <strong>${displayPlate}</strong>, but the payment was not completed. No worries – that happens!</p>
+          <p>I noticed you wanted to view the vehicle report for license plate <strong>${displayPlate}</strong>, but the payment was not completed. No worries, that happens!</p>
           <p>Your report is still ready for you. You can finish the payment in just a few clicks:</p>
           ${renderButton(checkoutUrl, "Complete your report")}
           <p>Still in doubt or running into an issue? Just reply to this email, I am happy to help.</p>
@@ -105,7 +105,7 @@ export function buildFollowUpEmail(args: { plate: string; locale: Locale }): Ema
     html: renderLayout({
       bodyHtml: `
         <p>Hoi!</p>
-        <p>Ik zag dat je het kentekenrapport voor <strong>${displayPlate}</strong> wilde bekijken, maar dat de betaling niet helemaal is afgerond. Geen zorgen – dat gebeurt wel vaker!</p>
+        <p>Ik zag dat je het kentekenrapport voor <strong>${displayPlate}</strong> wilde bekijken, maar dat de betaling niet helemaal is afgerond. Geen zorgen, dat gebeurt wel vaker!</p>
         <p>Je rapport staat nog steeds voor je klaar. Je rondt de betaling in een paar klikken af:</p>
         ${renderButton(checkoutUrl, "Rapport afronden")}
         <p>Twijfel je nog of loop je ergens tegenaan? Beantwoord gewoon deze e-mail, ik help je graag verder.</p>

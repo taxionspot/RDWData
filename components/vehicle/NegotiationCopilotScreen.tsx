@@ -7,10 +7,12 @@ import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { PremiumLock } from "../ui/PremiumLock";
 import { useI18n } from "@/lib/i18n/context";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { hasPaidAccessForPlate, ensurePaidAccessChecked, onPlateAccessChanged } from "@/lib/payments/access";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
 import styles from "./NegotiationCopilotScreen.module.css";
 
-type Props = { plate: string };
+type Props = { plate: string; embedded?: boolean };
 type CopilotAi = {
   script: string;
   offerStrategy: string;
@@ -39,7 +41,7 @@ function roundTo50(value: number): number {
   return Math.round(value / 50) * 50;
 }
 
-export function NegotiationCopilotScreen({ plate }: Props) {
+export function NegotiationCopilotScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const searchParams = useSearchParams();
   const mileageInput = useMemo(() => {
@@ -53,6 +55,27 @@ export function NegotiationCopilotScreen({ plate }: Props) {
   const [aiAdvice, setAiAdvice] = useState<CopilotAi | null>(null);
   const [aiPricing, setAiPricing] = useState<CopilotPricing | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const { settings } = useSiteSettings();
+  const [aiAllowed, setAiAllowed] = useState(false);
+
+  // Only call the (paid) Claude endpoint when the section is actually visible
+  // to the user: unlocked, or not locked at all. Avoids burning AI tokens on
+  // content that is blurred behind the premium lock.
+  useEffect(() => {
+    if (!normalized) return;
+    const lockedByAdmin = settings.paymentEnabled && settings.lockSections.marketAnalysis;
+    if (!lockedByAdmin) {
+      setAiAllowed(true);
+      return;
+    }
+    setAiAllowed(hasPaidAccessForPlate(normalized));
+    void ensurePaidAccessChecked(normalized).then((paid) => {
+      if (paid) setAiAllowed(true);
+    });
+    return onPlateAccessChanged(normalized, (paid) => {
+      if (paid) setAiAllowed(true);
+    });
+  }, [normalized, settings.paymentEnabled, settings.lockSections.marketAnalysis]);
 
   const v = data?.vehicle;
   const e = data?.enriched as Record<string, unknown> | undefined;
@@ -75,7 +98,7 @@ export function NegotiationCopilotScreen({ plate }: Props) {
   const reserveMax = roundTo50(Math.max(reserveMin + 150, marketNow * 0.08 + defects * 260 + recalls * 450));
 
   useEffect(() => {
-    if (isLoading || isError || !normalized || !data?.enriched) return;
+    if (!aiAllowed || isLoading || isError || !normalized || !data?.enriched) return;
     let active = true;
     setAiLoading(true);
     void (async () => {
@@ -100,7 +123,7 @@ export function NegotiationCopilotScreen({ plate }: Props) {
     return () => {
       active = false;
     };
-  }, [locale, mileageInput, normalized, offerMax, offerMin, reserveMax, reserveMin, walkAway, isLoading, isError, data]);
+  }, [aiAllowed, locale, mileageInput, normalized, offerMax, offerMin, reserveMax, reserveMin, walkAway, isLoading, isError, data]);
 
   if (!isValid || isError) {
     return (
@@ -152,9 +175,9 @@ export function NegotiationCopilotScreen({ plate }: Props) {
   ];
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.contentContainer}>
-        <VehicleNavBar plate={normalized} subtitle={locale === "nl" ? "Onderhandelcoach" : "Negotiation Copilot"} />
+    <div className={embedded ? undefined : styles.pageContainer}>
+      <div className={embedded ? undefined : styles.contentContainer}>
+        {!embedded && <VehicleNavBar plate={normalized} subtitle={locale === "nl" ? "Onderhandelcoach" : "Negotiation Copilot"} />}
         <PremiumLock
           featureName={locale === "nl" ? "Onderhandelcoach" : "Negotiation Copilot"}
           isLocked={true}
