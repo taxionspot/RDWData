@@ -6,8 +6,6 @@ export const runtime = "nodejs";
 
 type CreateOrderBody = {
   plate: string;
-  amount?: string;
-  currency?: string;
 };
 
 function normalizePlate(plate: string): string {
@@ -39,9 +37,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing plate." }, { status: 400 });
     }
 
+    // Price always comes from server-side settings; never trust a client-supplied amount.
     const settings = await getSiteSettings();
-    const amount = body.amount ?? settings.payment.amount;
-    const currency = body.currency ?? settings.payment.currency;
+    const amount = settings.payment.amount;
+    const currency = settings.payment.currency;
     const customId = `plate:${plate}`;
 
     const order = await createPaypalOrder({

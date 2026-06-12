@@ -5,6 +5,8 @@ import { X, Check, ShieldCheck, Zap, Sparkles } from "lucide-react";
 import styles from "./SubscriptionModal.module.css";
 import { useI18n } from "@/lib/i18n/context";
 import { PayPalCheckout } from "@/components/payments/PayPalCheckout";
+import { ApplePayButton } from "@/components/payments/ApplePayButton";
+import { GooglePayButton } from "@/components/payments/GooglePayButton";
 import { grantPaidAccessForPlate } from "@/lib/payments/access";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { trackBeginCheckout } from "@/lib/analytics/gtm";
@@ -97,7 +99,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
         <div className={styles.plans}>
           <div className={`${styles.planCard} ${styles.planActive}`}>
             <div className={styles.planHeader}>
-              <div className={styles.planName}>{locale === "nl" ? "Betalen met PayPal" : "Pay with PayPal"}</div>
+              <div className={styles.planName}>{locale === "nl" ? "Veilig betalen" : "Secure payment"}</div>
               <div className={styles.planPrice}>
                 {settings.payment.currency} {settings.payment.amount}
                 <span>/{locale === "nl" ? "zoekopdracht" : "search"}</span>
@@ -119,6 +121,30 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
               />
             </label>
             <div className={styles.planBtn}>
+              <ApplePayButton
+                plate={plate}
+                email={email}
+                amount={settings.payment.amount}
+                currency={settings.payment.currency}
+                onSuccess={() => {
+                  grantPaidAccessForPlate(plate);
+                  onUnlocked?.({ email: email.trim().toLowerCase() || undefined });
+                  onClose();
+                }}
+                onError={(message) => setError(mapCheckoutErrorToFriendly(message, locale))}
+              />
+              <GooglePayButton
+                plate={plate}
+                email={email}
+                amount={settings.payment.amount}
+                currency={settings.payment.currency}
+                onSuccess={() => {
+                  grantPaidAccessForPlate(plate);
+                  onUnlocked?.({ email: email.trim().toLowerCase() || undefined });
+                  onClose();
+                }}
+                onError={(message) => setError(mapCheckoutErrorToFriendly(message, locale))}
+              />
               <PayPalCheckout
                 plate={plate}
                 email={email}

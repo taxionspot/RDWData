@@ -1,0 +1,21 @@
+.applePayButton {
+  -webkit-appearance: -apple-pay-button;
+  -apple-pay-button-type: pay;
+  -apple-pay-button-style: black;
+  display: block;
+  width: 100%;
+  height: 45px;
+  margin-bottom: 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.googlePayContainer {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.googlePayContainer:empty {
+  margin-bottom: 0;
+}

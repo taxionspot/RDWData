@@ -82,10 +82,30 @@ NEXT_PUBLIC_PAYPAL_CLIENT_ID=<live client id>
 PAYPAL_CLIENT_ID=<live client id>
 PAYPAL_CLIENT_SECRET=<live secret>
 PAYPAL_BASE_URL=https://api-m.paypal.com
+NEXT_PUBLIC_PAYPAL_ENV=live
 ```
 
 Maak de live-app aan op developer.paypal.com onder het zakelijke account en doe na
 deploy één echte testbetaling (laag bedrag kan via de admin-prijsinstelling).
+
+**Betaalmethodes** — de checkout ondersteunt PayPal, iDEAL, creditcard/debitcard,
+Apple Pay en Google Pay (alles loopt via het PayPal-account):
+
+- **iDEAL & kaarten**: staan aan via de PayPal-knoppenstack (`enable-funding=ideal,card`).
+  iDEAL verschijnt automatisch voor bezoekers in Nederland. Controleer in het
+  PayPal-zakelijk account dat "iDEAL" en "Debit/Credit cards" als betaalmethodes
+  geaccepteerd worden.
+- **Apple Pay**: het verificatiebestand staat in de site op
+  `/.well-known/apple-developer-merchantid-domain-association`. Registreer daarna
+  het domein `kentekenrapport.com` in de PayPal-omgeving
+  (developer.paypal.com → je live-app → Features → Apple Pay → Manage domains →
+  Add domain). De Apple Pay-knop verschijnt alleen in Safari op Apple-apparaten
+  met een ingestelde wallet.
+- **Google Pay**: zet Google Pay aan in dezelfde Features-pagina van de live-app.
+  `NEXT_PUBLIC_PAYPAL_ENV=live` zorgt dat Google Pay in productie-modus draait
+  (bij `sandbox` gebruikt hij testkaarten).
+- De prijs wordt altijd server-side bepaald (admin-instelling); een klant kan het
+  bedrag niet manipuleren via de browser.
 
 ### 2. E-mail live zetten (Resend)
 
