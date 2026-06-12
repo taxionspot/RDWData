@@ -12,3 +12,6 @@ coverage
 
 .npm-cache
 .test-dist
+
+# Vercel
+.vercel
