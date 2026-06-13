@@ -61,7 +61,7 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
           <div className={styles.cardHeader}>
             <div className={styles.iconWrapper}>
               <div className={styles.pulse} />
-              <Lock className={styles.lockIcon} size={32} />
+              <Lock className={styles.lockIcon} size={22} />
             </div>
             <h3 className={styles.title}>{locale === "nl" ? `Ontgrendel ${featureName}` : `Unlock ${featureName}`}</h3>
             <p className={styles.description}>

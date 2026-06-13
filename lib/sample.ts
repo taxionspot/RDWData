@@ -1,10 +1,8 @@
 /**
- * The public sample report plate. RG-513-T is a data-rich vehicle in the RDW
- * register (long APK history with recorded defects), which makes it a good
- * showcase. All premium sections are open for this plate so visitors can see
- * exactly what they buy.
+ * The public sample report plate (the "Voorbeeldrapport"). All premium sections
+ * are open for this plate so visitors can see exactly what they buy.
  */
-export const SAMPLE_PLATE = "RG513T";
+export const SAMPLE_PLATE = "H223JZ";
 
 export function isSamplePlate(plate: string | null | undefined): boolean {
   if (!plate) return false;

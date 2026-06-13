@@ -31,7 +31,7 @@ export function AiAnalysisScreen({ plate }: Props) {
     return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
   }, [searchParams]);
 
-  const { normalized, isValid } = useVehicleLookup(plate);
+  const { normalized, isValid, data } = useVehicleLookup(plate, mileageInput);
   const { insights, valuation, loading } = useAiReport(isValid ? normalized : "", mileageInput);
 
   if (!isValid) return null;
@@ -45,9 +45,13 @@ export function AiAnalysisScreen({ plate }: Props) {
       ? nl ? "Hoog aandachtsniveau" : "High attention level"
       : nl ? "Gemiddeld aandachtsniveau" : "Medium attention level";
 
-  const valueNow = formatCurrency(valuation?.estimatedValueNow);
-  const valueMin = formatCurrency(valuation?.estimatedValueMin);
-  const valueMax = formatCurrency(valuation?.estimatedValueMax);
+  // Single source of truth: the formula value (enriched), which respects the
+  // entered mileage, so this matches the Marktprijsanalyse and the PDF exactly.
+  // The AI only supplies the qualitative explanation, never the numbers.
+  const enriched = data?.enriched;
+  const valueNow = formatCurrency(enriched?.estimatedValueNow);
+  const valueMin = formatCurrency(enriched?.estimatedValueMin);
+  const valueMax = formatCurrency(enriched?.estimatedValueMax);
 
   return (
     <PremiumLock featureName={nl ? "Analyse" : "Analysis"} isLocked={true} plate={normalized} sectionKey="riskOverview">
