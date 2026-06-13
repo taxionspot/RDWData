@@ -193,6 +193,47 @@ ff-gemerged op main bovenop d5dc2ad. Verwerkt n.a.v. Sabur-feedback:
   (sample-bewust) i.p.v. hasCompletedPlatePayment, zodat RG513T weer paid:true
   geeft zonder de betaalmuur te openen.
 
+## Sessie 13 juni 2026 deel 2: feedback-ronde 2 (LIVE, commit d63ca74)
+Na live-test door Sabur op mobiel. Live geverifieerd: RG513T AI-API 0 dashes/0
+providernaam; landing 0 dashes/0 providernaam/0 oude claims; 27 report-JS-chunks
+0 providernaam.
+- **Em-dash hardcoded weg**: lib/api/sanitize-text.ts (sanitizeText/sanitizeList/
+  sanitizeDeep, unicode-escapes) in claude.ts + claude-comparison.ts parsers +
+  fallbacks, EN sanitizeDeep op de AiReportCache-READ in app/api/vehicle/[plate]/
+  route.ts zodat oude cache-entries op leesmoment geschoond worden. escapeHtml
+  in report-template strikt ook.
+- **AI-provider verborgen**: elke klant-zichtbare "Claude" -> "Kentekenrapport AI"
+  (AiAnalysisScreen, NegotiationCopilotScreen, VehicleComparisonScreen, account).
+  Prompt verbiedt nu ook eurobedragen in proza.
+- **Marktwaarde 1 bron (enriched.estimatedValue*)**: cataloguePrice-fallback weg
+  (MarketAnalysisScreen toonde anders de NIEUWprijs), verzonnen *1.65-trend +
+  "vergelijkbare advertenties" weg, *0.9/1.1-nepbanden weg (market-value.ts,
+  NegotiationCopilot, pdf-report), dubbel eurobedrag uit report-template
+  AI-sectie, e-mailpad (route POST) + account-dashboard forwarden nu de km-stand,
+  PDF-hero leest alleen enriched + bar-geometrie gelijk aan labels.
+- **Mobiele horizontale scroll weg**: overflow-x:hidden + min-width:0/max-width
+  100%-keten (globals, FullReportScreen, hero/specs/market CSS). PremiumLock-
+  overlay leesbaar; sticky onderbalk wijkt (padding-left + z-index) voor de
+  zwevende knop.
+- **Checkout**: misleidende methode-opsomming weg (alleen tonen wat echt rendert),
+  eerlijke regel, echte retry die de SDK herlaadt (retryKey), PAYPAL_CONFIG_ERROR/
+  LOAD_ERROR + zichtbare melding i.p.v. lege knop. (Betaalknoppen vereisen nog
+  steeds de Vercel PayPal-env-vars + PayPal-dashboard, zie punt 1 hieronder.)
+- **Meer voertuigdata uit RDW**: mapper/types/service + TechnicalSpecs + PDF tonen
+  nu typeCode/variant/uitvoering, afmetingen (l/b/h, wielbasis) en massa rijklaar;
+  eerlijke regel "Transmissie: niet in RDW open data" (RDW heeft geen
+  versnellingsbak/uitvoering/opties; trim/opties = toekomstig VWE/RDC).
+- **Eigenaar-test (gratis betaalde flow)**: saburm1997@gmail.com ontgrendelt zonder
+  te betalen. server-access.ts isCompEmail (env COMP_ACCESS_EMAILS + hardcoded
+  default saburm1997@gmail.com), access-route POST maakt een comp-record (orderId
+  comp-, echt bedrag, telt mee in hasCompletedPlatePayment, opent de muur NIET voor
+  anderen), SubscriptionModal toont een "Eigenaar-test"-knop zodra dat adres is
+  ingevuld (client NEXT_PUBLIC_COMP_EMAILS). LET OP/beveiliging: wie dit e-mailadres
+  intypt krijgt gratis toegang; via COMP_ACCESS_EMAILS te wijzigen, of vraag om een
+  extra token-slot als je het strakker wilt.
+- Aanpak: multi-agent audit (6 dim + tegencheck) -> 18 implementatie-agents
+  (disjuncte bestanden) -> build -> deploy -> live verificatie.
+
 ## Overige openstaande punten
 1. Vercel env vars (Production) zetten + redeploy: live PayPal-keys,
    PAYPAL_BASE_URL=https://api-m.paypal.com, NEXT_PUBLIC_PAYPAL_ENV=live,
