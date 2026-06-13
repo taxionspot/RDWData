@@ -57,11 +57,6 @@ export function PremiumLock({ children, isLocked = true, featureName, plate, sec
         {children}
       </div>
       <div className={styles.overlay}>
-        <button className={styles.lockBadge} onClick={openModal} aria-label={locale === "nl" ? "Functie ontgrendelen" : "Unlock feature"}>
-          <Lock size={20} />
-          <span>{locale === "nl" ? "Vergrendeld" : "Locked"}</span>
-        </button>
-
         <div className={styles.lockCard}>
           <div className={styles.cardHeader}>
             <div className={styles.iconWrapper}>
