@@ -45,6 +45,23 @@ function formatPower(value: number | null) {
   return `${value} kW / ${Math.round(value * 1.36)} HP`;
 }
 
+/**
+ * Localized transmission label. Prefers the raw RDW code so the English UI
+ * shows English text; falls back to the stored (Dutch) label from the mapper.
+ */
+function transmissionDisplay(
+  label: string | null,
+  code: string | null,
+  locale: "nl" | "en"
+): string {
+  const c = (code ?? "").toUpperCase();
+  if (c === "M") return locale === "nl" ? "Handgeschakeld" : "Manual";
+  if (c === "A") return locale === "nl" ? "Automaat" : "Automatic";
+  if (c === "C") return locale === "nl" ? "CVT (automaat)" : "CVT (automatic)";
+  if (c) return locale === "nl" ? "Anders" : "Other";
+  return label ?? (locale === "nl" ? "Anders" : "Other");
+}
+
 function titleCase(value: string | null) {
   if (!value) return null;
   return value
@@ -210,13 +227,31 @@ export function TechnicalSpecsScreen({ plate, embedded = false }: Props) {
       { id: "payload", label: locale === "nl" ? "Laadvermogen" : "Payload", value: formatNumber(v.weight?.payload, "kg"), icon: Ruler }
     ].filter((spec) => spec.value) as Array<{ id: string; label: string; value: string; meta?: string; icon: ElementType }>;
 
-    // Always-shown info row (bypasses the .filter above): RDW open data has no transmission field.
+    // Transmission from the RDW TGK (type-approval) datasets. Localize the label
+    // from the raw code when possible; fall back to the stored (nl) label.
+    const transmissionValue = v.transmission
+      ? `${transmissionDisplay(v.transmission, v.transmissionCode, locale)}${
+          v.gears ? (locale === "nl" ? ` (${v.gears} versnellingen)` : ` (${v.gears} gears)`) : ""
+        }`
+      : locale === "nl"
+        ? "Niet geregistreerd in RDW open data"
+        : "Not registered in RDW open data";
     dimensionSpecs.push({
       id: "transmission",
       label: locale === "nl" ? "Transmissie" : "Transmission",
-      value: locale === "nl" ? "Niet geregistreerd in RDW open data" : "Not registered in RDW open data",
+      value: transmissionValue,
       icon: Settings
     });
+
+    // Factory model name from the TGK Handelsbenaming Fabrikant dataset.
+    if (v.factoryModelName) {
+      dimensionSpecs.push({
+        id: "factory-model",
+        label: locale === "nl" ? "Fabrieksbenaming" : "Factory model name",
+        value: v.factoryModelName,
+        icon: Ruler
+      });
+    }
 
     return [
       {

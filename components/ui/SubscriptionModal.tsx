@@ -187,8 +187,8 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
             ) : null}
             <p className={styles.guaranteeLine}>
               {locale === "nl"
-                ? "Veilig betalen, geen account nodig. De beschikbare betaalmethodes verschijnen hieronder."
-                : "Secure payment, no account needed. Available payment methods appear below."}
+                ? "Veilig betalen, geen account nodig. Kies hieronder je betaalmethode: iDEAL, Creditcard of PayPal."
+                : "Secure payment, no account needed. Choose your payment method below: iDEAL, Creditcard or PayPal."}
             </p>
             <div className={styles.planBtn} key={`pay-${retryKey}`}>
               <ApplePayButton

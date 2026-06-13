@@ -19,3 +19,39 @@
 .googlePayContainer:empty {
   margin-bottom: 0;
 }
+
+/* Stacked, labelled PayPal funding-source buttons (iDEAL / Creditcard / PayPal).
+   Each method reads as its own clear option, like a payment-method list. */
+.fundingStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.fundingMethod {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.fundingLabel {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #5b6b84;
+}
+
+.fundingButton {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Hide a whole method wrapper (label + slot) when no eligible button rendered
+   into its slot, so we never show an orphan label above an empty area.
+   Falls back gracefully: browsers without :has() simply show the label, which
+   is harmless. */
+.fundingMethod:has(.fundingButton:empty) {
+  display: none;
+}

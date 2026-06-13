@@ -15,7 +15,7 @@ import { hasPaidPlateAccess } from "@/lib/payments/server-access";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
-import { getEmailFrom } from "@/lib/email/resend";
+import { sendEmail } from "@/lib/email/resend";
 import { isSamplePlate } from "@/lib/sample";
 
 type Params = { params: { plate: string } };
@@ -171,43 +171,17 @@ async function sendReportEmail(args: {
   html: string;
   pdfBase64?: string;
 }): Promise<{ delivered: boolean; reason?: string }> {
-  const apiKey = process.env.RESEND_API_KEY ?? "";
-  const from = getEmailFrom();
-  if (!apiKey) {
-    return { delivered: false, reason: "EMAIL_PROVIDER_NOT_CONFIGURED" };
-  }
-
   const subject = args.locale === "nl" ? `Kentekenrapport voor ${args.plate}` : `Vehicle report for ${args.plate}`;
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      from,
-      to: [args.to],
-      subject,
-      html: args.html,
-      ...(args.pdfBase64
-        ? {
-            attachments: [
-              {
-                filename: `kentekenrapport-${args.plate}.pdf`,
-                content: args.pdfBase64
-              }
-            ]
-          }
-        : {})
-    }),
-    cache: "no-store"
+  // Send via the shared Gmail SMTP transport (lib/email/resend.ts), which also
+  // handles the graceful not-configured return shape.
+  return sendEmail({
+    to: args.to,
+    subject,
+    html: args.html,
+    attachments: args.pdfBase64
+      ? [{ filename: `kentekenrapport-${args.plate}.pdf`, content: args.pdfBase64 }]
+      : undefined
   });
-
-  if (!response.ok) {
-    const details = await response.text();
-    return { delivered: false, reason: `EMAIL_SEND_FAILED:${response.status}:${details}` };
-  }
-  return { delivered: true };
 }
 
 export async function GET(request: Request, { params }: Params) {

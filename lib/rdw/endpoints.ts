@@ -9,7 +9,11 @@ export const DATASETS = {
   body: "vezc-m2t6",
   typeApprovals: "55kv-xf7m",
   approvedGarages: "5k74-3jha",
-  defectDescriptions: "tbph-ct3j" // tbph-ct3j
+  defectDescriptions: "tbph-ct3j", // tbph-ct3j
+  // TGK (typegoedkeuring) datasets, keyed by typegoedkeuringsnummer (NOT kenteken).
+  // Second-stage lookup after the main register returns the type-approval number.
+  tgkGears: "7rjk-eycs",   // TGK Versnelling Uitvoering (transmission type + gear count)
+  tgkNames: "x5v3-sewk"    // TGK Handelsbenaming Fabrikant (factory model/type name)
 } as const;
 
 /** These datasets don't support `?kenteken=` filtering — skip or use $where */
@@ -37,6 +41,17 @@ export function rdwSoqlUrl(datasetId: string, plate: string, limit = 50): string
 export function rdwSoqlCustomUrl(datasetId: string, whereClause: string, limit = 50): string {
   const url = new URL(`${RDW_BASE_URL}/${datasetId}.json`);
   url.searchParams.set("$where", whereClause);
+  url.searchParams.set("$limit", String(limit));
+  return url.toString();
+}
+
+/**
+ * `?typegoedkeuringsnummer=<tgk>` URL for the TGK datasets (keyed by
+ * type-approval number, not kenteken). Used for the second-stage fetch.
+ */
+export function rdwTgkUrl(datasetId: string, typeApprovalNumber: string, limit = 200): string {
+  const url = new URL(`${RDW_BASE_URL}/${datasetId}.json`);
+  url.searchParams.set("typegoedkeuringsnummer", typeApprovalNumber);
   url.searchParams.set("$limit", String(limit));
   return url.toString();
 }

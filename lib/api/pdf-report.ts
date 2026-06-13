@@ -651,12 +651,33 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   if (readyToDrive !== null) {
     layout.keyValue(locale === "nl" ? "Massa rijklaar" : "Mass ready to drive", `${readyToDrive} kg`);
   }
-  layout.keyValue(
-    locale === "nl" ? "Transmissie" : "Transmission",
-    locale === "nl"
-      ? "Niet in RDW open data (handgeschakeld of automaat wordt niet geregistreerd)"
-      : "Not in RDW open data (manual vs automatic is not registered)"
-  );
+  // Transmission from the RDW TGK (type-approval) datasets, when available.
+  const transmissionRaw = s(vehicle.transmission);
+  if (transmissionRaw !== "-") {
+    const code = String(vehicle.transmissionCode ?? "").toUpperCase();
+    let transmissionLabel: string;
+    if (code === "M") transmissionLabel = locale === "nl" ? "Handgeschakeld" : "Manual";
+    else if (code === "A") transmissionLabel = locale === "nl" ? "Automaat" : "Automatic";
+    else if (code === "C") transmissionLabel = locale === "nl" ? "CVT (automaat)" : "CVT (automatic)";
+    else if (code) transmissionLabel = locale === "nl" ? "Anders" : "Other";
+    else transmissionLabel = transmissionRaw;
+    const gears = toNumber(vehicle.gears);
+    if (gears !== null) {
+      transmissionLabel += locale === "nl" ? ` (${gears} versnellingen)` : ` (${gears} gears)`;
+    }
+    layout.keyValue(locale === "nl" ? "Transmissie" : "Transmission", transmissionLabel);
+  } else {
+    layout.keyValue(
+      locale === "nl" ? "Transmissie" : "Transmission",
+      locale === "nl"
+        ? "Niet geregistreerd in RDW open data"
+        : "Not registered in RDW open data"
+    );
+  }
+  const factoryModelName = s(vehicle.factoryModelName);
+  if (factoryModelName !== "-") {
+    layout.keyValue(locale === "nl" ? "Fabrieksbenaming" : "Factory model name", factoryModelName);
+  }
   layout.keyValue(locale === "nl" ? "APK vervaldatum" : "APK expiry", s(vehicle.apkExpiryDate));
   layout.keyValue(locale === "nl" ? "Statusflags" : "Status flags", `WOK: ${boolLabel(vehicle.wok)}, Export: ${boolLabel(vehicle.exportIndicator)}, Transfer: ${boolLabel(vehicle.transferPossible)}, Insured: ${boolLabel(vehicle.insured)}, Taxi: ${boolLabel(vehicle.isTaxi)}, Recall open: ${boolLabel(vehicle.hasOpenRecall)}`);
 

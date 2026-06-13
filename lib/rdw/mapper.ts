@@ -28,6 +28,52 @@ function dateStr(v: unknown): string | null {
   return s;
 }
 
+/** Read a Socrata field tolerant of underscore-stripping in the raw JSON API. */
+function field(row: RdwRecord, ...names: string[]): unknown {
+  for (const n of names) {
+    if (row[n] != null && row[n] !== "") return row[n];
+  }
+  return null;
+}
+
+/**
+ * From a set of TGK rows (already filtered by typegoedkeuringsnummer), pick the
+ * row whose variant + uitvoering match the main register. Falls back to the
+ * first row when there is no exact match.
+ */
+function pickTgkRow(
+  rows: RdwRecord[],
+  variant: string | null,
+  uitvoering: string | null,
+  variantKeys: string[]
+): RdwRecord | null {
+  if (!rows.length) return null;
+  if (variant && uitvoering) {
+    const exact = rows.find(
+      (r) =>
+        String(field(r, ...variantKeys) ?? "") === variant &&
+        String(field(r, "code_uitvoering_tgk", "codeuitvoeringtgk") ?? "") === uitvoering
+    );
+    if (exact) return exact;
+  }
+  if (variant) {
+    const byVariant = rows.find((r) => String(field(r, ...variantKeys) ?? "") === variant);
+    if (byVariant) return byVariant;
+  }
+  return rows[0];
+}
+
+/** Human transmission label (nl/en) for a raw RDW versnellingsbak code. */
+function transmissionLabel(code: string | null, locale: "nl" | "en" = "nl"): string | null {
+  if (!code) return null;
+  const c = code.toUpperCase();
+  if (c === "M") return locale === "nl" ? "Handgeschakeld" : "Manual";
+  if (c === "A") return locale === "nl" ? "Automaat" : "Automatic";
+  if (c === "C") return locale === "nl" ? "CVT (automaat)" : "CVT (automatic)";
+  // G / F / W / O / H / D and any other documented code -> overig
+  return locale === "nl" ? "Anders" : "Other";
+}
+
 export function toVehicleProfile(input: {
   plate: string;
   fromCache: boolean;
@@ -39,6 +85,8 @@ export function toVehicleProfile(input: {
   recalls: RdwRecord[];
   body: RdwRecord[];
   typeApprovals: RdwRecord[];
+  tgkGears?: RdwRecord[];
+  tgkNames?: RdwRecord[];
 }): VehicleProfile {
   const m = input.main[0] ?? {};
   // fuel[0] = primary fuel (petrol/diesel); fuel[1] = secondary (electric)
@@ -51,6 +99,52 @@ export function toVehicleProfile(input: {
 
   const yearRaw = str(m.datum_eerste_toelating ?? m.datum_eerste_toelating_dt);
   const year = yearRaw ? Number(String(yearRaw).replace(/\D/g, "").slice(0, 4)) : null;
+
+  // --- TGK type-approval enrichment (transmission + factory model name) ---
+  const variant = str(m.variant);
+  const uitvoering = str(m.uitvoering);
+
+  // 7rjk-eycs (gears) uses code_variant_tgk; x5v3-sewk (names) uses code_variant_gk.
+  const gearsRow = pickTgkRow(
+    input.tgkGears ?? [],
+    variant,
+    uitvoering,
+    ["code_variant_tgk", "codevarianttgk"]
+  );
+  const nameRow = pickTgkRow(
+    input.tgkNames ?? [],
+    variant,
+    uitvoering,
+    ["code_variant_gk", "codevariantgk", "code_variant_tgk", "codevarianttgk"]
+  );
+
+  const transmissionCode = gearsRow
+    ? str(field(gearsRow, "code_type_versnellingsbak", "codetypeversnellingsbak"))
+    : null;
+  const transmission = transmissionLabel(transmissionCode, "nl");
+  const gears = gearsRow
+    ? num(
+        field(
+          gearsRow,
+          "aantal_versnellingen_boven_grens",
+          "aantalversnellingenbovengrens",
+          "aantal_versnellingen_onder_grens",
+          "aantalversnellingenondergrens"
+        )
+      )
+    : null;
+
+  let factoryModelName: string | null = null;
+  if (nameRow) {
+    const benaming = str(field(nameRow, "handelsbenaming_fabrikant", "handelsbenamingfabrikant"));
+    const typeAanduiding = str(field(nameRow, "type_aanduiding_fabrikant", "typeaanduidingfabrikant"));
+    // Only append the factory type code when it adds information.
+    if (benaming && typeAanduiding && typeAanduiding.toUpperCase() !== benaming.toUpperCase()) {
+      factoryModelName = `${benaming} (${typeAanduiding})`;
+    } else {
+      factoryModelName = benaming ?? typeAanduiding;
+    }
+  }
 
   const profile: VehicleProfile = {
     plate: input.plate,
@@ -82,6 +176,12 @@ export function toVehicleProfile(input: {
       energyLabel: str(m.zuinigheidsclassificatie ?? f.zuinigheidsclassificatie),
       consumptionCombined: num(f.brandstofverbruik_gecombineerd),
       emissionStandard: allFuelStandards || null,
+
+      // Transmission & factory naming (TGK type-approval datasets)
+      transmission,
+      transmissionCode,
+      gears,
+      factoryModelName,
 
       // Engine
       engine: {
@@ -149,7 +249,9 @@ export function toVehicleProfile(input: {
       defects: input.defects,
       recalls: input.recalls,
       body: input.body,
-      typeApprovals: input.typeApprovals
+      typeApprovals: input.typeApprovals,
+      tgkGears: input.tgkGears ?? [],
+      tgkNames: input.tgkNames ?? []
     }
   };
 

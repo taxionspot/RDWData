@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import styles from "./WalletButtons.module.css";
 import { useI18n } from "@/lib/i18n/context";
 import { loadPaypalSdk } from "@/lib/payments/paypal-sdk";
 import { captureOrderForPlate, createOrderForPlate } from "@/lib/payments/checkout-client";
@@ -15,6 +16,28 @@ type Props = {
   onError: (message: string) => void;
 };
 
+// Minimal local typing for the PayPal funding-source API. We keep the shared
+// paypal-sdk.ts type untouched and only describe the extra surface we use here:
+// FUNDING constants, the fundingSource option, and isEligible() on a button.
+type PayPalFundingButtons = {
+  isEligible: () => boolean;
+  render: (selectorOrElement: string | HTMLElement) => Promise<void>;
+  close: () => void;
+};
+
+type PayPalFundingSdk = {
+  FUNDING?: Record<string, string>;
+  Buttons: (config: Record<string, unknown>) => PayPalFundingButtons;
+};
+
+// The funding sources we offer, each rendered as its own labelled button so the
+// checkout reads like an explicit payment-method list (iDEAL, Creditcard, PayPal).
+const FUNDING_METHODS = [
+  { key: "IDEAL", label: "iDEAL" },
+  { key: "CARD", label: "Creditcard" },
+  { key: "PAYPAL", label: "PayPal" }
+] as const;
+
 export function PayPalCheckout({
   plate,
   email,
@@ -26,8 +49,11 @@ export function PayPalCheckout({
   const { locale } = useI18n();
   const [ready, setReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  // One container ref per funding source, so each button renders into its own
+  // labelled slot and the slots stack vertically as a method list.
+  const containerRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const renderedRef = useRef(false);
+  const buttonsRef = useRef<PayPalFundingButtons[]>([]);
 
   // Keep the latest props in a ref so the PayPal buttons (rendered exactly once)
   // always read current values. Without this, typing in the email field changes
@@ -58,29 +84,52 @@ export function PayPalCheckout({
   }, [currency, retryKey]);
 
   useEffect(() => {
-    if (!ready || !containerRef.current || !window.paypal || renderedRef.current) return;
+    if (!ready || !window.paypal || renderedRef.current) return;
     renderedRef.current = true;
 
-    const buttons = window.paypal.Buttons({
+    const sdk = window.paypal as unknown as PayPalFundingSdk;
+    const funding = sdk.FUNDING ?? {};
+
+    const sharedConfig = {
       createOrder: () => createOrderForPlate(latest.current.plate),
-      onApprove: async ({ orderID }) => {
+      onApprove: async ({ orderID }: { orderID: string }) => {
         const { plate: p, email: e, locale: l, onSuccess: ok } = latest.current;
         await captureOrderForPlate({ orderId: orderID, plate: p, email: e, locale: l });
         ok();
       },
-      onError: (error) => {
+      onError: (error: unknown) => {
         latest.current.onError(error instanceof Error ? error.message : "PayPal checkout failed.");
       }
-    });
+    };
 
-    void buttons.render(containerRef.current);
+    const rendered: PayPalFundingButtons[] = [];
+    for (const method of FUNDING_METHODS) {
+      const container = containerRefs.current[method.key];
+      const fundingSource = funding[method.key];
+      // Skip silently when the SDK does not expose this funding source or its
+      // slot is missing.
+      if (!container || !fundingSource) continue;
+      try {
+        const buttons = sdk.Buttons({ ...sharedConfig, fundingSource });
+        // Only render eligible funding sources; skip ineligible ones silently.
+        if (!buttons.isEligible()) continue;
+        void buttons.render(container);
+        rendered.push(buttons);
+      } catch {
+        // A single funding source failing must not break the other methods.
+      }
+    }
+    buttonsRef.current = rendered;
 
     return () => {
-      try {
-        buttons.close();
-      } catch {
-        // no-op
+      for (const buttons of buttonsRef.current) {
+        try {
+          buttons.close();
+        } catch {
+          // no-op
+        }
       }
+      buttonsRef.current = [];
     };
   }, [ready]);
 
@@ -94,5 +143,19 @@ export function PayPalCheckout({
     );
   }
 
-  return <div ref={containerRef} />;
+  return (
+    <div className={styles.fundingStack}>
+      {FUNDING_METHODS.map((method) => (
+        <div key={method.key} className={styles.fundingMethod}>
+          <span className={styles.fundingLabel}>{method.label}</span>
+          <div
+            className={styles.fundingButton}
+            ref={(el) => {
+              containerRefs.current[method.key] = el;
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
 }

@@ -2,6 +2,7 @@ import {
   rdwUrl,
   rdwSoqlUrl,
   rdwSoqlCustomUrl,
+  rdwTgkUrl,
   DATASETS,
   NON_PLATE_FILTERABLE_DATASETS
 } from "@/lib/rdw/endpoints";
@@ -42,7 +43,9 @@ function rehydrateFromRaw(plate: string, cachedData: Partial<VehicleProfile>): V
     defects: raw.defects ?? [],
     recalls: raw.recalls ?? [],
     body: raw.body ?? [],
-    typeApprovals: raw.typeApprovals ?? []
+    typeApprovals: raw.typeApprovals ?? [],
+    tgkGears: raw.tgkGears ?? [],
+    tgkNames: raw.tgkNames ?? []
   });
 }
 
@@ -73,6 +76,11 @@ function withProfileDefaults(profile: Partial<VehicleProfile>): VehicleProfile {
       energyLabel: v.energyLabel ?? null,
       consumptionCombined: v.consumptionCombined ?? null,
       emissionStandard: v.emissionStandard ?? null,
+
+      transmission: v.transmission ?? null,
+      transmissionCode: v.transmissionCode ?? null,
+      gears: v.gears ?? null,
+      factoryModelName: v.factoryModelName ?? null,
 
       engine: {
         displacement: v.engine?.displacement ?? null,
@@ -120,7 +128,9 @@ function withProfileDefaults(profile: Partial<VehicleProfile>): VehicleProfile {
       defects: raw.defects ?? [],
       recalls: raw.recalls ?? [],
       body: raw.body ?? [],
-      typeApprovals: raw.typeApprovals ?? []
+      typeApprovals: raw.typeApprovals ?? [],
+      tgkGears: raw.tgkGears ?? [],
+      tgkNames: raw.tgkNames ?? []
     }
   };
 }
@@ -174,6 +184,30 @@ async function fetchTypeApprovalsSafe(plate: string): Promise<RdwRecord[]> {
 }
 
 /**
+ * Second-stage TGK fetch: transmission/gears (7rjk-eycs) and factory model
+ * name (x5v3-sewk), keyed by typegoedkeuringsnummer (NOT kenteken).
+ * Fully best-effort: any error returns empty arrays so the main profile is never broken.
+ */
+async function fetchTgkSafe(typeApprovalNumber: string): Promise<{
+  tgkGears: RdwRecord[];
+  tgkNames: RdwRecord[];
+}> {
+  try {
+    const [tgkGears, tgkNames] = await Promise.all([
+      fetchRdwDataset(rdwTgkUrl(DATASETS.tgkGears, typeApprovalNumber), {
+        allowErrorStatuses: [400, 404]
+      }).catch(() => []),
+      fetchRdwDataset(rdwTgkUrl(DATASETS.tgkNames, typeApprovalNumber), {
+        allowErrorStatuses: [400, 404]
+      }).catch(() => [])
+    ]);
+    return { tgkGears, tgkNames };
+  } catch {
+    return { tgkGears: [], tgkNames: [] };
+  }
+}
+
+/**
  * Fetches defect descriptions for the given unique set of defect identification codes.
  * Datasets: tbph-ct3j
  */
@@ -214,12 +248,23 @@ async function fetchAndCacheLiveProfile(plate: string, now: number): Promise<Veh
   const defectCodes = new Set<string>();
   for (const item of apk) if (item.gebrek_identificatie) defectCodes.add(String(item.gebrek_identificatie));
   for (const item of defects) if (item.gebrek_identificatie) defectCodes.add(String(item.gebrek_identificatie));
-  const defectDescriptions = await fetchDefectDescriptionsSafe(Array.from(defectCodes));
+
+  // Second-stage TGK lookup needs the type-approval number from the main row.
+  // Only ~77% of vehicles carry an EU type-approval number; skip cleanly otherwise.
+  const typeApprovalNumber = String(main[0]?.typegoedkeuringsnummer ?? "").trim();
+
+  const [defectDescriptions, tgk] = await Promise.all([
+    fetchDefectDescriptionsSafe(Array.from(defectCodes)),
+    typeApprovalNumber
+      ? fetchTgkSafe(typeApprovalNumber)
+      : Promise.resolve({ tgkGears: [] as RdwRecord[], tgkNames: [] as RdwRecord[] })
+  ]);
 
   const profile = toVehicleProfile({
     plate, fromCache: false,
     defectDescriptions,
-    main, fuel, apk, defects, recalls, body, typeApprovals
+    main, fuel, apk, defects, recalls, body, typeApprovals,
+    tgkGears: tgk.tgkGears, tgkNames: tgk.tgkNames
   });
 
   // --- Cache write ---

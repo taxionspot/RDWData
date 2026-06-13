@@ -29,6 +29,12 @@ export type VehicleProfile = {
     consumptionCombined: number | null;
     emissionStandard: string | null;           // e.g. "EURO 5 F"
 
+    // Transmission & factory naming (RDW TGK type-approval datasets)
+    transmission: string | null;          // human label e.g. "Automaat" / "Automatic"
+    transmissionCode: string | null;      // raw RDW code M / A / C / ...
+    gears: number | null;                 // number of gears
+    factoryModelName: string | null;      // handelsbenaming_fabrikant (+ type)
+
     // Engine
     engine: {
       displacement: number | null;
@@ -94,5 +100,7 @@ export type VehicleProfile = {
     recalls: RdwRecord[];
     body: RdwRecord[];
     typeApprovals: RdwRecord[];
+    tgkGears?: RdwRecord[];
+    tgkNames?: RdwRecord[];
   };
 };
