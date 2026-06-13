@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createPaypalOrder } from "@/lib/payments/paypal";
+import { createPaypalOrder, getPaypalDiagnostics, probePaypalAuth } from "@/lib/payments/paypal";
 import { getSiteSettings } from "@/lib/site-settings/service";
 
 export const runtime = "nodejs";
@@ -30,6 +30,10 @@ function mapCreateOrderError(error: unknown): { status: number; code: string; er
 }
 
 export async function POST(request: Request) {
+  // Safe, secret-free diagnostics for pinpointing a live/sandbox mismatch.
+  if (new URL(request.url).searchParams.get("diag") === "1") {
+    return NextResponse.json({ diagnostics: getPaypalDiagnostics(), auth: await probePaypalAuth() });
+  }
   try {
     const body = (await request.json()) as CreateOrderBody;
     const plate = normalizePlate(body.plate ?? "");

@@ -23,6 +23,46 @@ type AccessTokenResponse = {
   access_token: string;
 };
 
+/** Safe, non-secret config snapshot for diagnosing live/sandbox mismatches. */
+export function getPaypalDiagnostics() {
+  return {
+    environment: PAYPAL_BASE_URL.includes("sandbox") ? "sandbox" : "live",
+    baseUrl: PAYPAL_BASE_URL,
+    hasClientId: PAYPAL_CLIENT_ID.length > 0,
+    hasSecret: PAYPAL_CLIENT_SECRET.length > 0,
+    clientIdPrefix: PAYPAL_CLIENT_ID.slice(0, 6),
+    clientIdLength: PAYPAL_CLIENT_ID.length
+  };
+}
+
+/** Probes the PayPal OAuth token endpoint and returns status + error code only
+ * (never the secret). Used by the create-order diag endpoint. */
+export async function probePaypalAuth(): Promise<{ ok: boolean; status: number; error?: string }> {
+  if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+    return { ok: false, status: 0, error: "missing_credentials" };
+  }
+  const basic = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString("base64");
+  try {
+    const res = await fetch(`${PAYPAL_BASE_URL}/v1/oauth2/token`, {
+      method: "POST",
+      headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: "grant_type=client_credentials",
+      cache: "no-store"
+    });
+    if (res.ok) return { ok: true, status: res.status };
+    let error: string | undefined;
+    try {
+      const data = (await res.json()) as { error?: string };
+      error = data.error;
+    } catch {
+      // ignore parse errors
+    }
+    return { ok: false, status: res.status, error };
+  } catch (err) {
+    return { ok: false, status: 0, error: err instanceof Error ? err.message : "fetch_failed" };
+  }
+}
+
 async function getAccessToken(): Promise<string> {
   assertPaypalConfig();
   const basic = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString("base64");
