@@ -17,7 +17,9 @@ Sabur communiceert in het Nederlands; antwoord altijd in het Nederlands.
 - Kleurenpalet: blauw #2563eb/#1d4ed8 primair, ink #0f172a, secundair #5b6b84,
   vlakken #fff/#f8fafc, randen #e2e8f2; groen/amber/rood alleen voor status;
   **geel uitsluitend voor het kentekenplaat-element**. Ruime spacing.
-- Rapport = één verticaal scrollende pagina, géén horizontale navigatie.
+- Rapport = één verticaal scrollende pagina met een sticky sectie-navigatie
+  (ReportSectionNav, scrollspy) om snel naar een sectie te springen; geen
+  aparte tab-pagina's.
 - Voorbeeldkenteken: **RG513T** (lib/sample.ts) — overal gratis ontgrendeld,
   incl. gratis inline voorbeeld-PDF (`/api/vehicle/RG513T?download=1`).
 
@@ -119,10 +121,12 @@ draait wordt op het Hobby-plan geweigerd en blokkeert dan STIL alle
 deployments (geen deployment verschijnt, geen foutmelding bij push). Beide
 crons staan nu op dagelijks (07:00 watch-check, 08:00 abandoned-checkout).
 
-## URGENTE issues van 12 juni: GEFIXT (branch claude/serene-feynman-kj410m)
-Beide issues zijn opgelost en geverifieerd met Playwright (productie-build,
-echte productie-payloads, desktop 1380 + mobiel 390, gratis en betaald,
-26 checks groen, geen pageerrors). Merge naar main deployt de fix.
+## URGENTE issues van 12 juni: GEFIXT + LIVE (gemerged naar main 13 juni)
+Beide issues zijn opgelost en LIVE op kentekenrapport.com (commits d5dc2ad +
+ade9ee3 op main, 13 juni). Live geverifieerd via /api/payments/access:
+H223JZ = paid:false (betaalmuur dicht), RG513T (sample) = paid:true. Eerder ook
+met Playwright geverifieerd (26 checks groen). cleanup-demo endpoint NOG
+uitvoeren (optioneel; het lek is al dicht via de servercheck).
 
 1. **Betaalmuur** (oorzaak: oude demo-PlatePayment-records, orderId
    "demo-<PLATE>-<ts>", amount "0.00", ontgrendelden elk getest kenteken
@@ -162,6 +166,33 @@ echte productie-payloads, desktop 1380 + mobiel 390, gratis en betaald,
      applyMileageValuationOverride); bij AI-failure formule-fallback i.p.v.
      client-bedragen.
 
+## Sessie 13 juni 2026: livegang-feedback (LIVE)
+Branch feedback/livegang-finetune (commit d522af5) + sample-fix (ade9ee3),
+ff-gemerged op main bovenop d5dc2ad. Verwerkt n.a.v. Sabur-feedback:
+- **Checkout-bug**: PayPal/Google Pay verdwenen zodra je het e-mailveld typte.
+  Oorzaak: email + callbacks in de useEffect-deps van PayPalCheckout/
+  GooglePayButton, waardoor de cleanup de knop afbrak. Fix: knop één keer
+  renderen, verse props via een ref (latest.current). ApplePayButton was al veilig.
+- **Geld-terug-garantie verwijderd** (was vals): FAQ + badge in app/page.tsx,
+  SubscriptionModal-guaranteeLine, FullReportScreen unlockMicro; ook de
+  "Beste prijs garantie"-claims weg. Vervangen door eerlijke teksten (directe
+  levering/herroepingsrecht, support via info@, "eenmalig per kenteken").
+- **Rapport-navigatie**: nieuwe components/vehicle/ReportSectionNav.tsx (sticky
+  tabbalk + scrollspy, mobiel horizontaal scrollend). De CSS (.navWrap/.navPill in
+  FullReportScreen.module.css) bestond al maar de JSX ontbrak, daarom was "de menu
+  weg".
+- **Gratis-eerst** expliciet met een voorproefje-uitleg in RecordsSummary.
+- **Marktwaarde v3**: formule was al exact (computeMarketValueV3); BMW-coeff
+  0.02 -> 0.01 gelijk aan de spec-PDF (market-value-formula-v3).
+- **PDF (pdf-report.ts) herordend**: AI-analyse naar boven, dubbele marktwaarde
+  samengevoegd, Kilometerstand/NAP-sectie toegevoegd, lege tabellen
+  (repairChances/knownIssues zijn nu altijd leeg) verborgen, jargon-labels
+  ("raw.main") leesbaar gemaakt.
+- **Bedankmail** wijst nu op de PDF-download.
+- **Sample-fix**: GET /api/payments/access gebruikt nu hasPaidPlateAccess
+  (sample-bewust) i.p.v. hasCompletedPlatePayment, zodat RG513T weer paid:true
+  geeft zonder de betaalmuur te openen.
+
 ## Overige openstaande punten
 1. Vercel env vars (Production) zetten + redeploy: live PayPal-keys,
    PAYPAL_BASE_URL=https://api-m.paypal.com, NEXT_PUBLIC_PAYPAL_ENV=live,
@@ -184,6 +215,6 @@ echte productie-payloads, desktop 1380 + mobiel 390, gratis en betaald,
 
 ## Branch & deploy
 Productie = `main` op kentekenrapport.com; push naar main deployt automatisch.
-Laatste stand: merge-commit 4e7be55 (12 juni). Volledige go-live-stappen staan
+Laatste stand: commit ade9ee3 (13 juni, livegang-feedback + sample-fix). Volledige go-live-stappen staan
 in docs/go-live-checklist.md. Build vereist force-dynamic op CMS-pagina's
 (gedaan); `npm run build` slaagt lokaal volledig zonder MongoDB.
