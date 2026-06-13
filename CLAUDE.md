@@ -234,6 +234,50 @@ providernaam; landing 0 dashes/0 providernaam/0 oude claims; 27 report-JS-chunks
 - Aanpak: multi-agent audit (6 dim + tegencheck) -> 18 implementatie-agents
   (disjuncte bestanden) -> build -> deploy -> live verificatie.
 
+## Sessie 13 juni 2026 deel 3: betaal-keys live, marktwaarde/design, checkout-plan
+- **PayPal LIVE + werkend** (commits e397dbc..d4612ca). User heeft de Vercel env-vars
+  gezet; diag bevestigt environment=live, auth ok, client-id ASLN..., secret niet
+  meer in de bundle. Correcte env: PAYPAL_CLIENT_ID + NEXT_PUBLIC_PAYPAL_CLIENT_ID =
+  de A-sleutel (client-id); PAYPAL_CLIENT_SECRET = de E-sleutel; PAYPAL_BASE_URL=
+  https://api-m.paypal.com; NEXT_PUBLIC_PAYPAL_ENV=live. BEVEILIGING: user plakte de
+  PayPal-secret EN het Gmail app-wachtwoord in de chat, en had even
+  NEXT_PUBLIC_PAYPAL_CLIENT_ID met de secret gevuld (secret stond kort publiek in de
+  JS-bundle) -> BEIDE secrets moeten geroteerd worden.
+- **E-mail via Gmail SMTP** (Google Workspace): env GMAIL_USER=info@kentekenrapport.com
+  + GMAIL_APP_PASSWORD. nodemailer in lib/email/resend.ts; vehicle-route sendReportEmail
+  ook gemigreerd; Resend eruit.
+- **Marktwaarde nu OVERAL uit de formule**: AiAnalysisScreen toonde de AI-waarde
+  (bv. EUR 28.800) i.p.v. enriched (EUR 6.150, mét km). Leest nu enriched.
+  estimatedValueNow/Min/Max via useVehicleLookup(plate, mileage), gelijk aan
+  Marktprijsanalyse + PDF.
+- **"AI"-buzzword weg uit alle klanttekst** (professioneler): AI-analyse->Analyse,
+  AI aankoopadvies->Aankoopadvies, AI Verdict->Oordeel, APK Intelligence->APK-inzichten,
+  "Kentekenrapport AI ..."->neutraal. Provider blijft verborgen.
+- **PremiumLock = teaser**: zichtbare gebluurde data (opacity 0.6, blur 5px), compacte
+  sectie (max-height 300px = minder scrollen), 1 nette unlock-kaart onderaan (dubbele
+  VERGRENDELD-badge weg).
+- **Voorbeeldrapport = H223JZ** (SAMPLE_PLATE in lib/sample.ts; alle links volgen).
+- **TGK-transmissie LIVE** (gratis; RDW 7rjk-eycs + x5v3-sewk; ~77% dekking).
+- **Comp/eigenaar-test = sessie-cookie** (kr_comp); comp- records uitgesloten van
+  globale toegang -> geen betaalmuur-lek meer.
+- Nav: dekkende achtergrond + scroll-padding-top 120px + ruimte onder de balk.
+- TIJDELIJK: POST /api/payments/paypal/create-order?diag=1 geeft veilige PayPal-diag
+  (geen secret) -> LATER VERWIJDEREN (lib/payments/paypal.ts getPaypalDiagnostics +
+  probePaypalAuth, en de diag-tak in de route).
+
+## NEXT (volgende sessie): checkout EXACT als annuleren via PayPal + Tikkie
+KERN-CORRECTIE door user: annuleren draait op ALLEEN PayPal + Tikkie (GEEN Mollie).
+De directe iDEAL-flow op annuleren (link pay.ideal.nl -> kies je bank) komt via
+**Tikkie (ABN AMRO)**, dat iDEAL-based is. PayPal-iDEAL geeft die directe bankkeuze
+NIET (wrapt iDEAL in PayPals checkout). Plan: bouw de kentekenrapport-checkout 1-op-1
+als annuleren.com/thankyou:
+- Radio-keuzelijst met "Betaal nu": iDEAL (via Tikkie -> pay.ideal.nl bankkeuze),
+  Tikkie, Creditcard (in POPUP, niet inline uitklappen), PayPal, + IBAN-overschrijving
+  als fallback. Zelfde design als annuleren.
+- Integreer de Tikkie/ABN AMRO-API (user heeft account, ook bij annuleren/taxionspot)
+  voor iDEAL+Tikkie; PayPal blijft voor PayPal + creditcard.
+- Doel: identieke betaalervaring aan annuleren.
+
 ## Overige openstaande punten
 1. Vercel env vars (Production) zetten + redeploy: live PayPal-keys,
    PAYPAL_BASE_URL=https://api-m.paypal.com, NEXT_PUBLIC_PAYPAL_ENV=live,
