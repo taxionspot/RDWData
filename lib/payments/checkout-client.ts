@@ -17,6 +17,32 @@ export async function createOrderForPlate(plate: string): Promise<string> {
   return order.id;
 }
 
+/**
+ * Start an iDEAL payment. Returns the PayPal "payer-action" URL the browser
+ * must be redirected to for the bank-selection step; fulfilment happens on the
+ * return URL + webhook, not here.
+ */
+export async function createIdealOrderForPlate(args: {
+  plate: string;
+  name: string;
+  email?: string;
+}): Promise<string> {
+  const response = await fetch("/api/payments/paypal/create-ideal-order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plate: args.plate, name: args.name, email: args.email })
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error ?? "Unable to start iDEAL payment.");
+  }
+
+  const data = (await response.json()) as { redirect?: string };
+  if (!data.redirect) throw new Error("iDEAL redirect URL missing.");
+  return data.redirect;
+}
+
 export async function captureOrderForPlate(args: {
   orderId: string;
   plate: string;

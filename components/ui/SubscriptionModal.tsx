@@ -5,9 +5,7 @@ import Link from "next/link";
 import { X, Check, ShieldCheck, Zap, Sparkles } from "lucide-react";
 import styles from "./SubscriptionModal.module.css";
 import { useI18n } from "@/lib/i18n/context";
-import { PayPalCheckout } from "@/components/payments/PayPalCheckout";
-import { ApplePayButton } from "@/components/payments/ApplePayButton";
-import { GooglePayButton } from "@/components/payments/GooglePayButton";
+import { CheckoutMethods } from "@/components/payments/CheckoutMethods";
 import { grantPaidAccessForPlate } from "@/lib/payments/access";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { trackBeginCheckout } from "@/lib/analytics/gtm";
@@ -186,29 +184,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
               </p>
             ) : null}
             <div className={styles.planBtn} key={`pay-${retryKey}`}>
-              <ApplePayButton
-                plate={plate}
-                email={email}
-                amount={settings.payment.amount}
-                currency={settings.payment.currency}
-                onSuccess={handleUnlocked}
-                onError={(message) => {
-                  track("payment_failed", { plate });
-                  setError(mapCheckoutErrorToFriendly(message, locale));
-                }}
-              />
-              <GooglePayButton
-                plate={plate}
-                email={email}
-                amount={settings.payment.amount}
-                currency={settings.payment.currency}
-                onSuccess={handleUnlocked}
-                onError={(message) => {
-                  track("payment_failed", { plate });
-                  setError(mapCheckoutErrorToFriendly(message, locale));
-                }}
-              />
-              <PayPalCheckout
+              <CheckoutMethods
                 plate={plate}
                 email={email}
                 amount={settings.payment.amount}

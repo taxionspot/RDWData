@@ -1,0 +1,202 @@
+/* Stacked radio-tile checkout, ported from the annuleren.com payment block and
+   recoloured to the Kentekenrapport palette. iDEAL is the default tile and the
+   only redirect method; card/PayPal/wallets render their own branded button on
+   selection. */
+
+.wrap {
+  --blue: #2563eb;
+  --blue-d: #1d4ed8;
+  --ink: #0f172a;
+  --muted: #5b6b84;
+  --muted2: #94a3b8;
+  --line: #e2e8f2;
+  --bg: #f8fafc;
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  margin-bottom: 8px;
+}
+
+.methods {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.tile {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 11px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 0 42px;
+  position: relative;
+  font-family: inherit;
+  text-align: left;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tile:hover {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.radio {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  border-radius: 50%;
+  box-sizing: border-box;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.tile.selected {
+  border-color: var(--blue);
+  background: #f5f8ff;
+}
+
+.tile.selected .radio {
+  border-color: var(--blue);
+  background: var(--blue);
+  box-shadow: inset 0 0 0 3px #fff;
+}
+
+.tileName {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.tileBrand {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted2);
+  letter-spacing: 0.02em;
+}
+
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+.swatchIdeal { background: #cc0066; }
+.swatchPaypal { background: #003087; }
+.swatchCard { background: #1f2937; }
+.swatchApple { background: #000; }
+.swatchGoogle { background: #1f2937; }
+
+.nameRow {
+  margin-top: 14px;
+}
+
+.nameLabel {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.nameInput {
+  width: 100%;
+  height: 46px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 0 13px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--ink);
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.nameInput:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.payBtn {
+  width: 100%;
+  height: 54px;
+  margin-top: 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--blue);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.12s ease;
+}
+
+.payBtn:hover {
+  background: var(--blue-d);
+}
+
+.payBtn:active {
+  transform: scale(0.99);
+}
+
+.payBtn[disabled] {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.walletSlot {
+  margin-top: 14px;
+  min-height: 52px;
+}
+
+.localError {
+  margin-top: 10px;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.secure {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.loading {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  padding: 18px 0;
+}

@@ -140,3 +140,144 @@ export async function capturePaypalOrder(orderId: string) {
 
   return response.json();
 }
+
+/** Read an order back from PayPal (used by the iDEAL return handler when a
+ * capture races with PayPal's own auto-capture and returns ORDER_ALREADY_CAPTURED). */
+export async function getPaypalOrder(orderId: string) {
+  const accessToken = await getAccessToken();
+  const response = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders/${orderId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`PayPal get order failed (${response.status}): ${details}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Create an iDEAL order via the Orders API. iDEAL is a redirect-based payment
+ * method: PayPal returns a PAYER_ACTION_REQUIRED order with a "payer-action"
+ * link. We send the buyer there (PayPal hosts the bank-selection + return),
+ * then capture on return. country_code and name are required by PayPal for
+ * iDEAL; return_url/cancel_url are required to hand the buyer back to us.
+ */
+export async function createPaypalIdealOrder(args: {
+  amount: string;
+  currency: string;
+  customId: string;
+  description: string;
+  name: string;
+  returnUrl: string;
+  cancelUrl: string;
+}): Promise<{ id: string; payerActionUrl: string }> {
+  const accessToken = await getAccessToken();
+  const response = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      // Idempotency: a double-submit reuses the same order instead of charging twice.
+      "PayPal-Request-Id": `kr-ideal-${args.customId}-${Date.now()}`
+    },
+    body: JSON.stringify({
+      intent: "CAPTURE",
+      purchase_units: [
+        {
+          custom_id: args.customId,
+          description: args.description,
+          amount: {
+            currency_code: args.currency,
+            value: args.amount
+          }
+        }
+      ],
+      payment_source: {
+        ideal: {
+          name: args.name,
+          country_code: "NL",
+          experience_context: {
+            locale: "nl-NL",
+            return_url: args.returnUrl,
+            cancel_url: args.cancelUrl
+          }
+        }
+      }
+    }),
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`PayPal iDEAL order creation failed (${response.status}): ${details}`);
+  }
+
+  const order = (await response.json()) as {
+    id?: string;
+    links?: Array<{ rel?: string; href?: string }>;
+  };
+  const payerAction = order.links?.find((link) => link.rel === "payer-action")?.href;
+  if (!order.id || !payerAction) {
+    throw new Error(`PayPal iDEAL order missing payer-action link: ${JSON.stringify(order)}`);
+  }
+  return { id: order.id, payerActionUrl: payerAction };
+}
+
+/**
+ * Verify a PayPal webhook signature server-side. Fails closed: without a
+ * configured PAYPAL_WEBHOOK_ID we never trust the event (an unverified webhook
+ * that grants paid access would be an open door). Returns true only on PayPal's
+ * SUCCESS verdict.
+ */
+export async function verifyPaypalWebhook(args: {
+  headers: {
+    authAlgo?: string | null;
+    certUrl?: string | null;
+    transmissionId?: string | null;
+    transmissionSig?: string | null;
+    transmissionTime?: string | null;
+  };
+  rawBody: string;
+}): Promise<boolean> {
+  const webhookId = (process.env.PAYPAL_WEBHOOK_ID ?? "").trim();
+  if (!webhookId) return false;
+  const { authAlgo, certUrl, transmissionId, transmissionSig, transmissionTime } = args.headers;
+  if (!authAlgo || !certUrl || !transmissionId || !transmissionSig || !transmissionTime) return false;
+
+  let event: unknown;
+  try {
+    event = JSON.parse(args.rawBody);
+  } catch {
+    return false;
+  }
+
+  const accessToken = await getAccessToken();
+  const response = await fetch(`${PAYPAL_BASE_URL}/v1/notifications/verify-webhook-signature`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      auth_algo: authAlgo,
+      cert_url: certUrl,
+      transmission_id: transmissionId,
+      transmission_sig: transmissionSig,
+      transmission_time: transmissionTime,
+      webhook_id: webhookId,
+      webhook_event: event
+    }),
+    cache: "no-store"
+  });
+
+  if (!response.ok) return false;
+  const data = (await response.json()) as { verification_status?: string };
+  return data.verification_status === "SUCCESS";
+}
