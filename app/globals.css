@@ -40,6 +40,12 @@
     overflow-x: hidden;
   }
 
+  html {
+    /* Account for the sticky site header + report section-nav so anchor jumps
+       and scroll-into-view never land a heading hidden behind them. */
+    scroll-padding-top: 120px;
+  }
+
   ::selection {
     @apply bg-brand-100 text-brand-900;
   }

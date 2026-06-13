@@ -269,13 +269,13 @@ export function NegotiationCopilotScreen({ plate, embedded = false }: Props) {
           <div className={styles.talkTrack}>
             <h3>{locale === "nl" ? "Praatpunten met bewijs" : "Evidence-backed talking points"}</h3>
             <div className={styles.aiScriptBox}>
-              <div className={styles.aiScriptTitle}>{locale === "nl" ? "Kentekenrapport AI onderhandelingsscript" : "Kentekenrapport AI negotiation script"}</div>
+              <div className={styles.aiScriptTitle}>{locale === "nl" ? "Onderhandelscript" : "Negotiation script"}</div>
               <div className={styles.aiScriptText}>
                 {aiLoading
                   ? (
                     <span className={styles.inlineLoading}>
                       <RefreshCw size={14} className={styles.inlineSpinner} />
-                      {locale === "nl" ? "Script wordt gegenereerd..." : "Generating Kentekenrapport AI script..."}
+                      {locale === "nl" ? "Script wordt gegenereerd..." : "Preparing script..."}
                     </span>
                   )
                   : aiAdvice?.script ??

@@ -420,9 +420,9 @@ function drawHeroVisuals(args: {
   const ai = args.aiInsights;
   const verdictLabel = ai?.purchaseVerdict ?? "-";
   const riskLabel = ai?.riskLevel ?? "-";
-  const summary = ai?.summary ?? (args.locale === "nl" ? "AI-analyse niet beschikbaar." : "AI analysis unavailable.");
+  const summary = ai?.summary ?? (args.locale === "nl" ? "Analyse niet beschikbaar." : "Analysis unavailable.");
 
-  args.page.drawText(args.locale === "nl" ? "AI aankoopadvies" : "AI purchase recommendation", {
+  args.page.drawText(args.locale === "nl" ? "Aankoopadvies" : "Purchase advice", {
     x: leftX + 10,
     y: heroTop - 18,
     font: args.bold,
@@ -597,7 +597,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   layout.section(locale === "nl" ? "Beslissingsdashboard" : "Decision Dashboard");
   layout.drawCardRow([
     {
-      title: locale === "nl" ? "AI Verdict" : "AI Verdict",
+      title: locale === "nl" ? "Oordeel" : "Verdict",
       value: args.aiInsights?.purchaseVerdict ?? "-",
       accent: verdictColor(args.aiInsights?.purchaseVerdict ?? "AVOID")
     },
@@ -618,7 +618,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   }
 
   if (aiInsights) {
-    layout.section(locale === "nl" ? "AI-analyse" : "AI Analysis");
+    layout.section(locale === "nl" ? "Analyse" : "Analysis");
     layout.keyValue(locale === "nl" ? "Samenvatting" : "Summary", aiInsights.summary);
     layout.keyValue(locale === "nl" ? "Sterke punten" : "Positives", aiInsights.positives.length > 0 ? aiInsights.positives.join(" | ") : "-");
     layout.keyValue(locale === "nl" ? "Aandachtspunten" : "Points of attention", aiInsights.risks.length > 0 ? aiInsights.risks.join(" | ") : "-");

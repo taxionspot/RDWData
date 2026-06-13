@@ -50,13 +50,13 @@ export function AiAnalysisScreen({ plate }: Props) {
   const valueMax = formatCurrency(valuation?.estimatedValueMax);
 
   return (
-    <PremiumLock featureName={nl ? "AI-analyse" : "AI analysis"} isLocked={true} plate={normalized} sectionKey="riskOverview">
+    <PremiumLock featureName={nl ? "Analyse" : "Analysis"} isLocked={true} plate={normalized} sectionKey="riskOverview">
       <div className={styles.panel}>
         <div className={styles.header}>
           <div className={styles.headerCopy}>
             <span className={styles.eyebrow}>
               <Sparkles size={13} />
-              {nl ? "AI-analyse op basis van officiële data" : "AI analysis based on official data"}
+              {nl ? "Analyse op basis van officiële data" : "Analysis based on official data"}
             </span>
             <div className={styles.title}>
               {nl ? "Wat betekent dit rapport voor jou?" : "What does this report mean for you?"}
@@ -68,7 +68,7 @@ export function AiAnalysisScreen({ plate }: Props) {
         {loading && !insights ? (
           <div className={styles.loading}>
             <span className={styles.spinner} />
-            {nl ? "Kentekenrapport AI analyseert het volledige voertuigprofiel..." : "Kentekenrapport AI is analysing the full vehicle profile..."}
+            {nl ? "We stellen de analyse op..." : "Preparing the analysis..."}
           </div>
         ) : null}
 

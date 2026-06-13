@@ -17,7 +17,7 @@ export default function PricingPage() {
         "APK-historie, gebreken en terugroepacties",
         "Kilometerstand-analyse en tellerstandoordeel",
         "Marktwaarde-indicatie en kosteninschatting",
-        "AI-aankoopadvies met sterke punten en risico's",
+        "Deskundig aankoopadvies met sterke punten en risico's",
         "PDF-rapport: direct downloaden én per e-mail"
       ]
     : [
@@ -25,7 +25,7 @@ export default function PricingPage() {
         "APK history, defects and recalls",
         "Mileage analysis and odometer judgment",
         "Market value estimate and running costs",
-        "AI purchase advice with strengths and risks",
+        "Expert purchase advice with strengths and risks",
         "PDF report: instant download and email delivery"
       ];
 

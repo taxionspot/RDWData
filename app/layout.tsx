@@ -52,12 +52,12 @@ export const metadata: Metadata = {
     template: "%s | Kentekenrapport"
   },
   description:
-    "Directe Nederlandse kentekencheck. Voertuigprofiel, APK-status, kilometerhistorie, terugroepacties, marktwaarde en AI-aankoopadvies op basis van officiële RDW-data.",
+    "Directe Nederlandse kentekencheck. Voertuigprofiel, APK-status, kilometerhistorie, terugroepacties, marktwaarde en deskundig aankoopadvies op basis van officiële RDW-data.",
   keywords: ["kenteken", "kentekencheck", "RDW", "APK", "kilometerstand", "voertuighistorie", "kenteken rapport"],
   openGraph: {
     title: "Kentekenrapport - Kentekencheck & voertuighistorie",
     description:
-      "Check elk Nederlands kenteken: APK-status, kilometerhistorie, terugroepacties, marktwaarde en AI-aankoopadvies.",
+      "Check elk Nederlands kenteken: APK-status, kilometerhistorie, terugroepacties, marktwaarde en deskundig aankoopadvies.",
     type: "website",
     url: BASE_URL,
     siteName: "Kentekenrapport"

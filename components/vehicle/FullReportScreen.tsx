@@ -65,8 +65,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     id: "ai-analyse",
-    labelNl: "AI-analyse",
-    labelEn: "AI analysis",
+    labelNl: "Analyse",
+    labelEn: "Analysis",
     subNl: "Het volledige profiel vertaald naar gewone taal",
     subEn: "The full profile translated into plain language",
     lockKey: "riskOverview"
@@ -121,8 +121,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     id: "apk-intelligence",
-    labelNl: "APK Intelligence",
-    labelEn: "APK Intelligence",
+    labelNl: "APK-inzichten",
+    labelEn: "APK insights",
     subNl: "Terugkerende gebreken en slaagkans",
     subEn: "Recurring defects and pass probability",
     lockKey: "riskOverview"
@@ -478,8 +478,8 @@ export function FullReportScreen({ plate }: Props) {
                 <span className={styles.actionTitle}>{nl ? "Vergelijk met een tweede auto" : "Compare with a second car"}</span>
                 <span className={styles.actionDesc}>
                   {nl
-                    ? "Zet dit kenteken naast een andere kandidaat over 30+ datapunten, met AI-advies."
-                    : "Put this plate next to another candidate across 30+ data points, with AI verdict."}
+                    ? "Zet dit kenteken naast een andere kandidaat over 30+ datapunten, met een duidelijk oordeel."
+                    : "Put this plate next to another candidate across 30+ data points, with a clear verdict."}
                 </span>
               </span>
               <ChevronRight size={18} className={styles.actionChevron} />

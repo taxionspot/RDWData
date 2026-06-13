@@ -39,7 +39,7 @@
   position: sticky;
   top: 58px;
   z-index: 40;
-  margin: 10px 0 0;
+  margin: 4px 0 20px;
   max-width: 100%;
   min-width: 0;
 }

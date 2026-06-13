@@ -357,7 +357,7 @@ export default function AccountPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {[
-                  { icon: TrendingUp, label: "AI Price Estimation", desc: "Kentekenrapport AI estimates real market value for every vehicle" },
+                  { icon: TrendingUp, label: "Marktwaarde-schatting", desc: "Marktwaarde berekend met onze eigen formule op basis van officiele data." },
                   { icon: Gauge, label: "APK Countdown", desc: "Track inspection expiry for all your saved vehicles" },
                   { icon: Bell, label: "Watch Mode", desc: "Get alerts when vehicle data or status changes" },
                   { icon: Zap, label: "Negotiation Copilot", desc: "AI scripts and strategies to negotiate the best deal" },

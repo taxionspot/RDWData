@@ -402,9 +402,9 @@ export function VehicleComparisonScreen({ plate }: Props) {
           </div>
 
           <div className={styles.aiCard}>
-            <h3>{locale === "nl" ? "AI Vergelijkingsinzichten" : "AI Comparison Insights"}</h3>
+            <h3>{locale === "nl" ? "Vergelijkingsinzichten" : "Comparison insights"}</h3>
             {aiLoading ? (
-              <div className={styles.loadingInline}><RefreshCw size={14} className={styles.spin} /> {locale === "nl" ? "Kentekenrapport AI analyseert..." : "Kentekenrapport AI is analyzing..."}</div>
+              <div className={styles.loadingInline}><RefreshCw size={14} className={styles.spin} /> {locale === "nl" ? "Analyse wordt opgesteld..." : "Preparing analysis..."}</div>
             ) : ai ? (
               <>
                 <p><strong>{locale === "nl" ? "Verdict" : "Verdict"}:</strong> {ai.verdict}</p>
@@ -426,7 +426,7 @@ export function VehicleComparisonScreen({ plate }: Props) {
                 </div>
               </>
             ) : (
-              <p>{locale === "nl" ? "Selecteer een tweede voertuig om AI-vergelijking te zien." : "Select another vehicle to see AI comparison."}</p>
+              <p>{locale === "nl" ? "Selecteer een tweede voertuig om de vergelijking te zien." : "Select another vehicle to see the comparison."}</p>
             )}
           </div>
         </PremiumLock>

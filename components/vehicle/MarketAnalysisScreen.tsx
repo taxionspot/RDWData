@@ -341,8 +341,8 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
                 />
                 <div className={styles.inputHint}>
                   {locale === "nl"
-                    ? "Voer kilometerstand in voor een preciezere marktwaarde. Deze waarde wordt ook meegenomen in AI-analyse en PDF-rapport."
-                    : "Enter mileage for a more precise market value. This will also be used in AI analysis and the PDF report."}
+                    ? "Voer kilometerstand in voor een preciezere marktwaarde. Deze waarde wordt ook meegenomen in de analyse en het PDF-rapport."
+                    : "Enter mileage for a more precise market value. This will also be used in the analysis and the PDF report."}
                 </div>
               </div>
 
