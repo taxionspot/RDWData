@@ -278,9 +278,12 @@ export async function GET(request: Request, { params }: Params) {
 export async function POST(request: Request, { params }: Params) {
   try {
     const plate = parsePlateOrThrow(params.plate);
-    const body = (await request.json()) as { email?: string; lang?: string };
+    const body = (await request.json()) as { email?: string; lang?: string; mileage?: number };
     const locale = parseLocale(body.lang ?? null);
     const email = String(body.email ?? "").trim().toLowerCase();
+    const userMileage = parseUserMileage(
+      body.mileage === undefined || body.mileage === null ? null : String(body.mileage)
+    );
     if (!isValidEmail(email)) {
       return NextResponse.json({ error: "Invalid email address.", code: "INVALID_EMAIL" }, { status: 400 });
     }
@@ -290,7 +293,7 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Payment required for report email.", code: "PAYMENT_REQUIRED" }, { status: 402 });
     }
 
-    const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, null);
+    const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
     const html = generateVehicleReportHtml({
       plate,
       locale,

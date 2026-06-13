@@ -24,6 +24,7 @@ export type ReportScore = {
 
 function escapeHtml(value: string): string {
   return value
+    .replace(/[\u2013\u2014]/g, "-")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -135,8 +136,6 @@ export function generateVehicleReportHtml(args: {
   <h2>${escape(locale === "nl" ? "Marktwaardering" : "Market valuation")}</h2>
   <table>
     <tr><th>${escape(locale === "nl" ? "Onderdeel" : "Section")}</th><th>${escape(locale === "nl" ? "Waarde" : "Value")}</th></tr>
-    <tr><td>${escape(locale === "nl" ? "Huidige waarde" : "Estimated value now")}</td><td>${escape(aiValuation.currency)} ${escape(aiValuation.estimatedValueNow.toLocaleString("nl-NL"))}</td></tr>
-    <tr><td>${escape(locale === "nl" ? "Bandbreedte" : "Estimated range")}</td><td>${escape(aiValuation.currency)} ${escape(aiValuation.estimatedValueMin.toLocaleString("nl-NL"))} - ${escape(aiValuation.currency)} ${escape(aiValuation.estimatedValueMax.toLocaleString("nl-NL"))}</td></tr>
     <tr><td>${escape(locale === "nl" ? "Betrouwbaarheid" : "Confidence")}</td><td>${escape(aiValuation.confidence)}</td></tr>
     <tr><td>${escape(locale === "nl" ? "Factoren" : "Key factors")}</td><td>${escape(aiValuation.factors.join(" | ") || "-")}</td></tr>
     <tr><td>${escape(locale === "nl" ? "Toelichting" : "Explanation")}</td><td>${escape(aiValuation.explanation || "-")}</td></tr>

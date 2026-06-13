@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { alignValuationWithFormula } from "@/lib/api/market-value";
+import { sanitizeText, sanitizeList } from "./sanitize-text";
 
 export type ClaudeInsightResult = {
   summary: string;
@@ -79,14 +80,14 @@ function parseReportCandidate(raw: string): ClaudeVehicleReportResult | null {
       rawInsights.riskLevel === "LOW" || rawInsights.riskLevel === "MEDIUM" ? rawInsights.riskLevel : "HIGH";
 
     const insights: ClaudeInsightResult = {
-      summary: typeof rawInsights.summary === "string" ? rawInsights.summary : "",
-      positives: Array.isArray(rawInsights.positives) ? rawInsights.positives.filter((x): x is string => typeof x === "string") : [],
-      risks: Array.isArray(rawInsights.risks) ? rawInsights.risks.filter((x): x is string => typeof x === "string") : [],
-      recommendation: typeof rawInsights.recommendation === "string" ? rawInsights.recommendation : "",
+      summary: typeof rawInsights.summary === "string" ? sanitizeText(rawInsights.summary) : "",
+      positives: Array.isArray(rawInsights.positives) ? sanitizeList(rawInsights.positives.filter((x): x is string => typeof x === "string")) : [],
+      risks: Array.isArray(rawInsights.risks) ? sanitizeList(rawInsights.risks.filter((x): x is string => typeof x === "string")) : [],
+      recommendation: typeof rawInsights.recommendation === "string" ? sanitizeText(rawInsights.recommendation) : "",
       purchaseVerdict,
       riskLevel,
       recommendations: Array.isArray(rawInsights.recommendations)
-        ? rawInsights.recommendations.filter((x): x is string => typeof x === "string")
+        ? sanitizeList(rawInsights.recommendations.filter((x): x is string => typeof x === "string"))
         : []
     };
 
@@ -100,8 +101,8 @@ function parseReportCandidate(raw: string): ClaudeVehicleReportResult | null {
       estimatedValueMin: Number.isFinite(min) ? Math.max(0, Math.round(min)) : 0,
       estimatedValueMax: Number.isFinite(max) ? Math.max(0, Math.round(max)) : 0,
       confidence,
-      factors: Array.isArray(rawValuation.factors) ? rawValuation.factors.filter((x): x is string => typeof x === "string").slice(0, 12) : [],
-      explanation: typeof rawValuation.explanation === "string" ? rawValuation.explanation : ""
+      factors: Array.isArray(rawValuation.factors) ? sanitizeList(rawValuation.factors.filter((x): x is string => typeof x === "string").slice(0, 12)) : [],
+      explanation: typeof rawValuation.explanation === "string" ? sanitizeText(rawValuation.explanation) : ""
     };
 
     if (!insights.summary && !insights.recommendation && insights.positives.length === 0 && insights.risks.length === 0) return null;
@@ -179,6 +180,7 @@ Regels:
 - summary 120-220 woorden, concreet en overtuigend
 - positives max 6, risks max 6, recommendations max 8, factors max 12
 - GEBRUIK voor estimatedValueNow, estimatedValueMin en estimatedValueMax EXACT de waarden uit enriched.estimatedValueNow, enriched.estimatedValueMin en enriched.estimatedValueMax in DATA (onze eigen taxatieformule). Verzin NOOIT eigen bedragen. Leg in explanation en factors uit welke factoren deze waarde verklaren.
+- De tekstvelden (summary, positives, risks, recommendation, explanation) mogen NOOIT een bedrag in euro's noemen. Spreek over waarde uitsluitend kwalitatief (laag, marktconform, hoog). De enige bron van marktwaarde-getallen zijn de numerieke velden estimatedValueNow/Min/Max uit enriched in DATA.
 - estimatedValueMin <= estimatedValueNow <= estimatedValueMax
 - waardes als gehele EUR getallen
 - recommendation moet expliciet advies geven: kopen/wachten/onderhandelen/extra inspectie
@@ -213,6 +215,7 @@ Rules:
 - summary 120-220 words, concrete and convincing
 - positives max 6, risks max 6, recommendations max 8, factors max 12
 - USE the exact values from enriched.estimatedValueNow, enriched.estimatedValueMin and enriched.estimatedValueMax in DATA (our own valuation formula) for estimatedValueNow/Min/Max. NEVER invent your own amounts. Use explanation and factors to explain what drives this value.
+- The prose fields (summary, positives, risks, recommendation, explanation) must NEVER state a euro amount. Refer to value only qualitatively (low, in line with the market, high). The only source of market-value numbers is the numeric estimatedValueNow/Min/Max fields from enriched in DATA.
 - estimatedValueMin <= estimatedValueNow <= estimatedValueMax
 - integer EUR values
 - recommendation must explicitly guide buy/wait/negotiate/inspect
@@ -313,12 +316,12 @@ function parseNegotiationCandidate(raw: string): ClaudeNegotiationCopilotResult 
     const parsed = JSON.parse(raw) as Partial<ClaudeNegotiationCopilotResult>;
     if (!parsed || typeof parsed !== "object") return null;
     const result: ClaudeNegotiationCopilotResult = {
-      script: typeof parsed.script === "string" ? parsed.script : "",
-      offerStrategy: typeof parsed.offerStrategy === "string" ? parsed.offerStrategy : "",
-      walkAwayReason: typeof parsed.walkAwayReason === "string" ? parsed.walkAwayReason : "",
-      repairReserveAdvice: typeof parsed.repairReserveAdvice === "string" ? parsed.repairReserveAdvice : "",
+      script: typeof parsed.script === "string" ? sanitizeText(parsed.script) : "",
+      offerStrategy: typeof parsed.offerStrategy === "string" ? sanitizeText(parsed.offerStrategy) : "",
+      walkAwayReason: typeof parsed.walkAwayReason === "string" ? sanitizeText(parsed.walkAwayReason) : "",
+      repairReserveAdvice: typeof parsed.repairReserveAdvice === "string" ? sanitizeText(parsed.repairReserveAdvice) : "",
       talkingPoints: Array.isArray(parsed.talkingPoints)
-        ? parsed.talkingPoints.filter((x): x is string => typeof x === "string").slice(0, 8)
+        ? sanitizeList(parsed.talkingPoints.filter((x): x is string => typeof x === "string").slice(0, 8))
         : []
     };
     if (!result.script || !result.offerStrategy) return null;
@@ -388,6 +391,7 @@ Regels:
 - script: 120-180 woorden, overtuigend en praktisch
 - talkingPoints: 4-8 concrete punten met bewijs uit data
 - gebruik de context-ranges letterlijk als basis
+- de tekstvelden (script, offerStrategy, walkAwayReason, repairReserveAdvice, talkingPoints) mogen GEEN eigen verzonnen euro-bedragen noemen; spreek kwalitatief over waarde, de enige bron van getallen zijn de meegegeven context-ranges
 - geen markdown, alleen JSON
 DATA:
 ${payload}`
@@ -404,6 +408,7 @@ Rules:
 - script: 120-180 words, practical and convincing
 - talkingPoints: 4-8 concrete points tied to evidence
 - use provided context ranges explicitly
+- the prose fields (script, offerStrategy, walkAwayReason, repairReserveAdvice, talkingPoints) must NOT state any self-invented euro amounts; speak about value qualitatively, the only source of numbers is the provided context ranges
 - no markdown, JSON only
 DATA:
 ${payload}`;
@@ -442,24 +447,32 @@ export function buildFallbackNegotiationCopilotAdvice(args: {
 }): ClaudeNegotiationCopilotResult {
   const isNl = args.locale === "nl";
   return {
-    script: isNl
-      ? `Start de onderhandeling tussen ${args.context.offerMin} en ${args.context.offerMax} euro en onderbouw je bod met onderhouds- en inspectiesignalen. Blijf strikt onder de walk-away grens van ${args.context.walkAway} euro, tenzij er aantoonbaar recent onderhoud met facturen aanwezig is. Reserveer direct ${args.context.reserveMin} tot ${args.context.reserveMax} euro voor onverwachte kosten in het eerste jaar.`
-      : `Start negotiation between EUR ${args.context.offerMin} and EUR ${args.context.offerMax}, anchored in maintenance and inspection signals. Stay below the walk-away threshold of EUR ${args.context.walkAway} unless there is documented recent maintenance with invoices. Keep EUR ${args.context.reserveMin} to EUR ${args.context.reserveMax} as first-year contingency reserve.`,
-    offerStrategy: isNl
-      ? "Open met onderkant biedrange, verhoog alleen bij hard bewijs van staat."
-      : "Open at lower offer band, increase only with hard condition evidence.",
-    walkAwayReason: isNl
-      ? "Boven deze grens is risico-rendement ongunstig versus marktwaarde."
-      : "Above this threshold, risk-adjusted value becomes unattractive.",
-    repairReserveAdvice: isNl
-      ? "Houd reserve apart voor slijtage, keuring en onverwachte reparaties."
-      : "Keep reserve for wear-and-tear, inspection follow-ups, and surprise repairs.",
-    talkingPoints: [
+    script: sanitizeText(
+      isNl
+        ? `Start de onderhandeling tussen ${args.context.offerMin} en ${args.context.offerMax} euro en onderbouw je bod met onderhouds- en inspectiesignalen. Blijf strikt onder de walk-away grens van ${args.context.walkAway} euro, tenzij er aantoonbaar recent onderhoud met facturen aanwezig is. Reserveer direct ${args.context.reserveMin} tot ${args.context.reserveMax} euro voor onverwachte kosten in het eerste jaar.`
+        : `Start negotiation between EUR ${args.context.offerMin} and EUR ${args.context.offerMax}, anchored in maintenance and inspection signals. Stay below the walk-away threshold of EUR ${args.context.walkAway} unless there is documented recent maintenance with invoices. Keep EUR ${args.context.reserveMin} to EUR ${args.context.reserveMax} as first-year contingency reserve.`
+    ),
+    offerStrategy: sanitizeText(
+      isNl
+        ? "Open met onderkant biedrange, verhoog alleen bij hard bewijs van staat."
+        : "Open at lower offer band, increase only with hard condition evidence."
+    ),
+    walkAwayReason: sanitizeText(
+      isNl
+        ? "Boven deze grens is risico-rendement ongunstig versus marktwaarde."
+        : "Above this threshold, risk-adjusted value becomes unattractive."
+    ),
+    repairReserveAdvice: sanitizeText(
+      isNl
+        ? "Houd reserve apart voor slijtage, keuring en onverwachte reparaties."
+        : "Keep reserve for wear-and-tear, inspection follow-ups, and surprise repairs."
+    ),
+    talkingPoints: sanitizeList([
       isNl ? "Vraag onderhoudsfacturen en koppel ontbrekende historie aan prijsverlaging." : "Request maintenance invoices and tie missing history to price reduction.",
       isNl ? "Gebruik risicoscore en defecthistorie als onderhandelingshefboom." : "Use risk score and defect history as leverage.",
       isNl ? "Hanteer walk-away grens zonder uitzonderingen." : "Apply walk-away threshold with no exceptions.",
       isNl ? "Reservebudget opnemen in totale aankoopbeslissing." : "Include reserve budget in total purchase decision."
-    ]
+    ])
   };
 }
 
@@ -578,9 +591,9 @@ export function buildFallbackVehicleAiReport(args: {
 
   const summary = isNl
     ? `${brand || "Voertuig"} ${tradeName}`.trim() +
-      `${year ? ` (${year})` : ""}: geschatte marktwaarde rond EUR ${estimatedValueNow} met bandbreedte EUR ${estimatedValueMin}-${estimatedValueMax}, gebaseerd op leeftijd, APK-signalen en onderhoudsprofiel.`
+      `${year ? ` (${year})` : ""}: geschatte marktwaarde is berekend met onze eigen taxatieformule, gebaseerd op leeftijd, APK-signalen en onderhoudsprofiel.`
     : `${brand || "Vehicle"} ${tradeName}`.trim() +
-      `${year ? ` (${year})` : ""}: estimated market value around EUR ${estimatedValueNow} with range EUR ${estimatedValueMin}-${estimatedValueMax}, based on age, inspection signals, and maintenance profile.`;
+      `${year ? ` (${year})` : ""}: estimated market value is computed with our own valuation formula, based on age, inspection signals, and maintenance profile.`;
   const recommendation = isNl
     ? "Gebruik deze indicatie als onderhandelingsbasis en combineer met fysieke inspectie en proefrit."
     : "Use this estimate as negotiation guidance and combine it with physical inspection and test drive.";
@@ -588,19 +601,19 @@ export function buildFallbackVehicleAiReport(args: {
     ? "Dit is een data-gedreven schatting, geen taxatierapport. Bandbreedte is vergroot bij hogere onzekerheid."
     : "This is a data-driven estimate, not a formal appraisal. The range widens as uncertainty increases.";
 
-  return {
+  const report: ClaudeVehicleReportResult = {
     insights: {
-      summary,
-      positives: positives.slice(0, 4),
-      risks: risks.slice(0, 4),
-      recommendation,
+      summary: sanitizeText(summary),
+      positives: sanitizeList(positives.slice(0, 4)),
+      risks: sanitizeList(risks.slice(0, 4)),
+      recommendation: sanitizeText(recommendation),
       purchaseVerdict: maintenanceRisk < 5.5 && effectiveDefectCount < 2 ? "BUY" : maintenanceRisk < 7 ? "CONSIDER" : maintenanceRisk < 8.5 ? "CAUTION" : "AVOID",
       riskLevel: maintenanceRisk < 5.5 ? "LOW" : maintenanceRisk < 7.5 ? "MEDIUM" : "HIGH",
-      recommendations: [
+      recommendations: sanitizeList([
         isNl ? "Controleer onderhoudsboekje en facturen op volledigheid." : "Verify maintenance history and invoices for consistency.",
         isNl ? "Plan een onafhankelijke aankoopkeuring voor definitieve beslissing." : "Schedule an independent pre-purchase inspection before final decision.",
         isNl ? "Gebruik de geschatte marktwaarde actief in de prijsonderhandeling." : "Use the estimated market value actively during negotiation."
-      ]
+      ])
     },
     valuation: {
       currency: "EUR",
@@ -608,8 +621,13 @@ export function buildFallbackVehicleAiReport(args: {
       estimatedValueMin,
       estimatedValueMax,
       confidence,
-      factors: factors.slice(0, 8),
-      explanation
+      factors: sanitizeList(factors.slice(0, 8)),
+      explanation: sanitizeText(explanation)
     }
   };
+
+  // Same alignment as the main path: when the formula (enriched) has a value,
+  // the fallback valuation numbers must equal enriched.estimatedValue*.
+  const aligned = alignValuationWithFormula(data, report.valuation);
+  return aligned ? { ...report, valuation: aligned } : report;
 }

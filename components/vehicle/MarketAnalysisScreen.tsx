@@ -118,7 +118,7 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
     });
   }, [data?.vehicle, appliedMileage]);
 
-  const marketValue = valuation?.value ?? data?.enriched?.estimatedValueNow ?? data?.vehicle.cataloguePrice ?? null;
+  const marketValue = valuation?.value ?? data?.enriched?.estimatedValueNow ?? null;
   const marketValueMin = valuation?.min ?? data?.enriched?.estimatedValueMin ?? null;
   const marketValueMax = valuation?.max ?? data?.enriched?.estimatedValueMax ?? null;
   const marketConfidence = valuation?.confidence ?? data?.enriched?.marketValueConfidence ?? null;
@@ -163,27 +163,19 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
     };
   }, [marketValue, sellerPrice, locale]);
 
-  const chartPoints = useMemo((): Array<{ label: string; value: number | null }> => {
-    const year = new Date().getFullYear();
-    if (!marketValue) {
-      return [
-        { label: String(year - 4), value: null },
-        { label: String(year - 3), value: null },
-        { label: String(year - 2), value: null },
-        { label: String(year - 1), value: null },
-        { label: locale === "nl" ? "Vandaag" : "Today", value: null }
-      ];
+  const chartPoints = useMemo((): Array<{ label: string; value: number }> => {
+    // Only anchor to real formula outputs: today = estimatedValueNow, next year = estimatedValueNextYear.
+    const valueNow = marketValue;
+    const valueNextYear = data?.enriched?.estimatedValueNextYear ?? null;
+    const points: Array<{ label: string; value: number }> = [];
+    if (valueNow != null) {
+      points.push({ label: locale === "nl" ? "Nu" : "Now", value: Math.round(valueNow) });
     }
-    const start = marketValue * 1.65;
-    const step = (start - marketValue) / 4;
-    return [
-      { label: String(year - 4), value: Math.round(start) },
-      { label: String(year - 3), value: Math.round(start - step) },
-      { label: String(year - 2), value: Math.round(start - step * 2) },
-      { label: String(year - 1), value: Math.round(start - step * 3) },
-      { label: locale === "nl" ? "Vandaag" : "Today", value: Math.round(marketValue) }
-    ];
-  }, [marketValue, locale]);
+    if (valueNextYear != null) {
+      points.push({ label: locale === "nl" ? "Over 1 jaar" : "In 1 year", value: Math.round(valueNextYear) });
+    }
+    return points;
+  }, [marketValue, data?.enriched?.estimatedValueNextYear, locale]);
 
   if (!isValid || isError) {
     return (
@@ -300,30 +292,32 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
                 </div>
               </div>
 
-              <div className={styles.chartContainer}>
-                <div className={styles.chartHeader}>
-                  <div className={styles.chartTitle}>{locale === "nl" ? "Waardetrend over tijd" : "Value trend over time"}</div>
-                  <div className={styles.chartNote}>{locale === "nl" ? "Gebaseerd op vergelijkbare advertenties" : "Based on similar listings"}</div>
-                </div>
+              {chartPoints.length >= 2 ? (
+                <div className={styles.chartContainer}>
+                  <div className={styles.chartHeader}>
+                    <div className={styles.chartTitle}>{locale === "nl" ? "Waardetrend over tijd" : "Value trend over time"}</div>
+                    <div className={styles.chartNote}>{locale === "nl" ? "Eigen waardeberekening, nu en over 1 jaar" : "Own valuation, now and in 1 year"}</div>
+                  </div>
 
-                <div className={styles.chartInteractive}>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <AreaChart data={chartPoints} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.4} />
-                      <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(v) => `€${v}`} />
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} labelStyle={{ color: '#0f172a' }} itemStyle={{ color: '#2563eb', fontWeight: 'bold' }} />
-                      <Area type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <div className={styles.chartInteractive}>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <AreaChart data={chartPoints} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.4} />
+                        <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(v) => `€${v}`} />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} labelStyle={{ color: '#0f172a' }} itemStyle={{ color: '#2563eb', fontWeight: 'bold' }} />
+                        <Area type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
 
             <div className={`${styles.panel} ${styles.calcPanel}`}>

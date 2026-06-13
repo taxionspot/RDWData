@@ -80,8 +80,13 @@ export function NegotiationCopilotScreen({ plate, embedded = false }: Props) {
   const v = data?.vehicle;
   const e = data?.enriched as Record<string, unknown> | undefined;
   const marketNow = Number(e?.estimatedValueNow ?? 0);
-  const marketMin = Number(e?.estimatedValueMin ?? marketNow * 0.9);
-  const marketMax = Number(e?.estimatedValueMax ?? marketNow * 1.1);
+  const marketMinRaw = e?.estimatedValueMin === null || e?.estimatedValueMin === undefined ? null : Number(e.estimatedValueMin);
+  const marketMaxRaw = e?.estimatedValueMax === null || e?.estimatedValueMax === undefined ? null : Number(e.estimatedValueMax);
+  const hasMarketBand = marketMinRaw !== null && Number.isFinite(marketMinRaw) && marketMaxRaw !== null && Number.isFinite(marketMaxRaw);
+  // Do not fabricate a +-10% band: only use real min/max from enriched data.
+  // For the offer/walk-away math, fall back to the point value when the band is absent.
+  const marketMin = hasMarketBand ? (marketMinRaw as number) : marketNow;
+  const marketMax = hasMarketBand ? (marketMaxRaw as number) : marketNow;
   const riskScore = Number(e?.maintenanceRiskScore ?? 6);
   const defects = data?.defects.length ?? 0;
   const recalls = data?.recalls.length ?? 0;
@@ -228,7 +233,9 @@ export function NegotiationCopilotScreen({ plate, embedded = false }: Props) {
               <div className={styles.cardTitle}><BadgeEuro size={16} /> {locale === "nl" ? "Referentiewaarde" : "Reference value"}</div>
               <div className={styles.bigValue}>{formatCurrency(marketNow)}</div>
               <div className={styles.note}>
-                {formatCurrency(marketMin)} - {formatCurrency(marketMax)} ({data.enriched.marketValueConfidence ?? "LOW"})
+                {hasMarketBand
+                  ? `${formatCurrency(marketMin)} - ${formatCurrency(marketMax)} (${data.enriched.marketValueConfidence ?? "LOW"})`
+                  : `(${data.enriched.marketValueConfidence ?? "LOW"})`}
               </div>
             </div>
           </div>
@@ -262,13 +269,13 @@ export function NegotiationCopilotScreen({ plate, embedded = false }: Props) {
           <div className={styles.talkTrack}>
             <h3>{locale === "nl" ? "Praatpunten met bewijs" : "Evidence-backed talking points"}</h3>
             <div className={styles.aiScriptBox}>
-              <div className={styles.aiScriptTitle}>{locale === "nl" ? "Claude onderhandelingsscript" : "Claude negotiation script"}</div>
+              <div className={styles.aiScriptTitle}>{locale === "nl" ? "Kentekenrapport AI onderhandelingsscript" : "Kentekenrapport AI negotiation script"}</div>
               <div className={styles.aiScriptText}>
                 {aiLoading
                   ? (
                     <span className={styles.inlineLoading}>
                       <RefreshCw size={14} className={styles.inlineSpinner} />
-                      {locale === "nl" ? "Claude script wordt gegenereerd..." : "Generating Claude script..."}
+                      {locale === "nl" ? "Script wordt gegenereerd..." : "Generating Kentekenrapport AI script..."}
                     </span>
                   )
                   : aiAdvice?.script ??

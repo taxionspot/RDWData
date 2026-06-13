@@ -276,12 +276,15 @@
   flex-direction: column;
   gap: 6px;
   padding-top: 2px;
+  min-width: 0;
 }
 
 .specLabel {
   font-size: 14px;
   font-weight: 600;
   color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .specValue {
@@ -289,6 +292,8 @@
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--foreground);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .specMeta {

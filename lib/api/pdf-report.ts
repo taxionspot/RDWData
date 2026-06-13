@@ -418,7 +418,6 @@ function drawHeroVisuals(args: {
   });
 
   const ai = args.aiInsights;
-  const valuation = args.aiValuation;
   const verdictLabel = ai?.purchaseVerdict ?? "-";
   const riskLabel = ai?.riskLevel ?? "-";
   const summary = ai?.summary ?? (args.locale === "nl" ? "AI-analyse niet beschikbaar." : "AI analysis unavailable.");
@@ -471,11 +470,11 @@ function drawHeroVisuals(args: {
       });
     });
 
-  // Our own formula (enriched) is the source of truth for market value;
-  // the AI valuation is only a fallback when the formula has no value.
-  const vNow = toNumber(asRow(args.data.enriched).estimatedValueNow) ?? valuation?.estimatedValueNow;
-  const vMin = toNumber(asRow(args.data.enriched).estimatedValueMin) ?? valuation?.estimatedValueMin;
-  const vMax = toNumber(asRow(args.data.enriched).estimatedValueMax) ?? valuation?.estimatedValueMax;
+  // Our own formula (enriched) is the single source of truth for market value;
+  // the AI valuation is never used for the hero numbers.
+  const vNow = toNumber(asRow(args.data.enriched).estimatedValueNow);
+  const vMin = toNumber(asRow(args.data.enriched).estimatedValueMin);
+  const vMax = toNumber(asRow(args.data.enriched).estimatedValueMax);
   args.page.drawText(args.locale === "nl" ? "Marktwaarde" : "Market value", {
     x: leftX + 10,
     y: cardY + 45,
@@ -487,8 +486,8 @@ function drawHeroVisuals(args: {
   if (vNow && vMin && vMax && vMax > vMin) {
     const barWidth = leftW - 20;
     const barY = cardY + 28;
-    const rangeMin = vMin * 0.9;
-    const rangeMax = vMax * 1.1;
+    const rangeMin = vMin;
+    const rangeMax = vMax;
     const diff = rangeMax - rangeMin;
     
     // Background track
@@ -609,12 +608,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     },
     {
       title: locale === "nl" ? "Waarde nu" : "Value now",
-      value:
-        toNumber(enriched.estimatedValueNow) !== null
-          ? currency(enriched.estimatedValueNow)
-          : args.aiValuation
-          ? `${args.aiValuation.currency} ${args.aiValuation.estimatedValueNow.toLocaleString("nl-NL")}`
-          : currency(enriched.estimatedValueNow),
+      value: currency(enriched.estimatedValueNow),
       accent: rgb(0.08, 0.2, 0.45)
     }
   ]);
@@ -634,10 +628,35 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
 
   layout.section(locale === "nl" ? "Voertuigoverzicht" : "Vehicle Overview");
   layout.keyValue(locale === "nl" ? "Merk / Model" : "Brand / Model", `${s(vehicle.brand)} ${s(vehicle.tradeName)}`.trim());
+  const typeVariant = [vehicle.typeCode, vehicle.variant, vehicle.uitvoering].filter(Boolean).join(" ");
+  if (typeVariant) {
+    layout.keyValue(locale === "nl" ? "Type/variant (RDW)" : "Type/variant (RDW)", typeVariant);
+  }
   layout.keyValue(locale === "nl" ? "Bouwjaar / Carrosserie" : "Year / Body type", `${s(vehicle.year)} / ${s(vehicle.bodyType)}`);
   layout.keyValue(locale === "nl" ? "Brandstof / Kleur" : "Fuel / Color", `${s(vehicle.fuelType)} / ${s(asRow(vehicle.color).primary)}`);
   layout.keyValue(locale === "nl" ? "Motor" : "Engine", `${s(asRow(vehicle.engine).displacement)} cc, ${s(asRow(vehicle.engine).cylinders)} cyl, ${s(asRow(vehicle.engine).powerKw)} kW`);
+  const dims = asRow(vehicle.dimensions);
+  const dimLength = toNumber(dims.length);
+  const dimWidth = toNumber(dims.width);
+  const dimHeight = toNumber(dims.height);
+  const dimWheelbase = toNumber(dims.wheelbase);
+  if (dimLength !== null && dimWidth !== null && dimHeight !== null && dimWheelbase !== null) {
+    layout.keyValue(
+      locale === "nl" ? "Afmetingen" : "Dimensions",
+      `${dimLength} x ${dimWidth} x ${dimHeight} mm, ${locale === "nl" ? "wielbasis" : "wheelbase"} ${dimWheelbase} mm`
+    );
+  }
   layout.keyValue(locale === "nl" ? "Gewicht" : "Weight", `${s(asRow(vehicle.weight).empty)} kg empty, ${s(asRow(vehicle.weight).max)} kg max`);
+  const readyToDrive = toNumber(asRow(vehicle.weight).readyToDrive);
+  if (readyToDrive !== null) {
+    layout.keyValue(locale === "nl" ? "Massa rijklaar" : "Mass ready to drive", `${readyToDrive} kg`);
+  }
+  layout.keyValue(
+    locale === "nl" ? "Transmissie" : "Transmission",
+    locale === "nl"
+      ? "Niet in RDW open data (handgeschakeld of automaat wordt niet geregistreerd)"
+      : "Not in RDW open data (manual vs automatic is not registered)"
+  );
   layout.keyValue(locale === "nl" ? "APK vervaldatum" : "APK expiry", s(vehicle.apkExpiryDate));
   layout.keyValue(locale === "nl" ? "Statusflags" : "Status flags", `WOK: ${boolLabel(vehicle.wok)}, Export: ${boolLabel(vehicle.exportIndicator)}, Transfer: ${boolLabel(vehicle.transferPossible)}, Insured: ${boolLabel(vehicle.insured)}, Taxi: ${boolLabel(vehicle.isTaxi)}, Recall open: ${boolLabel(vehicle.hasOpenRecall)}`);
 
@@ -733,9 +752,11 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   }
 
   const marketNowRaw = toNumber(enriched.estimatedValueNow);
+  const marketMinRaw = toNumber(enriched.estimatedValueMin);
+  const marketMaxRaw = toNumber(enriched.estimatedValueMax);
   const marketNow = marketNowRaw ?? 0;
-  const marketMin = toNumber(enriched.estimatedValueMin) ?? marketNow * 0.9;
-  const marketMax = toNumber(enriched.estimatedValueMax) ?? marketNow * 1.1;
+  const marketMin = marketMinRaw ?? 0;
+  const marketMax = marketMaxRaw ?? 0;
   const riskScore = toNumber(enriched.maintenanceRiskScore) ?? 6;
   const mileagePlausible =
     enriched.userMileagePlausible === null || enriched.userMileagePlausible === undefined
@@ -752,7 +773,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   });
 
   layout.section(locale === "nl" ? "Onderhandelcoach" : "Negotiation Coach");
-  if (marketNowRaw !== null && marketNowRaw > 0) {
+  if (marketNowRaw !== null && marketNowRaw > 0 && marketMinRaw !== null && marketMaxRaw !== null) {
     layout.drawCardRow([
       {
         title: locale === "nl" ? "Aanbevolen biedrange" : "Recommended offer range",

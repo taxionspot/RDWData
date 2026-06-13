@@ -404,7 +404,7 @@ export function VehicleComparisonScreen({ plate }: Props) {
           <div className={styles.aiCard}>
             <h3>{locale === "nl" ? "AI Vergelijkingsinzichten" : "AI Comparison Insights"}</h3>
             {aiLoading ? (
-              <div className={styles.loadingInline}><RefreshCw size={14} className={styles.spin} /> {locale === "nl" ? "Claude analyseert..." : "Claude is analyzing..."}</div>
+              <div className={styles.loadingInline}><RefreshCw size={14} className={styles.spin} /> {locale === "nl" ? "Kentekenrapport AI analyseert..." : "Kentekenrapport AI is analyzing..."}</div>
             ) : ai ? (
               <>
                 <p><strong>{locale === "nl" ? "Verdict" : "Verdict"}:</strong> {ai.verdict}</p>

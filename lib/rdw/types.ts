@@ -10,6 +10,9 @@ export type VehicleProfile = {
     // Identity
     brand: string | null;
     tradeName: string | null;
+    typeCode: string | null;
+    variant: string | null;
+    uitvoering: string | null;
     year: number | null;
     color: { primary: string | null; secondary: string | null };
 
@@ -33,11 +36,22 @@ export type VehicleProfile = {
       powerKw: number | null;
     };
 
+    // Dimensions
+    dimensions: {
+      wheels: number | null;
+      wheelbase: number | null;
+      length: number | null;
+      width: number | null;
+      height: number | null;
+    };
+
     // Weight
     weight: {
       empty: number | null;
       max: number | null;
       payload: number | null;
+      readyToDrive: number | null;
+      powerToMassRatio: number | null;
     };
 
     // APK

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { sanitizeText, sanitizeList } from "./sanitize-text";
 
 export type VehicleComparisonAiResult = {
   verdict: "BASE" | "COMPARE" | "TIE";
@@ -37,7 +38,14 @@ function parseCandidate(raw: string): VehicleComparisonAiResult | null {
     const comparePros = Array.isArray(parsed.comparePros) ? parsed.comparePros.filter((v): v is string => typeof v === "string").slice(0, 6) : [];
     const keyRisks = Array.isArray(parsed.keyRisks) ? parsed.keyRisks.filter((v): v is string => typeof v === "string").slice(0, 8) : [];
     if (!summary || !recommendation) return null;
-    return { verdict, summary, recommendation, basePros, comparePros, keyRisks };
+    return {
+      verdict,
+      summary: sanitizeText(summary),
+      recommendation: sanitizeText(recommendation),
+      basePros: sanitizeList(basePros),
+      comparePros: sanitizeList(comparePros),
+      keyRisks: sanitizeList(keyRisks)
+    };
   } catch {
     return null;
   }
@@ -59,6 +67,17 @@ function parseJson(raw: string): VehicleComparisonAiResult | null {
   return null;
 }
 
+function stripEmbeddedEuro(value: string): string {
+  if (typeof value !== "string") return value;
+  return sanitizeText(
+    value
+      .replace(/Geschatte marktwaarde:\s*EUR\s*[\d.,]+/gi, "")
+      .replace(/EUR\s*[\d.,]+/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+  );
+}
+
 function buildFallback(locale: "nl" | "en", args: { base: Record<string, unknown>; compare: Record<string, unknown> }): VehicleComparisonAiResult {
   const b = (args.base.enriched ?? {}) as Record<string, unknown>;
   const c = (args.compare.enriched ?? {}) as Record<string, unknown>;
@@ -75,10 +94,11 @@ function buildFallback(locale: "nl" | "en", args: { base: Record<string, unknown
 
   return {
     verdict,
-    summary:
+    summary: stripEmbeddedEuro(
       locale === "nl"
         ? "Vergelijking is gebaseerd op onderhoudsrisico, defecthistorie en marktwaarde. Controleer altijd onderhoudsbewijs en plan een onafhankelijke inspectie."
-        : "Comparison is based on maintenance risk, defect history, and market value. Always verify maintenance records and perform an independent inspection.",
+        : "Comparison is based on maintenance risk, defect history, and market value. Always verify maintenance records and perform an independent inspection."
+    ),
     basePros: [
       locale === "nl" ? `Onderhoudsrisico: ${bRisk.toFixed(1)}/10` : `Maintenance risk: ${bRisk.toFixed(1)}/10`,
       locale === "nl" ? `Geschatte marktwaarde: EUR ${Math.round(bValue).toLocaleString("nl-NL")}` : `Estimated market value: EUR ${Math.round(bValue).toLocaleString("nl-NL")}`
@@ -91,10 +111,11 @@ function buildFallback(locale: "nl" | "en", args: { base: Record<string, unknown
       locale === "nl" ? `Voertuig A defectrecords: ${bDefects}` : `Vehicle A defect records: ${bDefects}`,
       locale === "nl" ? `Voertuig B defectrecords: ${cDefects}` : `Vehicle B defect records: ${cDefects}`
     ],
-    recommendation:
+    recommendation: stripEmbeddedEuro(
       locale === "nl"
         ? "Kies het voertuig met lagere gecombineerde risico-indicatoren en gebruik de zwakke punten als onderhandelhefboom."
         : "Choose the vehicle with lower combined risk indicators and use weaknesses as negotiation leverage."
+    )
   };
 }
 
@@ -131,8 +152,8 @@ export async function generateVehicleComparisonAi(args: {
 
   const userPrompt =
     args.locale === "nl"
-      ? `Vergelijk deze twee gebruikte auto's en geef aankoopadvies.\nAntwoord met exact dit JSON-formaat:\n{\n  "verdict": "BASE|COMPARE|TIE",\n  "summary": "...",\n  "basePros": ["..."],\n  "comparePros": ["..."],\n  "keyRisks": ["..."],\n  "recommendation": "..."\n}\nRegels:\n- summary: 90-180 woorden\n- basePros/comparePros: max 6\n- keyRisks: max 8\n- geef concrete keuzehulp voor gebruikte auto koop\n- alleen JSON\nDATA:\n${payload}`
-      : `Compare these two used cars and provide purchase guidance.\nReturn exactly this JSON shape:\n{\n  "verdict": "BASE|COMPARE|TIE",\n  "summary": "...",\n  "basePros": ["..."],\n  "comparePros": ["..."],\n  "keyRisks": ["..."],\n  "recommendation": "..."\n}\nRules:\n- summary: 90-180 words\n- max 6 pros per side\n- max 8 key risks\n- provide concrete used-car buying guidance\n- JSON only\nDATA:\n${payload}`;
+      ? `Vergelijk deze twee gebruikte auto's en geef aankoopadvies.\nAntwoord met exact dit JSON-formaat:\n{\n  "verdict": "BASE|COMPARE|TIE",\n  "summary": "...",\n  "basePros": ["..."],\n  "comparePros": ["..."],\n  "keyRisks": ["..."],\n  "recommendation": "..."\n}\nRegels:\n- summary: 90-180 woorden\n- basePros/comparePros: max 6\n- keyRisks: max 8\n- geef concrete keuzehulp voor gebruikte auto koop\n- gebruik uitsluitend de marktwaarden uit DATA.enriched.estimatedValue*; noem nooit een ander eurobedrag; verwijs kwalitatief naar de waarden\n- alleen JSON\nDATA:\n${payload}`
+      : `Compare these two used cars and provide purchase guidance.\nReturn exactly this JSON shape:\n{\n  "verdict": "BASE|COMPARE|TIE",\n  "summary": "...",\n  "basePros": ["..."],\n  "comparePros": ["..."],\n  "keyRisks": ["..."],\n  "recommendation": "..."\n}\nRules:\n- summary: 90-180 words\n- max 6 pros per side\n- max 8 key risks\n- provide concrete used-car buying guidance\n- use only the market values present in DATA.enriched.estimatedValue*; never state any other euro amount; reference values qualitatively\n- JSON only\nDATA:\n${payload}`;
 
   try {
     const client = new Anthropic({ apiKey, maxRetries: 2 });

@@ -56,6 +56,9 @@ function withProfileDefaults(profile: Partial<VehicleProfile>): VehicleProfile {
     vehicle: {
       brand: v.brand ?? null,
       tradeName: v.tradeName ?? null,
+      typeCode: v.typeCode ?? null,
+      variant: v.variant ?? null,
+      uitvoering: v.uitvoering ?? null,
       year: v.year ?? null,
       color: {
         primary: v.color?.primary ?? null,
@@ -76,10 +79,19 @@ function withProfileDefaults(profile: Partial<VehicleProfile>): VehicleProfile {
         cylinders: v.engine?.cylinders ?? null,
         powerKw: v.engine?.powerKw ?? null
       },
+      dimensions: {
+        wheels: v.dimensions?.wheels ?? null,
+        wheelbase: v.dimensions?.wheelbase ?? null,
+        length: v.dimensions?.length ?? null,
+        width: v.dimensions?.width ?? null,
+        height: v.dimensions?.height ?? null
+      },
       weight: {
         empty: v.weight?.empty ?? null,
         max: v.weight?.max ?? null,
-        payload: v.weight?.payload ?? null
+        payload: v.weight?.payload ?? null,
+        readyToDrive: v.weight?.readyToDrive ?? null,
+        powerToMassRatio: v.weight?.powerToMassRatio ?? null
       },
       apkExpiryDate: v.apkExpiryDate ?? null,
       owners: { count: v.owners?.count ?? null },

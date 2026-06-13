@@ -99,7 +99,7 @@ function appendScript(args: { id: string; src: string }): Promise<void> {
     const existing = document.getElementById(args.id) as HTMLScriptElement | null;
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error(`Failed to load ${args.src}`)));
+      existing.addEventListener("error", () => reject(new Error(`PAYPAL_LOAD_ERROR: failed to load ${args.src}`)));
       return;
     }
     const script = document.createElement("script");
@@ -109,7 +109,7 @@ function appendScript(args: { id: string; src: string }): Promise<void> {
     // Payment is strictly necessary; keep Cookiebot auto-blocking from breaking checkout.
     script.setAttribute("data-cookieconsent", "ignore");
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load ${args.src}`));
+    script.onerror = () => reject(new Error(`PAYPAL_LOAD_ERROR: failed to load ${args.src}`));
     document.body.appendChild(script);
   });
 }
@@ -120,7 +120,7 @@ export function loadPaypalSdk(currency: string): Promise<void> {
   if (paypalSdkPromise) return paypalSdkPromise;
 
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? "";
-  if (!clientId) return Promise.reject(new Error("Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID."));
+  if (!clientId) return Promise.reject(new Error("PAYPAL_CONFIG_ERROR: missing client id"));
 
   const params = new URLSearchParams({
     "client-id": clientId,

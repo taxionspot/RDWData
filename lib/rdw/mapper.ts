@@ -61,6 +61,9 @@ export function toVehicleProfile(input: {
       // Identity
       brand: str(m.merk),
       tradeName: str(m.handelsbenaming),
+      typeCode: str(m.type),
+      variant: str(m.variant),
+      uitvoering: str(m.uitvoering),
       year: Number.isFinite(year) ? year : null,
       color: {
         primary: str(m.eerste_kleur),
@@ -87,11 +90,22 @@ export function toVehicleProfile(input: {
         powerKw: num(f.nettomaximumvermogen ?? f.nominaal_continu_maximumvermogen)
       },
 
+      // Dimensions
+      dimensions: {
+        wheels: num(m.aantal_wielen),
+        wheelbase: num(m.wielbasis),
+        length: num(m.lengte),
+        width: num(m.breedte),
+        height: num(m.hoogte_voertuig)
+      },
+
       // Weight
       weight: {
         empty: num(m.massa_ledig_voertuig),
         max: num(m.toegestane_maximum_massa_voertuig),
-        payload: num(m.laadvermogen)
+        payload: num(m.laadvermogen),
+        readyToDrive: num(m.massa_rijklaar),
+        powerToMassRatio: num(m.vermogen_massarijklaar)
       },
 
       // APK

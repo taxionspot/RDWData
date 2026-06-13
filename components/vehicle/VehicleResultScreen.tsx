@@ -408,11 +408,10 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
   const [isSaved, setIsSaved] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
-  const { valuation: aiValuation, loading: isCalculatingClaude } = useAiReport(
+  const { loading: isCalculatingClaude } = useAiReport(
     !isError && normalized ? normalized : "",
     mileageInput
   );
-  const claudeValue = aiValuation?.estimatedValueNow ?? null;
 
   const score = useMemo(() => {
     if (!data?.vehicle || !data.enriched) {
@@ -528,6 +527,7 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
 
   const vehicleTitle = [v.brand, v.tradeName].filter(Boolean).join(" ").trim();
   const vehicleSubtitle = [
+    v?.variant ?? null,
     v.engine?.displacement ? `${(v.engine.displacement / 1000).toFixed(1)}L` : null,
     v.fuelType,
     v.engine?.powerKw ? `${Math.round(v.engine.powerKw * 1.36)} HP` : null
@@ -579,7 +579,11 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
     { label: locale === "nl" ? "Deuren" : "Doors", value: formatNumber(v.doors) },
     { label: locale === "nl" ? "Zitplaatsen" : "Seats", value: formatNumber(v.seats) },
     { label: locale === "nl" ? "Kleur" : "Color", value: titleCase(v.color.primary) },
-    { label: locale === "nl" ? "Leeggewicht" : "Empty weight", value: formatNumber(v.weight?.empty, "kg") }
+    { label: locale === "nl" ? "Leeggewicht" : "Empty weight", value: formatNumber(v.weight?.empty, "kg") },
+    {
+      label: locale === "nl" ? "Type/variant (RDW)" : "Type/variant (RDW)",
+      value: [v?.typeCode, v?.variant, v?.uitvoering].filter(Boolean).join(" ")
+    }
     // Hide cards without real data instead of showing dashes/"unknown".
   ].filter((card) => card.value && !["-", "Onbekend", "Unknown", "N/A"].includes(card.value));
 
@@ -722,8 +726,8 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
               <InsightCard
                 icon={Coins}
                 title={locale === "nl" ? "Geschatte waarde" : "Estimated value"}
-                value={formatCurrency(e.estimatedValueNow ?? claudeValue)}
-                isLoading={isCalculatingClaude && !e.estimatedValueNow && !claudeValue}
+                value={e.estimatedValueNow != null ? formatCurrency(e.estimatedValueNow) : marketLabel}
+                isLoading={isCalculatingClaude && e.estimatedValueNow == null}
               />
               <InsightCard
                 icon={Clock3}

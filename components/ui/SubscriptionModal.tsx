@@ -45,9 +45,17 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
   const [isMounted, setIsMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
   const [view, setView] = useState<"checkout" | "success">("checkout");
   const canSkipPaymentForDemo =
     process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
+  // Owner test access: the allowlisted owner email unlocks the full paid flow
+  // without paying (the server re-verifies the email before granting).
+  const ownerTestEmails = (process.env.NEXT_PUBLIC_COMP_EMAILS ?? "saburm1997@gmail.com")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+  const isOwnerTestEmail = ownerTestEmails.includes(email.trim().toLowerCase());
 
   useEffect(() => {
     setIsMounted(true);
@@ -177,15 +185,12 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
                 {locale === "nl" ? `We sturen het rapport naar ${email.trim()}` : `We will send the report to ${email.trim()}`}
               </p>
             ) : null}
-            <div className={styles.payMethodsRow}>
-              <span>iDEAL</span><span>Apple Pay</span><span>Google Pay</span><span>PayPal</span><span>Visa/MC</span>
-            </div>
             <p className={styles.guaranteeLine}>
               {locale === "nl"
-                ? "Veilig betalen via iDEAL, Apple Pay, Google Pay of PayPal. Geen account nodig."
-                : "Secure payment via iDEAL, Apple Pay, Google Pay or PayPal. No account needed."}
+                ? "Veilig betalen, geen account nodig. De beschikbare betaalmethodes verschijnen hieronder."
+                : "Secure payment, no account needed. Available payment methods appear below."}
             </p>
-            <div className={styles.planBtn}>
+            <div className={styles.planBtn} key={`pay-${retryKey}`}>
               <ApplePayButton
                 plate={plate}
                 email={email}
@@ -213,6 +218,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
                 email={email}
                 amount={settings.payment.amount}
                 currency={settings.payment.currency}
+                retryKey={retryKey}
                 onSuccess={handleUnlocked}
                 onError={(message) => {
                   track("payment_failed", { plate });
@@ -250,12 +256,19 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
             {error ? (
               <div className={styles.errorBox}>
                 <p>{error}</p>
-                <button type="button" className={styles.retryBtn} onClick={() => setError(null)}>
+                <button
+                  type="button"
+                  className={styles.retryBtn}
+                  onClick={() => {
+                    setError(null);
+                    setRetryKey((k) => k + 1);
+                  }}
+                >
                   {locale === "nl" ? "Probeer opnieuw" : "Try again"}
                 </button>
               </div>
             ) : null}
-            {canSkipPaymentForDemo ? (
+            {canSkipPaymentForDemo || isOwnerTestEmail ? (
               <button
                 type="button"
                 className={styles.skipButton}
@@ -267,12 +280,14 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
                       body: JSON.stringify({ email: email.trim().toLowerCase() || undefined })
                     });
                   } catch {
-                    // Keep demo UX non-blocking even if backend grant fails.
+                    // Keep the unlock UX non-blocking even if the backend grant fails.
                   }
                   handleUnlocked();
                 }}
               >
-                {locale === "nl" ? "Demo: betaling overslaan" : "Demo: Skip payment"}
+                {canSkipPaymentForDemo
+                  ? locale === "nl" ? "Demo: betaling overslaan" : "Demo: Skip payment"
+                  : locale === "nl" ? "Eigenaar-test: gratis ontgrendelen" : "Owner test: unlock for free"}
               </button>
             ) : null}
           </div>

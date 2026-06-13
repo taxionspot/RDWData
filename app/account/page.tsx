@@ -213,7 +213,7 @@ export default function AccountPage() {
     void (async () => {
       const entries = await Promise.allSettled(
         savedVehicles.slice(0, 24).map(async (v) => {
-          const response = await fetch(`/api/vehicle/${encodeURIComponent(v.plate)}?lang=nl`, { cache: "no-store" });
+          const response = await fetch(`/api/vehicle/${encodeURIComponent(v.plate)}?lang=nl${typeof v.mileageInput === "number" ? `&mileage=${v.mileageInput}` : ""}`, { cache: "no-store" });
           if (!response.ok) throw new Error("lookup failed");
           const payload = (await response.json()) as {
             vehicle?: { apkExpiryDate?: string | null };
@@ -357,7 +357,7 @@ export default function AccountPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {[
-                  { icon: TrendingUp, label: "AI Price Estimation", desc: "Claude AI estimates real market value for every vehicle" },
+                  { icon: TrendingUp, label: "AI Price Estimation", desc: "Kentekenrapport AI estimates real market value for every vehicle" },
                   { icon: Gauge, label: "APK Countdown", desc: "Track inspection expiry for all your saved vehicles" },
                   { icon: Bell, label: "Watch Mode", desc: "Get alerts when vehicle data or status changes" },
                   { icon: Zap, label: "Negotiation Copilot", desc: "AI scripts and strategies to negotiate the best deal" },

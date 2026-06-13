@@ -17,6 +17,25 @@ export function isDemoAccessEnabled(): boolean {
 export const DEMO_PAYMENT_FILTER = { $or: [{ orderId: { $regex: /^demo-/ } }, { amount: "0.00" }] };
 
 /**
+ * Comp (complimentary) access: lets the owner test the paid customer flow
+ * without paying, scoped to specific emails. Comp grants write a real,
+ * non-zero PlatePayment record (orderId "comp-", not "demo-"), so they pass
+ * the production hasCompletedPlatePayment check without opening the paywall
+ * for anyone else. The allowlist is the env COMP_ACCESS_EMAILS (comma
+ * separated) plus the hardcoded owner email.
+ */
+export function isCompEmail(email?: string | null): boolean {
+  const normalized = (email ?? "").trim().toLowerCase();
+  if (!normalized) return false;
+  const allowlist = new Set<string>(["saburm1997@gmail.com"]);
+  for (const entry of (process.env.COMP_ACCESS_EMAILS ?? "").split(",")) {
+    const trimmed = entry.trim().toLowerCase();
+    if (trimmed) allowlist.add(trimmed);
+  }
+  return allowlist.has(normalized);
+}
+
+/**
  * True when a real (non-demo) completed payment exists for this plate.
  * Demo records only count while demo access is explicitly enabled.
  */

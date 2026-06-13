@@ -40,8 +40,8 @@ export function alignValuationWithFormula<T extends ValuationLike>(
   return {
     ...valuation,
     estimatedValueNow: Math.round(now),
-    estimatedValueMin: Number.isFinite(min) && min > 0 ? Math.round(min) : Math.round(now * 0.9),
-    estimatedValueMax: Number.isFinite(max) && max > 0 ? Math.round(max) : Math.round(now * 1.1),
+    estimatedValueMin: Number.isFinite(min) && min > 0 ? Math.round(min) : valuation.estimatedValueMin,
+    estimatedValueMax: Number.isFinite(max) && max > 0 ? Math.round(max) : valuation.estimatedValueMax,
     confidence:
       confidence === "HIGH" || confidence === "MEDIUM" || confidence === "LOW" ? confidence : valuation.confidence
   };

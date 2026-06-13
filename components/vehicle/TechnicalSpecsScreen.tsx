@@ -191,15 +191,32 @@ export function TechnicalSpecsScreen({ plate, embedded = false }: Props) {
       { id: "energy", label: locale === "nl" ? "Energielabel" : "Energy label", value: v.energyLabel ?? null, icon: Leaf }
     ].filter((spec) => spec.value) as Array<{ id: string; label: string; value: string; meta?: string; icon: ElementType }>;
 
+    const identityValue = [v.typeCode, v.variant, v.uitvoering].filter(Boolean).join(" ");
+
     const dimensionSpecs = [
+      { id: "identity", label: locale === "nl" ? "Type/uitvoering (RDW)" : "Type/variant (RDW)", value: identityValue, icon: Ruler },
       { id: "body", label: locale === "nl" ? "Carrosserie" : "Body type", value: titleCase(v.bodyType), icon: Ruler },
       { id: "doors", label: locale === "nl" ? "Deuren" : "Doors", value: formatNumber(v.doors), icon: Ruler },
       { id: "seats", label: locale === "nl" ? "Zitplaatsen" : "Seats", value: formatNumber(v.seats), icon: Ruler },
       { id: "axles", label: locale === "nl" ? "Assen" : "Axles", value: formatNumber(v.axles), icon: Ruler },
+      { id: "wheels", label: locale === "nl" ? "Aantal wielen" : "Wheels", value: formatNumber(v.dimensions?.wheels), icon: Ruler },
+      { id: "wheelbase", label: locale === "nl" ? "Wielbasis" : "Wheelbase", value: formatNumber(v.dimensions?.wheelbase, "mm"), icon: Ruler },
+      { id: "length", label: locale === "nl" ? "Lengte" : "Length", value: formatNumber(v.dimensions?.length, "mm"), icon: Ruler },
+      { id: "width", label: locale === "nl" ? "Breedte" : "Width", value: formatNumber(v.dimensions?.width, "mm"), icon: Ruler },
+      { id: "height", label: locale === "nl" ? "Hoogte" : "Height", value: formatNumber(v.dimensions?.height, "mm"), icon: Ruler },
       { id: "weight-empty", label: locale === "nl" ? "Leeggewicht" : "Empty weight", value: formatNumber(v.weight?.empty, "kg"), icon: Ruler },
+      { id: "weight-ready", label: locale === "nl" ? "Massa rijklaar" : "Ready-to-drive mass", value: formatNumber(v.weight?.readyToDrive, "kg"), icon: Ruler },
       { id: "weight-max", label: locale === "nl" ? "Max gewicht" : "Max weight", value: formatNumber(v.weight?.max, "kg"), icon: Ruler },
       { id: "payload", label: locale === "nl" ? "Laadvermogen" : "Payload", value: formatNumber(v.weight?.payload, "kg"), icon: Ruler }
     ].filter((spec) => spec.value) as Array<{ id: string; label: string; value: string; meta?: string; icon: ElementType }>;
+
+    // Always-shown info row (bypasses the .filter above): RDW open data has no transmission field.
+    dimensionSpecs.push({
+      id: "transmission",
+      label: locale === "nl" ? "Transmissie" : "Transmission",
+      value: locale === "nl" ? "Niet geregistreerd in RDW open data" : "Not registered in RDW open data",
+      icon: Settings
+    });
 
     return [
       {

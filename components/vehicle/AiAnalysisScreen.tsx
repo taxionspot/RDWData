@@ -68,7 +68,7 @@ export function AiAnalysisScreen({ plate }: Props) {
         {loading && !insights ? (
           <div className={styles.loading}>
             <span className={styles.spinner} />
-            {nl ? "Claude analyseert het volledige voertuigprofiel..." : "Claude is analysing the full vehicle profile..."}
+            {nl ? "Kentekenrapport AI analyseert het volledige voertuigprofiel..." : "Kentekenrapport AI is analysing the full vehicle profile..."}
           </div>
         ) : null}
 
