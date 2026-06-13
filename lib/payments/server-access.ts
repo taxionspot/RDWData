@@ -1,7 +1,23 @@
+import { cookies } from "next/headers";
 import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
 import { getSiteSettings } from "@/lib/site-settings/service";
 import { isSamplePlate } from "@/lib/sample";
+
+/**
+ * Comp access is SESSION-scoped via this cookie (set after the owner email is
+ * verified), never a global plate record, so it unlocks reports only in the
+ * owner's own browser and can never leak the paywall to other visitors.
+ */
+export const COMP_COOKIE = "kr_comp";
+
+export function hasCompCookie(): boolean {
+  try {
+    return cookies().get(COMP_COOKIE)?.value === "1";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Demo grants (the "skip payment" button) write PlatePayment records with an
@@ -43,7 +59,9 @@ export async function hasCompletedPlatePayment(plate: string): Promise<boolean> 
   await connectMongo();
   const query: Record<string, unknown> = { plate, status: "COMPLETED", provider: "paypal" };
   if (!isDemoAccessEnabled()) {
-    query.orderId = { $not: /^demo-/ };
+    // Exclude demo- AND comp- grants: neither is a real customer payment, so
+    // they must never count as global per-plate access.
+    query.orderId = { $not: /^(demo|comp)-/ };
     query.amount = { $ne: "0.00" };
   }
   const exists = await PlatePaymentModel.exists(query);
@@ -57,6 +75,7 @@ export async function hasCompletedPlatePayment(plate: string): Promise<boolean> 
  */
 export async function hasPaidPlateAccess(plate: string): Promise<boolean> {
   if (isSamplePlate(plate)) return true;
+  if (hasCompCookie()) return true;
   if (isDemoAccessEnabled()) return true;
   const settings = await getSiteSettings();
   if (!settings.paymentEnabled) return true;

@@ -102,7 +102,11 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
   }, [mileageValue, data?.vehicle]);
 
   const valuation = useMemo(() => {
-    if (!data?.vehicle) return null;
+    // Only recompute client-side when the user explicitly entered a mileage.
+    // Otherwise the server value (enriched.estimatedValueNow, which already uses
+    // the formula's estimated mileage) is the single source of truth, so the
+    // displayed value matches the API, AI analysis and PDF everywhere.
+    if (!data?.vehicle || appliedMileage == null) return null;
     const first = data.vehicle.firstRegistrationWorld ? new Date(data.vehicle.firstRegistrationWorld) : null;
     const ageYears =
       first && !Number.isNaN(first.getTime())

@@ -50,7 +50,7 @@
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  background: rgba(255, 255, 255, 0.92);
+  background: #ffffff;
   backdrop-filter: blur(12px);
   border: 1px solid #e2e8f2;
   border-radius: 999px;
