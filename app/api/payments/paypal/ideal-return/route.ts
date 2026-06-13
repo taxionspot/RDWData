@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { capturePaypalOrder, getPaypalOrder } from "@/lib/payments/paypal";
 import { fulfillFromCapture, type PaypalCaptureLike } from "@/lib/payments/fulfill";
+import { PAID_COOKIE, PAID_COOKIE_OPTIONS, paidCookieValueWith } from "@/lib/payments/server-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,5 +60,10 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(reportUrl(ok ? "?paid=1" : "?checkout=pending"), { status: 303 });
+  const res = NextResponse.redirect(reportUrl(ok ? "?paid=1" : "?checkout=pending"), { status: 303 });
+  if (ok) {
+    // Grant access to THIS browser only (per-buyer signed cookie), never globally.
+    res.cookies.set(PAID_COOKIE, paidCookieValueWith(plate), PAID_COOKIE_OPTIONS);
+  }
+  return res;
 }

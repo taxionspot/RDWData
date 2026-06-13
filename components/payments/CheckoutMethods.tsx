@@ -25,16 +25,33 @@ type Props = {
   onError: (message: string) => void;
 };
 
-// Minimal local view of the PayPal funding API (FUNDING constants + Buttons
-// with a fundingSource). We keep the shared paypal-sdk.ts global type untouched.
+// Minimal local view of the PayPal funding + card-fields API. We keep the shared
+// paypal-sdk.ts global type untouched and describe only what we use here.
 type FundingButtons = {
   isEligible: () => boolean;
   render: (el: HTMLElement) => Promise<void>;
   close: () => void;
 };
-type FundingSdk = {
+type CardField = { render: (el: string | HTMLElement) => Promise<void> };
+type CardFieldsInstance = {
+  isEligible: () => boolean;
+  NumberField: (o?: Record<string, unknown>) => CardField;
+  ExpiryField: (o?: Record<string, unknown>) => CardField;
+  CVVField: (o?: Record<string, unknown>) => CardField;
+  submit: (o?: { billingAddress?: Record<string, string> }) => Promise<void>;
+};
+type PaypalSdk = {
   FUNDING?: Record<string, string>;
   Buttons: (config: Record<string, unknown>) => FundingButtons;
+  CardFields?: (config: Record<string, unknown>) => CardFieldsInstance;
+};
+
+const LOGOS: Record<Method, string[]> = {
+  applepay: ["apple-pay.svg"],
+  googlepay: ["google-pay.svg"],
+  ideal: ["ideal.svg"],
+  card: ["visa.svg", "mastercard.svg"],
+  paypal: ["paypal.svg"]
 };
 
 export function CheckoutMethods({
@@ -57,14 +74,30 @@ export function CheckoutMethods({
   const [selected, setSelected] = useState<Method>("ideal");
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState("");
+  // Card: "fields" = inline PayPal CardFields (advanced cards), "button" = the
+  // hosted card button fallback when CardFields is not eligible on the account.
+  const [cardMode, setCardMode] = useState<"fields" | "button" | null>(null);
+  const [billing, setBilling] = useState({ line1: "", postalCode: "", city: "" });
 
-  const fundingContainerRef = useRef<HTMLDivElement | null>(null);
+  const actionContainerRef = useRef<HTMLDivElement | null>(null);
   const fundingButtonsRef = useRef<FundingButtons | null>(null);
+  const cardFieldsRef = useRef<CardFieldsInstance | null>(null);
 
-  // Latest props so the funding button (created once per selection) reads
-  // current plate/email at pay time without re-rendering on each keystroke.
   const latest = useRef({ plate, email, locale, onSuccess, onError });
   latest.current = { plate, email, locale, onSuccess, onError };
+
+  const sharedOrderConfig = () => ({
+    createOrder: () => createOrderForPlate(latest.current.plate),
+    onApprove: async ({ orderID }: { orderID: string }) => {
+      const { plate: p, email: e, locale: l, onSuccess: ok } = latest.current;
+      await captureOrderForPlate({ orderId: orderID, plate: p, email: e, locale: l });
+      ok();
+    },
+    onError: (err: unknown) => {
+      setBusy(false);
+      latest.current.onError(err instanceof Error ? err.message : "Betaling mislukt.");
+    }
+  });
 
   // Load the SDK and probe which non-iDEAL methods are eligible. iDEAL needs no
   // SDK (it is a server-side redirect), so it stays available even if this fails.
@@ -80,17 +113,14 @@ export function CheckoutMethods({
     loadPaypalSdk(currency)
       .then(() => {
         if (!active) return;
-        const sdk = window.paypal as unknown as FundingSdk | undefined;
+        const sdk = window.paypal as unknown as PaypalSdk | undefined;
         const funding = sdk?.FUNDING ?? {};
-        const eligible = (key: string): boolean => {
+        const fundingEligible = (key: string): boolean => {
           try {
             if (!sdk || !funding[key]) return false;
-            const probe = sdk.Buttons({
-              fundingSource: funding[key],
-              createOrder: () => Promise.resolve(""),
-              onApprove: async () => {}
-            });
-            return probe.isEligible();
+            return sdk
+              .Buttons({ fundingSource: funding[key], createOrder: () => Promise.resolve(""), onApprove: async () => {} })
+              .isEligible();
           } catch {
             return false;
           }
@@ -98,68 +128,27 @@ export function CheckoutMethods({
         setAvailable({
           applepay: isIOS,
           googlepay: isAndroid,
-          card: eligible("CARD"),
-          paypal: eligible("PAYPAL")
+          // CARD funding eligibility gates the tile; the selection effect then
+          // uses inline CardFields when available, else the hosted card button.
+          card: fundingEligible("CARD"),
+          paypal: fundingEligible("PAYPAL")
         });
         setReady(true);
       })
       .catch(() => {
-        // SDK failed: only iDEAL (server redirect) remains usable.
         if (active) setReady(true);
       });
 
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currency, retryKey]);
 
-  // Render the branded button for card / PayPal into its slot on selection.
+  // Render the branded button (PayPal, or the card fallback) or the inline
+  // CardFields into the action area on selection.
   useEffect(() => {
-    if (fundingButtonsRef.current) {
-      try {
-        fundingButtonsRef.current.close();
-      } catch {
-        // no-op
-      }
-      fundingButtonsRef.current = null;
-    }
-    if (!ready || (selected !== "card" && selected !== "paypal")) return;
-
-    const sdk = window.paypal as unknown as FundingSdk | undefined;
-    const funding = sdk?.FUNDING ?? {};
-    const key = selected === "card" ? "CARD" : "PAYPAL";
-    const container = fundingContainerRef.current;
-    if (!sdk || !funding[key] || !container) return;
-
-    container.innerHTML = "";
-    try {
-      const buttons = sdk.Buttons({
-        fundingSource: funding[key],
-        style:
-          key === "PAYPAL"
-            ? { height: 48, shape: "pill", color: "gold", label: "paypal" }
-            : { height: 48, shape: "pill" },
-        createOrder: () => createOrderForPlate(latest.current.plate),
-        onApprove: async ({ orderID }: { orderID: string }) => {
-          const { plate: p, email: e, locale: l, onSuccess: ok } = latest.current;
-          await captureOrderForPlate({ orderId: orderID, plate: p, email: e, locale: l });
-          ok();
-        },
-        onCancel: () => {
-          setLocalError("");
-        },
-        onError: (err: unknown) => {
-          latest.current.onError(err instanceof Error ? err.message : "Betaling mislukt.");
-        }
-      });
-      if (!buttons.isEligible()) return;
-      void buttons.render(container);
-      fundingButtonsRef.current = buttons;
-    } catch {
-      // A single funding source failing must not break the rest of the checkout.
-    }
-
-    return () => {
+    const cleanup = () => {
       if (fundingButtonsRef.current) {
         try {
           fundingButtonsRef.current.close();
@@ -168,8 +157,67 @@ export function CheckoutMethods({
         }
         fundingButtonsRef.current = null;
       }
+      cardFieldsRef.current = null;
     };
-  }, [selected, ready]);
+    cleanup();
+    setLocalError("");
+
+    if (!ready) return cleanup;
+    const sdk = window.paypal as unknown as PaypalSdk | undefined;
+    const funding = sdk?.FUNDING ?? {};
+    const container = actionContainerRef.current;
+    if (!sdk) return cleanup;
+
+    const renderFunding = (key: string) => {
+      if (!funding[key] || !container) return;
+      container.innerHTML = "";
+      try {
+        const buttons = sdk.Buttons({
+          fundingSource: funding[key],
+          style:
+            key === "PAYPAL"
+              ? { height: 48, shape: "pill", color: "gold", label: "paypal" }
+              : { height: 48, shape: "pill" },
+          ...sharedOrderConfig()
+        });
+        if (!buttons.isEligible()) return;
+        void buttons.render(container);
+        fundingButtonsRef.current = buttons;
+      } catch {
+        // a single funding source failing must not break the checkout
+      }
+    };
+
+    if (selected === "paypal") {
+      renderFunding("PAYPAL");
+    } else if (selected === "card") {
+      // Prefer inline CardFields (collects billing address); fall back to the
+      // hosted card button if the account is not enabled for advanced cards.
+      let usedFields = false;
+      try {
+        if (sdk.CardFields) {
+          const cf = sdk.CardFields(sharedOrderConfig());
+          if (cf.isEligible()) {
+            cf.NumberField({ placeholder: locale === "nl" ? "Kaartnummer" : "Card number" }).render("#kr-card-number");
+            cf.ExpiryField({ placeholder: "MM/JJ" }).render("#kr-card-expiry");
+            cf.CVVField({ placeholder: "CVC" }).render("#kr-card-cvv");
+            cardFieldsRef.current = cf;
+            usedFields = true;
+            setCardMode("fields");
+          }
+        }
+      } catch {
+        usedFields = false;
+      }
+      if (!usedFields) {
+        setCardMode("button");
+        renderFunding("CARD");
+      }
+    }
+
+    return cleanup;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, ready, locale]);
 
   const payIdeal = async () => {
     setLocalError("");
@@ -189,18 +237,56 @@ export function CheckoutMethods({
     }
   };
 
-  const tiles: Array<{ key: Method; name: string; swatch: string; brand: string }> = [];
-  if (available.applepay) tiles.push({ key: "applepay", name: "Apple Pay", swatch: styles.swatchApple, brand: "Pay" });
-  if (available.googlepay) tiles.push({ key: "googlepay", name: "Google Pay", swatch: styles.swatchGoogle, brand: "Pay" });
-  tiles.push({ key: "ideal", name: "iDEAL", swatch: styles.swatchIdeal, brand: "iDEAL" });
-  if (available.card)
-    tiles.push({
-      key: "card",
-      name: locale === "nl" ? "Creditcard" : "Credit card",
-      swatch: styles.swatchCard,
-      brand: "VISA"
-    });
-  if (available.paypal) tiles.push({ key: "paypal", name: "PayPal", swatch: styles.swatchPaypal, brand: "PayPal" });
+  const payCard = () => {
+    if (!cardFieldsRef.current) {
+      onError(locale === "nl" ? "Kaartbetaling is niet beschikbaar." : "Card payment is unavailable.");
+      return;
+    }
+    if (!billing.line1.trim() || !billing.postalCode.trim() || !billing.city.trim()) {
+      setLocalError(locale === "nl" ? "Vul je adresgegevens in." : "Please fill in your billing address.");
+      return;
+    }
+    setLocalError("");
+    setBusy(true);
+    cardFieldsRef.current
+      .submit({
+        billingAddress: {
+          addressLine1: billing.line1.trim(),
+          adminArea2: billing.city.trim(),
+          postalCode: billing.postalCode.trim(),
+          countryCode: "NL"
+        }
+      })
+      .then(() => {
+        // On success the PayPal SDK has already run onApprove -> capture ->
+        // onSuccess (the modal then shows its success view). Reset busy in case
+        // the component stays mounted.
+        setBusy(false);
+      })
+      .catch(() => {
+        setBusy(false);
+        setLocalError(
+          locale === "nl"
+            ? "De betaling is niet afgerond. Controleer je kaart- en adresgegevens."
+            : "Payment was not completed. Check your card and address details."
+        );
+      });
+  };
+
+  const onPayNow = () => {
+    if (busy) return;
+    if (selected === "ideal") return void payIdeal();
+    if (selected === "card" && cardMode === "fields") return payCard();
+  };
+
+  const tiles: Array<{ key: Method; name: string }> = [];
+  if (available.applepay) tiles.push({ key: "applepay", name: "Apple Pay" });
+  if (available.googlepay) tiles.push({ key: "googlepay", name: "Google Pay" });
+  tiles.push({ key: "ideal", name: "iDEAL" });
+  if (available.card) tiles.push({ key: "card", name: locale === "nl" ? "Creditcard" : "Credit card" });
+  if (available.paypal) tiles.push({ key: "paypal", name: "PayPal" });
+
+  const showPayNow = selected === "ideal" || (selected === "card" && cardMode === "fields");
 
   return (
     <div className={styles.wrap}>
@@ -221,47 +307,73 @@ export function CheckoutMethods({
           >
             <span className={styles.radio} />
             <span className={styles.tileName}>{tile.name}</span>
-            <span className={styles.tileBrand}>
-              <span className={`${styles.swatch} ${tile.swatch}`}>{tile.brand}</span>
+            <span className={styles.tileLogos}>
+              {LOGOS[tile.key].map((file) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={file} className={styles.logo} src={`/payment-logos/${file}`} alt={tile.name} />
+              ))}
             </span>
           </button>
         ))}
       </div>
 
-      {selected === "ideal" ? (
-        <button type="button" className={styles.payBtn} onClick={payIdeal} disabled={busy}>
-          {busy ? (locale === "nl" ? "Bezig..." : "Working...") : locale === "nl" ? "Betaal nu" : "Pay now"}
-        </button>
+      {/* Inline card fields + billing address (shown only in CardFields mode). */}
+      {selected === "card" ? (
+        <div className={`${styles.cardArea} ${cardMode === "button" ? styles.hidden : ""}`}>
+          <div className={styles.cardField} id="kr-card-number" />
+          <div className={styles.cardRow}>
+            <div className={styles.cardField} id="kr-card-expiry" />
+            <div className={styles.cardField} id="kr-card-cvv" />
+          </div>
+          <div className={styles.addrLabel}>{locale === "nl" ? "Factuuradres" : "Billing address"}</div>
+          <input
+            className={styles.addrInput}
+            placeholder={locale === "nl" ? "Straat en huisnummer" : "Street and number"}
+            autoComplete="address-line1"
+            value={billing.line1}
+            onChange={(e) => setBilling((b) => ({ ...b, line1: e.target.value }))}
+          />
+          <div className={styles.cardRow}>
+            <input
+              className={styles.addrInput}
+              placeholder={locale === "nl" ? "Postcode" : "Postal code"}
+              autoComplete="postal-code"
+              value={billing.postalCode}
+              onChange={(e) => setBilling((b) => ({ ...b, postalCode: e.target.value }))}
+            />
+            <input
+              className={styles.addrInput}
+              placeholder={locale === "nl" ? "Plaats" : "City"}
+              autoComplete="address-level2"
+              value={billing.city}
+              onChange={(e) => setBilling((b) => ({ ...b, city: e.target.value }))}
+            />
+          </div>
+        </div>
       ) : null}
 
-      {selected === "card" || selected === "paypal" ? (
-        <div className={styles.walletSlot} ref={fundingContainerRef} />
-      ) : null}
+      {/* Branded button slot: PayPal, or the card fallback button. */}
+      <div
+        className={`${styles.actionSlot} ${selected === "paypal" || (selected === "card" && cardMode === "button") ? "" : styles.hidden}`}
+        ref={actionContainerRef}
+      />
 
       {selected === "applepay" ? (
-        <div className={styles.walletSlot}>
-          <ApplePayButton
-            plate={plate}
-            email={email}
-            amount={amount}
-            currency={currency}
-            onSuccess={onSuccess}
-            onError={onError}
-          />
+        <div className={styles.actionSlot}>
+          <ApplePayButton plate={plate} email={email} amount={amount} currency={currency} onSuccess={onSuccess} onError={onError} />
         </div>
       ) : null}
 
       {selected === "googlepay" ? (
-        <div className={styles.walletSlot}>
-          <GooglePayButton
-            plate={plate}
-            email={email}
-            amount={amount}
-            currency={currency}
-            onSuccess={onSuccess}
-            onError={onError}
-          />
+        <div className={styles.actionSlot}>
+          <GooglePayButton plate={plate} email={email} amount={amount} currency={currency} onSuccess={onSuccess} onError={onError} />
         </div>
+      ) : null}
+
+      {showPayNow ? (
+        <button type="button" className={styles.payBtn} onClick={onPayNow} disabled={busy}>
+          {busy ? (locale === "nl" ? "Bezig..." : "Working...") : locale === "nl" ? "Betaal nu" : "Pay now"}
+        </button>
       ) : null}
 
       {localError ? <p className={styles.localError}>{localError}</p> : null}

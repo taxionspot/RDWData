@@ -103,6 +103,8 @@ export async function createPaypalOrder(args: {
       purchase_units: [
         {
           custom_id: args.customId,
+          // Shows on the buyer's card/bank statement as "Kentekenrapport".
+          soft_descriptor: "Kentekenrapport",
           description: args.description,
           amount: {
             currency_code: args.currency,
@@ -201,6 +203,8 @@ export async function createPaypalIdealOrder(args: {
       purchase_units: [
         {
           custom_id: args.customId,
+          // Shows on the buyer's card/bank statement as "Kentekenrapport".
+          soft_descriptor: "Kentekenrapport",
           description: args.description,
           amount: {
             currency_code: args.currency,

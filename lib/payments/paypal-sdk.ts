@@ -125,7 +125,7 @@ export function loadPaypalSdk(currency: string): Promise<void> {
   const params = new URLSearchParams({
     "client-id": clientId,
     currency,
-    components: "buttons,applepay,googlepay",
+    components: "buttons,card-fields,applepay,googlepay",
     "enable-funding": "ideal,card"
   });
   paypalSdkPromise = appendScript({

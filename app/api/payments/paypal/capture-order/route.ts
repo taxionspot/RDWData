@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { capturePaypalOrder } from "@/lib/payments/paypal";
 import { fulfillFromCapture, type PaypalCaptureLike } from "@/lib/payments/fulfill";
+import { PAID_COOKIE, PAID_COOKIE_OPTIONS, paidCookieValueWith } from "@/lib/payments/server-access";
 
 export const runtime = "nodejs";
 
@@ -75,7 +76,8 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
+    // Grant access to THIS browser only (per-buyer signed cookie), never globally.
+    const res = NextResponse.json({
       ok: true,
       plate,
       orderId,
@@ -83,6 +85,8 @@ export async function POST(request: Request) {
       amount: result.amount,
       currency: result.currency
     });
+    res.cookies.set(PAID_COOKIE, paidCookieValueWith(plate), PAID_COOKIE_OPTIONS);
+    return res;
   } catch (error) {
     const mapped = mapCaptureError(error);
     return NextResponse.json({ error: mapped.error, code: mapped.code }, { status: mapped.status });

@@ -1,7 +1,7 @@
 /* Stacked radio-tile checkout, ported from the annuleren.com payment block and
-   recoloured to the Kentekenrapport palette. iDEAL is the default tile and the
-   only redirect method; card/PayPal/wallets render their own branded button on
-   selection. */
+   recoloured to the Kentekenrapport palette. iDEAL is the default tile and a
+   redirect; card uses inline PayPal CardFields with a billing address;
+   PayPal/wallets render their own branded button on selection. */
 
 .wrap {
   --blue: #2563eb;
@@ -81,35 +81,73 @@
   color: var(--ink);
 }
 
-.tileBrand {
+.tileLogos {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted2);
-  letter-spacing: 0.02em;
+  gap: 7px;
 }
 
-.swatch {
-  display: inline-flex;
+.logo {
+  height: 24px;
+  width: auto;
+  display: block;
+  pointer-events: none;
+}
+
+.cardArea {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.cardField {
+  height: 46px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #fff;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 5px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  color: #fff;
+  box-sizing: border-box;
 }
 
-.swatchIdeal { background: #cc0066; }
-.swatchPaypal { background: #003087; }
-.swatchCard { background: #1f2937; }
-.swatchApple { background: #000; }
-.swatchGoogle { background: #1f2937; }
+.cardRow {
+  display: flex;
+  gap: 9px;
+}
+
+.cardRow > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.addrLabel {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.addrInput {
+  width: 100%;
+  height: 46px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 0 13px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--ink);
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.addrInput:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
 
 .payBtn {
   width: 100%;
@@ -139,9 +177,13 @@
   cursor: default;
 }
 
-.walletSlot {
+.actionSlot {
   margin-top: 14px;
   min-height: 52px;
+}
+
+.hidden {
+  display: none;
 }
 
 .localError {
@@ -161,11 +203,4 @@
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
-}
-
-.loading {
-  font-size: 13px;
-  color: var(--muted);
-  text-align: center;
-  padding: 18px 0;
 }
