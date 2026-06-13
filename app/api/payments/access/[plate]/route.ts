@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
 import { CheckoutLeadModel } from "@/models/CheckoutLead";
-import { hasCompletedPlatePayment, isDemoAccessEnabled } from "@/lib/payments/server-access";
+import { hasPaidPlateAccess, isDemoAccessEnabled } from "@/lib/payments/server-access";
 
 export const runtime = "nodejs";
 
@@ -19,8 +19,9 @@ export async function GET(_: Request, { params }: Params) {
       return NextResponse.json({ paid: false }, { status: 400 });
     }
 
-    // Old demo records in the database must not unlock plates for everyone.
-    const paid = await hasCompletedPlatePayment(plate);
+    // The public sample plate is always open; every other plate needs a real
+    // (non-demo) completed payment. Old demo records must never unlock plates.
+    const paid = await hasPaidPlateAccess(plate);
     return NextResponse.json({ paid });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to check access.";
