@@ -58,6 +58,7 @@ export function buildThankYouEmail(args: {
           <p>Thank you for your purchase at Kentekenrapport. We have successfully received your payment of <strong>${amount}</strong> for license plate <strong>${displayPlate}</strong>.</p>
           <p>All premium sections of the report are now unlocked for you:</p>
           ${renderButton(reportUrl, "View your report")}
+          <p style="color:#475569;font-size:13px;">Tip: on the report page you can also download the full report as a PDF or email it to yourself.</p>
           <p>Questions about your report or payment? Just reply to this email, I am happy to help.</p>
           <p>Best regards,<br><strong>Anouk van Kentekenrapport</strong></p>`,
         footerHtml: `You are receiving this email because you purchased a vehicle report on kentekenrapport.com.<br>Order reference: ${args.orderId}`
@@ -73,6 +74,7 @@ export function buildThankYouEmail(args: {
         <p>Bedankt voor je aankoop bij Kentekenrapport. Je betaling van <strong>${amount}</strong> voor kenteken <strong>${displayPlate}</strong> is goed ontvangen.</p>
         <p>Alle premium onderdelen van het rapport zijn nu voor je ontgrendeld:</p>
         ${renderButton(reportUrl, "Bekijk je rapport")}
+        <p style="color:#475569;font-size:13px;">Tip: op de rapportpagina kun je het volledige rapport ook als PDF downloaden of naar jezelf mailen.</p>
         <p>Heb je vragen over je rapport of de betaling? Beantwoord gewoon deze e-mail, ik help je graag verder.</p>
         <p>Groetjes,<br><strong>Anouk van Kentekenrapport</strong></p>`,
       footerHtml: `Je ontvangt deze e-mail omdat je een kentekenrapport hebt gekocht op kentekenrapport.com.<br>Ordernummer: ${args.orderId}`

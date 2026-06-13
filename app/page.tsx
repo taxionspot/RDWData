@@ -265,8 +265,8 @@ export default function LandingPage() {
           a: "Nee. Internationale checkers zijn sterk voor importauto's, maar missen Nederlandse diepte: geen NAP-oordeel en beperkte APK-historie. Kentekenrapport is Nederlands-eerst, gebouwd op de officiële RDW-bronnen, en kost een derde van de prijs."
         },
         {
-          q: "Krijg ik mijn geld terug als het rapport tegenvalt?",
-          a: "Ja. Niet tevreden? Mail ons binnen 14 dagen en je krijgt je geld terug."
+          q: "Kan ik mijn geld terugkrijgen?",
+          a: "Het rapport wordt direct na betaling geleverd, waarmee je instemt met directe levering en afstand doet van je herroepingsrecht. Klopt er iets niet of heb je een vraag? Mail ons via info@kentekenrapport.com en we lossen het op."
         }
       ]
     : [
@@ -291,8 +291,8 @@ export default function LandingPage() {
           a: "No. International checkers are strong for imported cars but miss Dutch depth: no NAP verdict and limited APK history. Kentekenrapport is Dutch-first, built on official RDW sources, at a third of the price."
         },
         {
-          q: "Do I get a refund if the report disappoints?",
-          a: "Yes. Not satisfied? Email us within 14 days and you get your money back."
+          q: "Can I get a refund?",
+          a: "The report is delivered immediately after payment, so you consent to immediate delivery and waive your right of withdrawal. Something not right, or have a question? Email us at info@kentekenrapport.com and we'll sort it out."
         }
       ];
 
@@ -588,7 +588,7 @@ export default function LandingPage() {
           <div className={styles.guaranteeRow}>
             <span className={styles.guaranteeItem}>
               <Shield size={16} />
-              {nl ? "Niet-goed-geld-terug binnen 14 dagen" : "Money back within 14 days"}
+              {nl ? "Eenmalig per kenteken, geen abonnement" : "One-time per plate, no subscription"}
             </span>
             <span className={styles.guaranteeItem}>
               <CheckCircle2 size={16} />

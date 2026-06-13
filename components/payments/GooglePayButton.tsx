@@ -26,6 +26,12 @@ export function GooglePayButton({ plate, email, amount, currency = "EUR", onSucc
   const containerRef = useRef<HTMLDivElement | null>(null);
   const renderedRef = useRef(false);
 
+  // Latest props in a ref so the Google Pay button (created once) reads current
+  // values at pay time. This keeps the email keystrokes from re-running setup
+  // and confirms the order with the email the user actually typed.
+  const latest = useRef({ plate, email, amount, locale, onSuccess, onError });
+  latest.current = { plate, email, amount, locale, onSuccess, onError };
+
   useEffect(() => {
     let active = true;
 
@@ -54,7 +60,7 @@ export function GooglePayButton({ plate, email, amount, currency = "EUR", onSucc
         },
         buttonType: "pay",
         buttonSizeMode: "fill",
-        buttonLocale: locale
+        buttonLocale: latest.current.locale
       });
       containerRef.current.appendChild(button);
     };
@@ -74,11 +80,11 @@ export function GooglePayButton({ plate, email, amount, currency = "EUR", onSucc
             countryCode: config.countryCode ?? "NL",
             currencyCode: currency,
             totalPriceStatus: "FINAL",
-            totalPrice: amount
+            totalPrice: latest.current.amount
           }
         });
 
-        const orderId = await createOrderForPlate(plate);
+        const orderId = await createOrderForPlate(latest.current.plate);
         const confirmation = await googlepay.confirmOrder({
           orderId,
           paymentMethodData: paymentData.paymentMethodData
@@ -90,14 +96,15 @@ export function GooglePayButton({ plate, email, amount, currency = "EUR", onSucc
           throw new Error(`Google Pay order not approved: ${confirmation.status}`);
         }
 
-        await captureOrderForPlate({ orderId, plate, email, locale });
-        onSuccess();
+        const { plate: p, email: e, locale: l, onSuccess: ok } = latest.current;
+        await captureOrderForPlate({ orderId, plate: p, email: e, locale: l });
+        ok();
       } catch (error) {
         // Closing the Google Pay sheet rejects with statusCode CANCELED; not an error.
         const canceled =
           typeof error === "object" && error !== null && (error as { statusCode?: string }).statusCode === "CANCELED";
         if (canceled) return;
-        onError(error instanceof Error ? error.message : "Google Pay payment failed.");
+        latest.current.onError(error instanceof Error ? error.message : "Google Pay payment failed.");
       }
     };
 
@@ -108,7 +115,7 @@ export function GooglePayButton({ plate, email, amount, currency = "EUR", onSucc
     return () => {
       active = false;
     };
-  }, [amount, currency, email, locale, onError, onSuccess, plate]);
+  }, [currency]);
 
   return <div ref={containerRef} className={styles.googlePayContainer} />;
 }

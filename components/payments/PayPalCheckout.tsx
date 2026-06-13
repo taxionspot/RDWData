@@ -26,6 +26,14 @@ export function PayPalCheckout({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const renderedRef = useRef(false);
 
+  // Keep the latest props in a ref so the PayPal buttons (rendered exactly once)
+  // always read current values. Without this, typing in the email field changes
+  // the email/callback props, re-runs the render effect, and the cleanup tears
+  // the buttons down (buttons.close) without re-rendering them: the buttons
+  // visibly disappear the moment the user types their email.
+  const latest = useRef({ plate, email, locale, onSuccess, onError });
+  latest.current = { plate, email, locale, onSuccess, onError };
+
   useEffect(() => {
     let active = true;
     loadPaypalSdk(currency)
@@ -33,26 +41,27 @@ export function PayPalCheckout({
         if (active) setReady(true);
       })
       .catch((err) => {
-        onError(err instanceof Error ? err.message : "PayPal SDK failed to load.");
+        latest.current.onError(err instanceof Error ? err.message : "PayPal SDK failed to load.");
       });
 
     return () => {
       active = false;
     };
-  }, [currency, onError]);
+  }, [currency]);
 
   useEffect(() => {
     if (!ready || !containerRef.current || !window.paypal || renderedRef.current) return;
     renderedRef.current = true;
 
     const buttons = window.paypal.Buttons({
-      createOrder: () => createOrderForPlate(plate),
+      createOrder: () => createOrderForPlate(latest.current.plate),
       onApprove: async ({ orderID }) => {
-        await captureOrderForPlate({ orderId: orderID, plate, email, locale });
-        onSuccess();
+        const { plate: p, email: e, locale: l, onSuccess: ok } = latest.current;
+        await captureOrderForPlate({ orderId: orderID, plate: p, email: e, locale: l });
+        ok();
       },
       onError: (error) => {
-        onError(error instanceof Error ? error.message : "PayPal checkout failed.");
+        latest.current.onError(error instanceof Error ? error.message : "PayPal checkout failed.");
       }
     });
 
@@ -65,7 +74,7 @@ export function PayPalCheckout({
         // no-op
       }
     };
-  }, [ready, plate, email, locale, onSuccess, onError]);
+  }, [ready]);
 
   return <div ref={containerRef} />;
 }

@@ -149,6 +149,15 @@
   gap: 8px;
 }
 
+.summaryHint {
+  margin: 2px 0 0;
+  max-width: 52ch;
+  color: #9fb3d1;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
 .summaryChip {
   display: inline-flex;
   align-items: center;

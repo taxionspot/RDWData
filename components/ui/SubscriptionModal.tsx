@@ -182,8 +182,8 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
             </div>
             <p className={styles.guaranteeLine}>
               {locale === "nl"
-                ? "14 dagen niet-goed-geld-terug. Veilig betalen via PayPal, geen account nodig."
-                : "14-day money-back guarantee. Secure checkout via PayPal, no account needed."}
+                ? "Veilig betalen via iDEAL, Apple Pay, Google Pay of PayPal. Geen account nodig."
+                : "Secure payment via iDEAL, Apple Pay, Google Pay or PayPal. No account needed."}
             </p>
             <div className={styles.planBtn}>
               <ApplePayButton
@@ -284,7 +284,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
             <ShieldCheck size={16} /> {locale === "nl" ? "Geverifieerde RDW-data" : "Verified RDW Data"}
           </div>
           <div className={styles.trustItem}>
-            <Sparkles size={16} /> {locale === "nl" ? "Beste prijs garantie" : "Best Price Guaranteed"}
+            <Sparkles size={16} /> {locale === "nl" ? "Direct toegang na betaling" : "Instant access after payment"}
           </div>
         </div>
       </div>

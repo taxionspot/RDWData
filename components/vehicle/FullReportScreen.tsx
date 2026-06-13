@@ -40,6 +40,7 @@ import { OwnershipTimelineScreen } from "./OwnershipTimelineScreen";
 import { ApkFailureIntelligenceScreen } from "./ApkFailureIntelligenceScreen";
 import { NegotiationCopilotScreen } from "./NegotiationCopilotScreen";
 import { TechnicalSpecsScreen } from "./TechnicalSpecsScreen";
+import { ReportSectionNav } from "./ReportSectionNav";
 import styles from "./FullReportScreen.module.css";
 
 type Props = { plate: string };
@@ -291,6 +292,13 @@ function RecordsSummary({
             </span>
           ))}
         </div>
+        {!unlocked ? (
+          <p className={styles.summaryHint}>
+            {nl
+              ? "Hieronder zie je van elk onderdeel een voorproefje. Ontgrendel eenmalig om de volledige analyse, marktwaarde en historie te zien."
+              : "Below you get a preview of every section. Unlock once to see the full analysis, market value and history."}
+          </p>
+        ) : null}
       </div>
 
       <div className={styles.summaryAction}>
@@ -307,8 +315,8 @@ function RecordsSummary({
             </button>
             <span className={styles.unlockMicro}>
               {nl
-                ? "Eenmalig voor dit kenteken · iDEAL, Apple Pay, PayPal · niet-goed-geld-terug"
-                : "One-time for this plate · iDEAL, Apple Pay, PayPal · money-back guarantee"}
+                ? "Eenmalig voor dit kenteken · iDEAL, Apple Pay, Google Pay, PayPal · direct toegang"
+                : "One-time for this plate · iDEAL, Apple Pay, Google Pay, PayPal · instant access"}
             </span>
           </>
         )}
@@ -394,11 +402,19 @@ export function FullReportScreen({ plate }: Props) {
   const withQuery = (href: string) => (sharedQuery ? `${href}?${sharedQuery}` : href);
   const sectionById = (id: string): SectionDef => SECTIONS.find((section) => section.id === id) ?? SECTIONS[0];
 
+  const navItems = SECTIONS.map((section) => ({
+    id: section.id,
+    label: nl ? section.labelNl : section.labelEn,
+    locked: isPremiumSection(section)
+  }));
+
   return (
     <div className={styles.page}>
       <ScanIntro plate={normalized} />
 
       <div className={styles.container}>
+        <ReportSectionNav items={navItems} />
+
         <SectionBlock section={sectionById("overzicht")} index={1} isPremium={false} locale={locale}>
           <VehicleResultScreen plate={plate} embedded />
         </SectionBlock>

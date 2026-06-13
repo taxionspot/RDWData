@@ -77,7 +77,7 @@ const BRAND_OFFSETS: Record<string, number> = {
   KIA: 0.02,
   HYUNDAI: 0.01,
   SSANGYONG: -0.08,
-  BMW: 0.02,
+  BMW: 0.01,
   VOLKSWAGEN: 0.01,
   VW: 0.01,
   SEAT: -0.04,
