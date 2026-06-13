@@ -10,6 +10,7 @@ import { connectMongo } from "@/lib/db/mongodb";
 import { generateVehicleReportHtml } from "@/lib/api/report-template";
 import { generateVehicleReportPdf } from "@/lib/api/pdf-report";
 import { alignValuationWithFormula, applyMileageValuationOverride } from "@/lib/api/market-value";
+import { sanitizeDeep } from "@/lib/api/sanitize-text";
 import { hasPaidPlateAccess } from "@/lib/payments/server-access";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
@@ -107,12 +108,16 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
   if (cached) {
     return {
       localized,
-      aiInsights: cached.insights as ReturnType<typeof buildFallbackVehicleAiReport>["insights"],
+      // sanitizeDeep cleans dashes from entries cached before the sanitizer
+      // existed, so stale cache can never show en/em-dashes.
+      aiInsights: sanitizeDeep(cached.insights as ReturnType<typeof buildFallbackVehicleAiReport>["insights"]),
       // Cached valuations also get the formula amounts forced in, so stale
       // cache entries can never show AI-invented values.
-      aiValuation: alignValuationWithFormula(
-        localized,
-        cached.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
+      aiValuation: sanitizeDeep(
+        alignValuationWithFormula(
+          localized,
+          cached.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
+        )
       )
     };
   }
