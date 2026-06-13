@@ -24,13 +24,12 @@ export async function createOrderForPlate(plate: string): Promise<string> {
  */
 export async function createIdealOrderForPlate(args: {
   plate: string;
-  name: string;
   email?: string;
 }): Promise<string> {
   const response = await fetch("/api/payments/paypal/create-ideal-order", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plate: args.plate, name: args.name, email: args.email })
+    body: JSON.stringify({ plate: args.plate, email: args.email })
   });
 
   if (!response.ok) {

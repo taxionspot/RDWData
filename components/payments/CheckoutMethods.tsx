@@ -55,7 +55,6 @@ export function CheckoutMethods({
     paypal: false
   });
   const [selected, setSelected] = useState<Method>("ideal");
-  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState("");
 
@@ -173,17 +172,10 @@ export function CheckoutMethods({
   }, [selected, ready]);
 
   const payIdeal = async () => {
-    const trimmed = name.trim();
-    if (trimmed.length < 2) {
-      setLocalError(
-        locale === "nl" ? "Vul je naam in om met iDEAL te betalen." : "Enter your name to pay with iDEAL."
-      );
-      return;
-    }
     setLocalError("");
     setBusy(true);
     try {
-      const redirect = await createIdealOrderForPlate({ plate, name: trimmed, email });
+      const redirect = await createIdealOrderForPlate({ plate, email });
       window.location.href = redirect;
     } catch (error) {
       setBusy(false);
@@ -237,25 +229,9 @@ export function CheckoutMethods({
       </div>
 
       {selected === "ideal" ? (
-        <>
-          <div className={styles.nameRow}>
-            <label className={styles.nameLabel} htmlFor="kr-ideal-name">
-              {locale === "nl" ? "Naam rekeninghouder" : "Account holder name"}
-            </label>
-            <input
-              id="kr-ideal-name"
-              type="text"
-              className={styles.nameInput}
-              autoComplete="name"
-              placeholder={locale === "nl" ? "Voor- en achternaam" : "Full name"}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <button type="button" className={styles.payBtn} onClick={payIdeal} disabled={busy}>
-            {busy ? (locale === "nl" ? "Bezig..." : "Working...") : locale === "nl" ? "Betaal nu" : "Pay now"}
-          </button>
-        </>
+        <button type="button" className={styles.payBtn} onClick={payIdeal} disabled={busy}>
+          {busy ? (locale === "nl" ? "Bezig..." : "Working...") : locale === "nl" ? "Betaal nu" : "Pay now"}
+        </button>
       ) : null}
 
       {selected === "card" || selected === "paypal" ? (

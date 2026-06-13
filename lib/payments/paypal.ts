@@ -174,21 +174,30 @@ export async function createPaypalIdealOrder(args: {
   currency: string;
   customId: string;
   description: string;
-  name: string;
+  name?: string;
   returnUrl: string;
   cancelUrl: string;
 }): Promise<{ id: string; payerActionUrl: string }> {
   const accessToken = await getAccessToken();
+  // iDEAL requires a name in the API, but it is metadata only (not validated
+  // against the bank account), so we send a placeholder when we have none.
+  // This is exactly how annuleren.com does it: the buyer is never asked for a
+  // name. A real name is passed through only if the caller has one.
+  const idealName = args.name && args.name.trim() ? args.name.trim() : "Klant";
   const response = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
+      Prefer: "return=representation",
       // Idempotency: a double-submit reuses the same order instead of charging twice.
       "PayPal-Request-Id": `kr-ideal-${args.customId}-${Date.now()}`
     },
     body: JSON.stringify({
       intent: "CAPTURE",
+      // Auto-capture on approval, so the payment still completes if the buyer
+      // closes the tab before the return URL loads (the webhook then confirms).
+      processing_instruction: "ORDER_COMPLETE_ON_PAYMENT_APPROVAL",
       purchase_units: [
         {
           custom_id: args.customId,
@@ -201,7 +210,7 @@ export async function createPaypalIdealOrder(args: {
       ],
       payment_source: {
         ideal: {
-          name: args.name,
+          name: idealName,
           country_code: "NL",
           experience_context: {
             locale: "nl-NL",
@@ -247,7 +256,12 @@ export async function verifyPaypalWebhook(args: {
   rawBody: string;
 }): Promise<boolean> {
   const webhookId = (process.env.PAYPAL_WEBHOOK_ID ?? "").trim();
-  if (!webhookId) return false;
+  if (!webhookId) {
+    console.warn(
+      "PayPal webhook rejected: PAYPAL_WEBHOOK_ID is not configured, so the webhook backstop is disabled."
+    );
+    return false;
+  }
   const { authAlgo, certUrl, transmissionId, transmissionSig, transmissionTime } = args.headers;
   if (!authAlgo || !certUrl || !transmissionId || !transmissionSig || !transmissionTime) return false;
 

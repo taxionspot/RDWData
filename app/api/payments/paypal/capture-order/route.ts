@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { capturePaypalOrder } from "@/lib/payments/paypal";
-import { connectMongo } from "@/lib/db/mongodb";
-import { PlatePaymentModel } from "@/models/PlatePayment";
-import { CheckoutLeadModel } from "@/models/CheckoutLead";
-import { sendEmail } from "@/lib/email/resend";
-import { buildThankYouEmail } from "@/lib/email/templates";
+import { fulfillFromCapture, type PaypalCaptureLike } from "@/lib/payments/fulfill";
 
 export const runtime = "nodejs";
 
@@ -58,66 +54,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing orderId or plate." }, { status: 400 });
     }
 
-    const capture = (await capturePaypalOrder(orderId)) as {
-      status?: string;
-      id?: string;
-      purchase_units?: Array<{
-        payments?: {
-          captures?: Array<{
-            id?: string;
-            amount?: { value?: string; currency_code?: string };
-            status?: string;
-          }>;
-        };
-      }>;
-    };
+    const capture = (await capturePaypalOrder(orderId)) as PaypalCaptureLike;
 
-    const unit = capture.purchase_units?.[0];
-    const firstCapture = unit?.payments?.captures?.[0];
-    const captureStatus = firstCapture?.status ?? capture.status ?? "UNKNOWN";
+    // One shared, idempotent fulfilment path for every method: marks the plate
+    // paid, converts the lead and sends the thank-you mail exactly once. The
+    // PAYMENT.CAPTURE.COMPLETED webhook also fires for these captures; the
+    // idempotency guard in fulfillFromCapture makes that a no-op (no second mail).
+    const result = await fulfillFromCapture({
+      orderId,
+      plate,
+      email: email || undefined,
+      locale,
+      capture
+    });
 
-    if (captureStatus !== "COMPLETED") {
+    if (!result.ok) {
       return NextResponse.json(
-        { error: `PayPal capture not completed: ${captureStatus}` },
+        { error: `PayPal capture not completed: ${result.status}` },
         { status: 402 }
       );
-    }
-
-    await connectMongo();
-    await PlatePaymentModel.updateOne(
-      { orderId },
-      {
-        $set: {
-          plate,
-          orderId,
-          ...(email ? { email } : {}),
-          captureId: firstCapture?.id ?? capture.id ?? orderId,
-          amount: firstCapture?.amount?.value ?? "9.95",
-          currency: firstCapture?.amount?.currency_code ?? "EUR",
-          status: "COMPLETED",
-          provider: "paypal",
-          createdAt: new Date()
-        }
-      },
-      { upsert: true }
-    );
-
-    const amount = firstCapture?.amount?.value ?? "9.95";
-    const currency = firstCapture?.amount?.currency_code ?? "EUR";
-
-    if (email) {
-      // Post-payment extras must never fail the capture response.
-      try {
-        await CheckoutLeadModel.updateMany({ email, plate }, { $set: { status: "converted" } });
-      } catch {
-        // no-op
-      }
-      try {
-        const { subject, html } = buildThankYouEmail({ plate, amount, currency, orderId, locale });
-        await sendEmail({ to: email, subject, html });
-      } catch {
-        // no-op
-      }
     }
 
     return NextResponse.json({
@@ -125,8 +80,8 @@ export async function POST(request: Request) {
       plate,
       orderId,
       status: "COMPLETED",
-      amount,
-      currency
+      amount: result.amount,
+      currency: result.currency
     });
   } catch (error) {
     const mapped = mapCaptureError(error);

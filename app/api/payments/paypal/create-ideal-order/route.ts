@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 
 type CreateIdealBody = {
   plate: string;
-  name: string;
   email?: string;
 };
 
@@ -21,17 +20,10 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreateIdealBody;
     const plate = normalizePlate(body.plate ?? "");
-    const name = (body.name ?? "").trim();
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
 
     if (!plate) {
       return NextResponse.json({ error: "Missing plate." }, { status: 400 });
-    }
-    if (name.length < 2) {
-      return NextResponse.json(
-        { error: "Vul je naam in om met iDEAL te betalen.", code: "IDEAL_NAME_REQUIRED" },
-        { status: 400 }
-      );
     }
 
     // Price always comes from server-side settings; never trust a client amount.
@@ -51,7 +43,6 @@ export async function POST(request: Request) {
       currency,
       customId,
       description: `Kentekenrapport full unlock for ${plate}`,
-      name,
       returnUrl,
       cancelUrl
     });
@@ -78,9 +69,11 @@ export async function POST(request: Request) {
         },
         { upsert: true }
       );
-    } catch {
-      // A failed PENDING write must not block starting the payment; the webhook
-      // can still fulfil from the order's custom_id.
+    } catch (error) {
+      // A failed PENDING write must not block starting the payment; access is
+      // still granted on capture. Only the thank-you email address would be lost,
+      // so log it for diagnosis.
+      console.error("create-ideal-order: PENDING record write failed", { orderId: order.id, error });
     }
 
     return NextResponse.json({ id: order.id, redirect: order.payerActionUrl });

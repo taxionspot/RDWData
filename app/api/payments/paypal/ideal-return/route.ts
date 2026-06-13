@@ -30,30 +30,34 @@ export async function GET(request: Request) {
     return NextResponse.redirect(reportUrl("?checkout=error"), { status: 303 });
   }
 
-  let capture: PaypalCaptureLike | null = null;
-  try {
-    capture = (await capturePaypalOrder(orderId)) as PaypalCaptureLike;
-  } catch {
-    // Likely ORDER_ALREADY_CAPTURED (PayPal auto-captured iDEAL on approval):
-    // read the order back and fulfil from that.
-    try {
-      capture = (await getPaypalOrder(orderId)) as PaypalCaptureLike;
-    } catch {
-      capture = null;
-    }
-  }
-
-  if (capture) {
+  const tryFulfill = async (capture: PaypalCaptureLike | null): Promise<boolean> => {
+    if (!capture) return false;
     try {
       const result = await fulfillFromCapture({ orderId, plate, locale: "nl", capture });
-      if (result.ok) {
-        return NextResponse.redirect(reportUrl("?paid=1"), { status: 303 });
-      }
+      return result.ok;
     } catch {
-      // fall through to the pending path
+      return false;
+    }
+  };
+
+  // The order auto-captures on approval (ORDER_COMPLETE_ON_PAYMENT_APPROVAL),
+  // so reading it back is normally enough.
+  let ok = false;
+  try {
+    ok = await tryFulfill((await getPaypalOrder(orderId)) as PaypalCaptureLike);
+  } catch {
+    ok = false;
+  }
+
+  // Rare race: the buyer returned before PayPal finished auto-capturing. Capture
+  // explicitly; if that also fails, the webhook is the backstop.
+  if (!ok) {
+    try {
+      ok = await tryFulfill((await capturePaypalOrder(orderId)) as PaypalCaptureLike);
+    } catch {
+      // already captured or not yet payable; leave it to the webhook
     }
   }
 
-  // Not confirmed yet: the webhook will complete it shortly.
-  return NextResponse.redirect(reportUrl("?checkout=pending"), { status: 303 });
+  return NextResponse.redirect(reportUrl(ok ? "?paid=1" : "?checkout=pending"), { status: 303 });
 }
