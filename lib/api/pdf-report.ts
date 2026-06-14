@@ -698,6 +698,65 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     }
   }
 
+  const marketNowRaw = toNumber(enriched.estimatedValueNow);
+  const marketMinRaw = toNumber(enriched.estimatedValueMin);
+  const marketMaxRaw = toNumber(enriched.estimatedValueMax);
+  const marketNow = marketNowRaw ?? 0;
+  const marketMin = marketMinRaw ?? 0;
+  const marketMax = marketMaxRaw ?? 0;
+  const riskScore = toNumber(enriched.maintenanceRiskScore) ?? 6;
+  const mileagePlausible =
+    enriched.userMileagePlausible === null || enriched.userMileagePlausible === undefined
+      ? null
+      : Boolean(enriched.userMileagePlausible);
+  const pricing = computeNegotiationPricing({
+    marketNow,
+    marketMin,
+    marketMax,
+    riskScore,
+    defects: defects.length,
+    recalls: recalls.length,
+    mileagePlausible
+  });
+
+  layout.section(locale === "nl" ? "Onderhandelcoach" : "Negotiation Coach");
+  if (marketNowRaw !== null && marketNowRaw > 0 && marketMinRaw !== null && marketMaxRaw !== null) {
+    layout.drawCardRow([
+      {
+        title: locale === "nl" ? "Aanbevolen biedrange" : "Recommended offer range",
+        value: `${currency(pricing.offerMin)} - ${currency(pricing.offerMax)}`,
+        accent: rgb(0.07, 0.44, 0.63)
+      },
+      {
+        title: locale === "nl" ? "Walk-away grens" : "Walk-away threshold",
+        value: currency(pricing.walkAway),
+        accent: rgb(0.72, 0.12, 0.18)
+      },
+      {
+        title: locale === "nl" ? "Reparatiereserve" : "Repair reserve",
+        value: `${currency(pricing.reserveMin)} - ${currency(pricing.reserveMax)}`,
+        accent: rgb(0.78, 0.5, 0.08)
+      }
+    ]);
+    layout.keyValue(
+      locale === "nl" ? "Strategie" : "Strategy",
+      locale === "nl"
+        ? "Start bij de onderkant van de biedrange en sluit idealiter binnen deze band. Boven de walk-away grens neemt uw nadeel toe ten opzichte van markt en risico. Houd de reparatiereserve apart voor verrassingskosten in het eerste jaar."
+        : "Start near the lower bound of the offer range and ideally close within this band. Above the walk-away threshold your downside increases against market and risk. Keep the repair reserve aside for surprise costs in the first year."
+    );
+    layout.keyValue(
+      locale === "nl" ? "Referentiewaarde" : "Reference value",
+      `${currency(marketNow)} (${currency(marketMin)} - ${currency(marketMax)})`
+    );
+  } else {
+    layout.keyValue(
+      locale === "nl" ? "Status" : "Status",
+      locale === "nl"
+        ? "Onvoldoende marktdata om een biedstrategie te berekenen."
+        : "Insufficient market data to compute an offer strategy."
+    );
+  }
+
   layout.section(locale === "nl" ? "Kilometerstand en NAP" : "Mileage and NAP");
   layout.keyValue(locale === "nl" ? "NAP-tellerstandoordeel (RDW)" : "NAP odometer verdict (RDW)", s(vehicle.napVerdict));
   layout.keyValue(locale === "nl" ? "Geschatte kilometerstand nu" : "Estimated mileage now", kmLabel(enriched.estimatedMileageNow));
@@ -769,65 +828,6 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     layout.table(
       [locale === "nl" ? "Issue" : "Issue", locale === "nl" ? "Ernst" : "Severity", locale === "nl" ? "Doel" : "Target", locale === "nl" ? "Advies" : "Advice"],
       knownIssues.map((it) => [s(it.title), s(it.severity), s(it.target), s(it.advice)])
-    );
-  }
-
-  const marketNowRaw = toNumber(enriched.estimatedValueNow);
-  const marketMinRaw = toNumber(enriched.estimatedValueMin);
-  const marketMaxRaw = toNumber(enriched.estimatedValueMax);
-  const marketNow = marketNowRaw ?? 0;
-  const marketMin = marketMinRaw ?? 0;
-  const marketMax = marketMaxRaw ?? 0;
-  const riskScore = toNumber(enriched.maintenanceRiskScore) ?? 6;
-  const mileagePlausible =
-    enriched.userMileagePlausible === null || enriched.userMileagePlausible === undefined
-      ? null
-      : Boolean(enriched.userMileagePlausible);
-  const pricing = computeNegotiationPricing({
-    marketNow,
-    marketMin,
-    marketMax,
-    riskScore,
-    defects: defects.length,
-    recalls: recalls.length,
-    mileagePlausible
-  });
-
-  layout.section(locale === "nl" ? "Onderhandelcoach" : "Negotiation Coach");
-  if (marketNowRaw !== null && marketNowRaw > 0 && marketMinRaw !== null && marketMaxRaw !== null) {
-    layout.drawCardRow([
-      {
-        title: locale === "nl" ? "Aanbevolen biedrange" : "Recommended offer range",
-        value: `${currency(pricing.offerMin)} - ${currency(pricing.offerMax)}`,
-        accent: rgb(0.07, 0.44, 0.63)
-      },
-      {
-        title: locale === "nl" ? "Walk-away grens" : "Walk-away threshold",
-        value: currency(pricing.walkAway),
-        accent: rgb(0.72, 0.12, 0.18)
-      },
-      {
-        title: locale === "nl" ? "Reparatiereserve" : "Repair reserve",
-        value: `${currency(pricing.reserveMin)} - ${currency(pricing.reserveMax)}`,
-        accent: rgb(0.78, 0.5, 0.08)
-      }
-    ]);
-    layout.keyValue(
-      locale === "nl" ? "Strategie" : "Strategy",
-      locale === "nl"
-        ? "Start bij de onderkant van de biedrange en sluit idealiter binnen deze band. Boven de walk-away grens neemt uw nadeel toe ten opzichte van markt en risico. Houd de reparatiereserve apart voor verrassingskosten in het eerste jaar."
-        : "Start near the lower bound of the offer range and ideally close within this band. Above the walk-away threshold your downside increases against market and risk. Keep the repair reserve aside for surprise costs in the first year."
-    );
-    layout.keyValue(
-      locale === "nl" ? "Referentiewaarde" : "Reference value",
-      `${currency(marketNow)} (${currency(marketMin)} - ${currency(marketMax)})`
-    );
-  } else {
-    layout.keyValue(
-      locale === "nl" ? "Status" : "Status",
-      locale === "nl"
-        ? "Onvoldoende marktdata om een biedstrategie te berekenen."
-        : "Insufficient market data to compute an offer strategy."
     );
   }
 
