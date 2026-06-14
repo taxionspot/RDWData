@@ -391,7 +391,11 @@ export function InspectionTimelineScreen({ plate, embedded = false }: Props) {
                   const badge = statusBadge(event.result, locale);
                   const highlight = event.result === "fail" ? styles.highlightDestructive : event.result === "advisory" ? styles.highlightWarning : "";
                   const nodeClass = event.result === "fail" ? styles.nodeDestructive : event.result === "advisory" ? styles.nodeWarning : styles.nodeSuccess;
-                  const isExpanded = expanded[event.id] ?? true;
+                  // Standalone page: defect lists open by default. Embedded in a
+                  // collapsible report group: defect lists start closed so opening
+                  // the group does not dump every defect list at once (the inner
+                  // toggle stays independent of the outer group collapse).
+                  const isExpanded = expanded[event.id] ?? !embedded;
                   return (
                     <div key={event.id} className={styles.timelineItem}>
                       <div className={styles.timelineMeta}>
