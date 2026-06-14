@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   BellRing,
@@ -23,6 +23,7 @@ import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
 import { SectionErrorBoundary } from "@/components/ui/SectionErrorBoundary";
 import { isSamplePlate } from "@/lib/sample";
 import { track } from "@/lib/analytics";
+import { trackPurchase } from "@/lib/analytics/gtm";
 import { ScanIntro } from "./ScanIntro";
 import { JudgmentBlock } from "./JudgmentBlock";
 import { AiAnalysisScreen } from "./AiAnalysisScreen";
@@ -118,12 +119,48 @@ export function FullReportScreen({ plate }: Props) {
   const { locale } = useI18n();
   const nl = locale === "nl";
   const { settings } = useSiteSettings();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { normalized, isValid, data } = useVehicleLookup(plate);
   const [showPayment, setShowPayment] = useState(false);
 
   const unlocked = usePlateUnlocked(normalized, settings.paymentEnabled);
   const priceLabel = `€ ${settings.payment.amount}`;
+
+  // Fire the GTM purchase event exactly once on the iDEAL return.
+  // Gate strictly on the signed PAID cookie (unlocked) AND paid==="1" in the
+  // URL so a spoofed bare ?paid=1 without a valid cookie never fires the event.
+  useEffect(() => {
+    if (!unlocked) return;
+    const paid = searchParams?.get("paid");
+    if (paid !== "1") return;
+    const oid = searchParams?.get("oid") ?? "";
+    // Skip comp-/demo- orders: they never go through the iDEAL return handler.
+    if (!oid || oid.startsWith("comp-") || oid.startsWith("demo-")) return;
+    const dedupKey = `kr_purchase_fired:${oid}`;
+    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(dedupKey)) return;
+    const amt = searchParams?.get("amt") ?? "";
+    const cur = searchParams?.get("cur") ?? "EUR";
+    trackPurchase({
+      transactionId: oid,
+      plate: normalized,
+      value: parseFloat(amt) || parseFloat(settings.payment.amount) || 0,
+      currency: cur || "EUR"
+    });
+    if (typeof sessionStorage !== "undefined") {
+      try { sessionStorage.setItem(dedupKey, "1"); } catch { /* best effort */ }
+    }
+    // Strip the iDEAL return params from the URL so the event cannot re-fire
+    // on refresh and the URL stays clean. Preserve any other search params.
+    const next = new URLSearchParams(searchParams?.toString() ?? "");
+    next.delete("paid");
+    next.delete("oid");
+    next.delete("amt");
+    next.delete("cur");
+    const suffix = next.toString() ? `?${next.toString()}` : "";
+    router.replace(`/search/${encodeURIComponent(normalized)}${suffix}`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unlocked, normalized]);
 
   // Warm the comparable cache as soon as the plate is unlocked (after payment
   // or on a return visit). This overlaps the 45s Apify run with the ScanIntro

@@ -60,7 +60,26 @@ export async function GET(request: Request) {
     }
   }
 
-  const res = NextResponse.redirect(reportUrl(ok ? "?paid=1" : "?checkout=pending"), { status: 303 });
+  let paidSuffix = ok ? "?paid=1" : "?checkout=pending";
+  if (ok) {
+    // Retrieve amount/currency from the order so the client can fire the GTM
+    // purchase event without a second round-trip. We already have the order
+    // from the tryFulfill calls above, but re-reading it here is the simplest
+    // safe approach: the order is already captured at this point.
+    try {
+      const order = (await getPaypalOrder(orderId)) as PaypalCaptureLike;
+      const firstCapture = order?.purchase_units?.[0]?.payments?.captures?.[0];
+      const amt = firstCapture?.amount?.value ?? "";
+      const cur = firstCapture?.amount?.currency_code ?? "EUR";
+      if (amt) {
+        paidSuffix = `?paid=1&oid=${encodeURIComponent(orderId)}&amt=${encodeURIComponent(amt)}&cur=${encodeURIComponent(cur)}`;
+      }
+    } catch {
+      // If we can't read back the order, fall through with bare ?paid=1.
+      // The client falls back to the settings amount.
+    }
+  }
+  const res = NextResponse.redirect(reportUrl(paidSuffix), { status: 303 });
   if (ok) {
     // Grant access to THIS browser only (per-buyer signed cookie), never globally.
     res.cookies.set(PAID_COOKIE, paidCookieValueWith(plate), PAID_COOKIE_OPTIONS);
