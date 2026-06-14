@@ -25,7 +25,10 @@
     "lib/rdw/types.ts",
     "lib/vehicle/groups.ts",
     "lib/vehicle/signals.ts",
-    "lib/vehicle/pdf-presentation.ts"
+    "lib/vehicle/pdf-presentation.ts",
+    "lib/listings/comparable.ts",
+    "lib/listings/apify.ts",
+    "lib/listings/deeplinks.ts"
   ],
   "exclude": ["node_modules", ".next", ".test-dist"]
 }

@@ -6,11 +6,17 @@
  * wrapAffiliate() once an affiliate-network account exists.
  */
 
+import { normalizeFuel, KM_BAND_PCT, KM_BAND_FLOOR } from "./comparable";
+
 export type ListingVehicle = {
   brand: string | null;
   model: string | null; // RDW tradeName
   year: number | null;
   estValue: number | null; // enriched.estimatedValueNow
+  /** enriched.estimatedMileageNow - used for km-band deeplinks */
+  mileage?: number | null;
+  /** vehicle.fuelType - used for fuel filter deeplinks */
+  fuelType?: string | null;
 };
 
 export type ListingProvider = "AutoScout24" | "Marktplaats" | "Gaspedaal";
@@ -33,6 +39,17 @@ function priceBand(estValue: number | null): { min: number; max: number } | null
 }
 
 /**
+ * Mileage band for deeplink filters: +/- max(40%, 40000 km), rounded to 5000.
+ * Matches the KM_BAND_PCT / KM_BAND_FLOOR constants from comparable.ts.
+ */
+function kmBand(mileage: number | null | undefined): { min: number; max: number } | null {
+  if (!mileage || mileage <= 0) return null;
+  const round5000 = (n: number) => Math.max(0, Math.round(n / 5000) * 5000);
+  const delta = Math.max(KM_BAND_PCT * mileage, KM_BAND_FLOOR);
+  return { min: round5000(mileage - delta), max: round5000(mileage + delta) };
+}
+
+/**
  * Wrap an outbound URL for affiliate tracking. No-op until an affiliate program
  * (e.g. TradeTracker/Awin) is connected; then route through the network's
  * tracking template here so every link earns commission with one change.
@@ -41,12 +58,14 @@ export function wrapAffiliate(url: string): string {
   return url;
 }
 
-/** Tier 0: the exact car (make + model), price-banded where the site supports it. */
+/** Tier 0: the exact car (make + model), price-banded and optionally km/fuel filtered. */
 export function buildExactLinks(v: ListingVehicle): ListingLink[] {
   if (!v.brand || !v.model) return [];
   const mk = slug(v.brand);
   const md = slug(v.model);
   const band = priceBand(v.estValue);
+  const km = kmBand(v.mileage);
+  const fuelToken = normalizeFuel(v.fuelType ?? null);
   const links: ListingLink[] = [];
 
   const as24 = new URLSearchParams();
@@ -54,6 +73,13 @@ export function buildExactLinks(v: ListingVehicle): ListingLink[] {
     as24.set("pricefrom", String(band.min));
     as24.set("priceto", String(band.max));
   }
+  if (km) {
+    as24.set("kmfrom", String(km.min));
+    as24.set("kmto", String(km.max));
+  }
+  // AutoScout24 fuel param: "B"=petrol, "D"=diesel, "E"=ev, "H"=hybrid, "L"=lpg
+  const as24FuelMap: Record<string, string> = { petrol: "B", diesel: "D", ev: "E", hybrid: "H", lpg: "L" };
+  if (fuelToken && as24FuelMap[fuelToken]) as24.set("fuel", as24FuelMap[fuelToken]);
   as24.set("sort", "price");
   as24.set("desc", "0");
   links.push({ provider: "AutoScout24", url: `https://www.autoscout24.nl/lst/${mk}/${md}?${as24.toString()}` });
@@ -69,6 +95,13 @@ export function buildExactLinks(v: ListingVehicle): ListingLink[] {
     gp.set("pmin", String(band.min));
     gp.set("pmax", String(band.max));
   }
+  if (km) {
+    gp.set("kmin", String(km.min));
+    gp.set("kmax", String(km.max));
+  }
+  // Gaspedaal fuel param: "benzine", "diesel", "elektrisch", "hybride", "lpg"
+  const gpFuelMap: Record<string, string> = { petrol: "benzine", diesel: "diesel", ev: "elektrisch", hybrid: "hybride", lpg: "lpg" };
+  if (fuelToken && gpFuelMap[fuelToken]) gp.set("brandstof", gpFuelMap[fuelToken]);
   const gpQuery = gp.toString();
   links.push({ provider: "Gaspedaal", url: `https://www.gaspedaal.nl/${mk}/${md}${gpQuery ? `?${gpQuery}` : ""}` });
 

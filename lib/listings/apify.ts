@@ -1,25 +1,8 @@
 import { wrapAffiliate } from "./deeplinks";
-
-/**
- * A normalized "comparable car for sale" used by the report's listings cards.
- * Sourced from the Gaspedaal Apify actor (NL aggregator), which returns a photo,
- * price, mileage, year and a deeplink to the original listing.
- */
-export type ComparableCar = {
-  title: string | null;
-  brand: string | null;
-  model: string | null;
-  year: number | null;
-  priceEur: number | null;
-  mileageKm: number | null;
-  fuelType: string | null;
-  bodyType: string | null;
-  city: string | null;
-  region: string | null;
-  imageUrl: string | null;
-  sourceUrl: string | null; // deeplink to the real source listing (autotrack.nl etc.)
-  source: string | null; // e.g. "gaspedaal.nl"
-};
+// ComparableCar is defined in comparable.ts (shared module) to avoid a circular
+// dependency (apify -> deeplinks -> comparable -> apify).
+import type { ComparableCar } from "./comparable";
+export type { ComparableCar } from "./comparable";
 
 // Apify actor id (slash replaced by ~ for the REST path).
 const ACTOR = "unfenced-group~gaspedaal-nl-scraper";
