@@ -46,6 +46,8 @@ type PaypalSdk = {
   CardFields?: (config: Record<string, unknown>) => CardFieldsInstance;
 };
 
+const CARD_FIELD_IDS = ["kr-card-number", "kr-card-expiry", "kr-card-cvv"];
+
 const LOGOS: Record<Method, string[]> = {
   applepay: ["apple-pay.svg"],
   googlepay: ["google-pay.svg"],
@@ -53,6 +55,14 @@ const LOGOS: Record<Method, string[]> = {
   card: ["visa.svg", "mastercard.svg"],
   paypal: ["paypal.svg"]
 };
+
+function clearCardEls() {
+  if (typeof document === "undefined") return;
+  for (const id of CARD_FIELD_IDS) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = "";
+  }
+}
 
 export function CheckoutMethods({
   plate,
@@ -77,7 +87,6 @@ export function CheckoutMethods({
   // Card: "fields" = inline PayPal CardFields (advanced cards), "button" = the
   // hosted card button fallback when CardFields is not eligible on the account.
   const [cardMode, setCardMode] = useState<"fields" | "button" | null>(null);
-  const [billing, setBilling] = useState({ line1: "", postalCode: "", city: "" });
 
   const actionContainerRef = useRef<HTMLDivElement | null>(null);
   const fundingButtonsRef = useRef<FundingButtons | null>(null);
@@ -104,14 +113,9 @@ export function CheckoutMethods({
   useEffect(() => {
     let active = true;
     setReady(false);
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
-    const isIOS =
-      /iPad|iPhone|iPod/i.test(ua) ||
-      (typeof navigator !== "undefined" && navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    const isAndroid = /Android/i.test(ua);
 
     loadPaypalSdk(currency)
-      .then(() => {
+      .then(async () => {
         if (!active) return;
         const sdk = window.paypal as unknown as PaypalSdk | undefined;
         const funding = sdk?.FUNDING ?? {};
@@ -125,9 +129,30 @@ export function CheckoutMethods({
             return false;
           }
         };
+        // Apple Pay works on Safari (desktop + iOS); Google Pay works wherever
+        // the SDK reports it eligible (Chrome desktop included), not just Android.
+        let applepayOk = false;
+        let googlepayOk = false;
+        try {
+          if (window.ApplePaySession?.canMakePayments?.() && window.paypal?.Applepay) {
+            const cfg = await window.paypal.Applepay().config();
+            applepayOk = Boolean(cfg?.isEligible);
+          }
+        } catch {
+          applepayOk = false;
+        }
+        try {
+          if (window.paypal?.Googlepay) {
+            const cfg = await window.paypal.Googlepay().config();
+            googlepayOk = Boolean(cfg?.isEligible);
+          }
+        } catch {
+          googlepayOk = false;
+        }
+        if (!active) return;
         setAvailable({
-          applepay: isIOS,
-          googlepay: isAndroid,
+          applepay: applepayOk,
+          googlepay: googlepayOk,
           // CARD funding eligibility gates the tile; the selection effect then
           // uses inline CardFields when available, else the hosted card button.
           card: fundingEligible("CARD"),
@@ -158,6 +183,8 @@ export function CheckoutMethods({
         fundingButtonsRef.current = null;
       }
       cardFieldsRef.current = null;
+      // Remove any rendered card-field iframes so a re-select never stacks them.
+      clearCardEls();
     };
     cleanup();
     setLocalError("");
@@ -191,13 +218,20 @@ export function CheckoutMethods({
     if (selected === "paypal") {
       renderFunding("PAYPAL");
     } else if (selected === "card") {
-      // Prefer inline CardFields (collects billing address); fall back to the
-      // hosted card button if the account is not enabled for advanced cards.
+      // Prefer inline CardFields; fall back to the hosted card button if the
+      // account is not enabled for advanced cards.
       let usedFields = false;
       try {
         if (sdk.CardFields) {
-          const cf = sdk.CardFields(sharedOrderConfig());
+          const cf = sdk.CardFields({
+            ...sharedOrderConfig(),
+            style: {
+              input: { "font-size": "15px", "font-family": "inherit", color: "#0f172a" },
+              ".invalid": { color: "#b91c1c" }
+            }
+          });
           if (cf.isEligible()) {
+            clearCardEls(); // never stack iframes from a previous render
             cf.NumberField({ placeholder: locale === "nl" ? "Kaartnummer" : "Card number" }).render("#kr-card-number");
             cf.ExpiryField({ placeholder: "MM/JJ" }).render("#kr-card-expiry");
             cf.CVVField({ placeholder: "CVC" }).render("#kr-card-cvv");
@@ -242,33 +276,23 @@ export function CheckoutMethods({
       onError(locale === "nl" ? "Kaartbetaling is niet beschikbaar." : "Card payment is unavailable.");
       return;
     }
-    if (!billing.line1.trim() || !billing.postalCode.trim() || !billing.city.trim()) {
-      setLocalError(locale === "nl" ? "Vul je adresgegevens in." : "Please fill in your billing address.");
-      return;
-    }
     setLocalError("");
     setBusy(true);
+    // PayPal collects/validates the billing address it needs during submit; we
+    // do not duplicate an address form on our side.
     cardFieldsRef.current
-      .submit({
-        billingAddress: {
-          addressLine1: billing.line1.trim(),
-          adminArea2: billing.city.trim(),
-          postalCode: billing.postalCode.trim(),
-          countryCode: "NL"
-        }
-      })
+      .submit()
       .then(() => {
-        // On success the PayPal SDK has already run onApprove -> capture ->
-        // onSuccess (the modal then shows its success view). Reset busy in case
-        // the component stays mounted.
+        // onApprove -> capture -> onSuccess already ran in the SDK; the modal
+        // switches to its success view. Reset busy in case it stays mounted.
         setBusy(false);
       })
       .catch(() => {
         setBusy(false);
         setLocalError(
           locale === "nl"
-            ? "De betaling is niet afgerond. Controleer je kaart- en adresgegevens."
-            : "Payment was not completed. Check your card and address details."
+            ? "De betaling is niet afgerond. Controleer je kaartgegevens."
+            : "Payment was not completed. Check your card details."
         );
       });
   };
@@ -317,37 +341,13 @@ export function CheckoutMethods({
         ))}
       </div>
 
-      {/* Inline card fields + billing address (shown only in CardFields mode). */}
+      {/* Inline card fields (shown only in CardFields mode). */}
       {selected === "card" ? (
         <div className={`${styles.cardArea} ${cardMode === "button" ? styles.hidden : ""}`}>
           <div className={styles.cardField} id="kr-card-number" />
           <div className={styles.cardRow}>
             <div className={styles.cardField} id="kr-card-expiry" />
             <div className={styles.cardField} id="kr-card-cvv" />
-          </div>
-          <div className={styles.addrLabel}>{locale === "nl" ? "Factuuradres" : "Billing address"}</div>
-          <input
-            className={styles.addrInput}
-            placeholder={locale === "nl" ? "Straat en huisnummer" : "Street and number"}
-            autoComplete="address-line1"
-            value={billing.line1}
-            onChange={(e) => setBilling((b) => ({ ...b, line1: e.target.value }))}
-          />
-          <div className={styles.cardRow}>
-            <input
-              className={styles.addrInput}
-              placeholder={locale === "nl" ? "Postcode" : "Postal code"}
-              autoComplete="postal-code"
-              value={billing.postalCode}
-              onChange={(e) => setBilling((b) => ({ ...b, postalCode: e.target.value }))}
-            />
-            <input
-              className={styles.addrInput}
-              placeholder={locale === "nl" ? "Plaats" : "City"}
-              autoComplete="address-level2"
-              value={billing.city}
-              onChange={(e) => setBilling((b) => ({ ...b, city: e.target.value }))}
-            />
           </div>
         </div>
       ) : null}
