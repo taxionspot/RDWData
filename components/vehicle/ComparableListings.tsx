@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 import { track } from "@/lib/analytics";
 import { buildAlternativeLinks, buildExactLinks, type ListingVehicle } from "@/lib/listings/deeplinks";
+import { ensurePaidAccessChecked, onPlateAccessChanged } from "@/lib/payments/access";
 import { PremiumLock } from "../ui/PremiumLock";
 import styles from "./ComparableListings.module.css";
 
@@ -17,7 +18,27 @@ import styles from "./ComparableListings.module.css";
  * the whole block sits behind PremiumLock. Falls back to plain marketplace
  * search links when no listings are available. Legal: minimal facts + a
  * thumbnail + a prominent source deeplink, never claiming the cars as our own.
+ *
+ * Loader design: gated on confirmed paid access (ensurePaidAccessChecked) so
+ * unpaid visitors never fire a throwaway Apify call. After payment, the
+ * onPlateAccessChanged event re-fires runFetch so cards appear without a
+ * manual refresh. A module-level promise cache (comparableCache) deduplicates
+ * double-mounts and lets FullReportScreen warm the fetch during ScanIntro.
  */
+
+// Module-level cache: key = "<normalizedPlate>|<locale>"
+// CLIENT-ONLY (this file is "use client").
+const comparableCache = new Map<string, Promise<ApiCar[]>>();
+
+export function warmComparableCache(normalizedPlate: string, locale: string): void {
+  const key = `${normalizedPlate}|${locale}`;
+  if (comparableCache.has(key)) return;
+  const p = fetch(`/api/listings/comparable/${encodeURIComponent(normalizedPlate)}?lang=${locale}`, { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : { cars: [] }))
+    .then((d: { cars?: ApiCar[] }) => (Array.isArray(d.cars) ? d.cars : []))
+    .catch((): ApiCar[] => []);
+  comparableCache.set(key, p);
+}
 
 type ApiCar = {
   title: string | null;
@@ -62,21 +83,50 @@ export function ComparableListings({ plate, embedded = false }: { plate: string;
   useEffect(() => {
     if (!normalized) return;
     let active = true;
-    setLoading(true);
-    fetch(`/api/listings/comparable/${encodeURIComponent(normalized)}?lang=${locale}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { cars: [] }))
-      .then((d) => {
+
+    function runFetch(): void {
+      setLoading(true);
+      const key = `${normalized}|${locale}`;
+      // Reuse an in-flight or completed promise from the module cache.
+      let promise = comparableCache.get(key);
+      if (!promise) {
+        promise = fetch(`/api/listings/comparable/${encodeURIComponent(normalized)}?lang=${locale}`, { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : { cars: [] }))
+          .then((d: { cars?: ApiCar[] }) => (Array.isArray(d.cars) ? d.cars : []))
+          .catch((): ApiCar[] => []);
+        comparableCache.set(key, promise);
+      }
+      void promise.then((result) => {
         if (!active) return;
-        setCars(Array.isArray(d.cars) ? (d.cars as ApiCar[]) : []);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!active) return;
-        setCars([]);
+        setCars(result);
         setLoading(false);
       });
+    }
+
+    // Gate the first fetch on confirmed paid access so unpaid visitors do not
+    // trigger a throwaway Apify call. Paid visitors fetch exactly once with access.
+    void ensurePaidAccessChecked(normalized).then((paid) => {
+      if (!active) return;
+      if (paid) runFetch();
+      else {
+        // Unpaid: show empty / deeplink fallback immediately (no spinner).
+        setCars([]);
+        setLoading(false);
+      }
+    });
+
+    // After payment fires grantPaidAccessForPlate -> PLATE_ACCESS_EVENT, re-fetch
+    // so cards appear without a manual refresh (mirrors useAiReport.ts pattern).
+    const unsubscribe = onPlateAccessChanged(normalized, (paid) => {
+      if (!paid) return;
+      // Bust the cache entry so a fresh paid call is made.
+      comparableCache.delete(`${normalized}|${locale}`);
+      runFetch();
+    });
+
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [normalized, locale]);
 
@@ -85,9 +135,12 @@ export function ComparableListings({ plate, embedded = false }: { plate: string;
       brand: v?.brand ?? null,
       model: v?.tradeName ?? null,
       year: v?.year ?? null,
-      estValue: data?.enriched?.estimatedValueNow ?? null
+      estValue: data?.enriched?.estimatedValueNow ?? null,
+      // Premium-redacted when null (unpaid); deeplink simply omits the band.
+      mileage: data?.enriched?.estimatedMileageNow ?? null,
+      fuelType: v?.fuelType ?? null
     }),
-    [v?.brand, v?.tradeName, v?.year, data?.enriched?.estimatedValueNow]
+    [v?.brand, v?.tradeName, v?.year, data?.enriched?.estimatedValueNow, data?.enriched?.estimatedMileageNow, v?.fuelType]
   );
 
   const exact = useMemo(() => buildExactLinks(model), [model]);

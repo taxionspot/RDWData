@@ -40,7 +40,7 @@ import { ReportSectionNav } from "./ReportSectionNav";
 import { ReportTeaser } from "./ReportTeaser";
 import { PageUnlockContext } from "./page-unlock-context";
 import { TrustBadges } from "./TrustBadges";
-import { ComparableListings } from "./ComparableListings";
+import { ComparableListings, warmComparableCache } from "./ComparableListings";
 import styles from "./FullReportScreen.module.css";
 
 type Props = { plate: string };
@@ -124,6 +124,14 @@ export function FullReportScreen({ plate }: Props) {
 
   const unlocked = usePlateUnlocked(normalized, settings.paymentEnabled);
   const priceLabel = `€ ${settings.payment.amount}`;
+
+  // Warm the comparable cache as soon as the plate is unlocked (after payment
+  // or on a return visit). This overlaps the 45s Apify run with the ScanIntro
+  // animation so cards are ready sooner. warmComparableCache is a no-op if the
+  // cache already has an entry for this key.
+  useEffect(() => {
+    if (unlocked && normalized) warmComparableCache(normalized, locale);
+  }, [unlocked, normalized, locale]);
 
   const [openGroups, setOpenGroups] = useState<Record<GroupId, boolean>>(() => {
     const seed = {} as Record<GroupId, boolean>;
