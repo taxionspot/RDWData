@@ -8,6 +8,8 @@ import { buildThankYouEmail } from "@/lib/email/templates";
 import { buildReportPdfForEmail } from "@/lib/api/report-email";
 
 export const runtime = "nodejs";
+// PDF build (<=6s) + one email send (<=7.5s) on the comp path; give it headroom.
+export const maxDuration = 30;
 
 type Params = { params: { plate: string } };
 
@@ -79,42 +81,25 @@ export async function POST(request: Request, { params }: Params) {
         const orderId = `comp-${plate}-${Date.now()}`;
         const locale = "nl" as const;
 
-        // Step A: guaranteed link-only thank-you (fast).
+        // buildReportPdfForEmail is already capped (~8s) and returns null on a
+        // slow/failed build. Send EXACTLY ONE email with the PDF attached when it
+        // built in time, link-only otherwise (no separate PDF mail).
+        const pdfBase64 = await buildReportPdfForEmail(plate, locale);
+
         try {
-          const { subject, html } = buildThankYouEmail({ plate, amount: "0.00", currency: "EUR", orderId, locale });
-          const linkResult = await sendEmail({ to: email, subject, html });
-          if (!linkResult.delivered) {
-            console.error("comp access: thank-you link mail not delivered", { plate, email, reason: linkResult.reason });
+          const { subject, html } = buildThankYouEmail({ plate, amount: "0.00", currency: "EUR", orderId, locale, hasPdf: pdfBase64 !== null });
+          const result = await sendEmail({
+            to: email,
+            subject,
+            html,
+            attachments: pdfBase64 ? [{ filename: `kentekenrapport-${plate}.pdf`, content: pdfBase64 }] : undefined
+          });
+          if (!result.delivered) {
+            console.error("comp access: thank-you mail not delivered", { plate, email, reason: result.reason });
           }
         } catch (err) {
-          console.error("comp access: thank-you link mail threw", { plate, email, err });
+          console.error("comp access: thank-you mail threw", { plate, email, err });
         }
-
-        // Step B: best-effort PDF, capped at 6s so it never delays the grant response.
-        const PDF_TIMEOUT_MS = 6000;
-        const deadline = new Promise<void>((resolve) => setTimeout(resolve, PDF_TIMEOUT_MS));
-        const pdfWork = (async () => {
-          try {
-            const pdfBase64 = await buildReportPdfForEmail(plate, locale);
-            if (pdfBase64) {
-              const pdfSubject = `Je kentekenrapport ${plate} (PDF) — eigenaar-test`;
-              const { html: pdfHtml } = buildThankYouEmail({ plate, amount: "0.00", currency: "EUR", orderId, locale });
-              const pdfResult = await sendEmail({
-                to: email,
-                subject: pdfSubject,
-                html: pdfHtml,
-                attachments: [{ filename: `kentekenrapport-${plate}.pdf`, content: pdfBase64 }]
-              });
-              if (!pdfResult.delivered) {
-                console.error("comp access: PDF mail not delivered", { plate, email, reason: pdfResult.reason });
-              }
-            }
-          } catch (err) {
-            console.error("comp access: PDF mail threw", { plate, email, err });
-          }
-        })();
-        // Race: whichever settles first wins; the response is returned regardless.
-        await Promise.race([pdfWork, deadline]);
       }
 
       return res;

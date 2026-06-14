@@ -6,6 +6,8 @@ import { PlatePaymentModel } from "@/models/PlatePayment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// PDF build (<=6s) + one email send (<=7.5s) run on the webhook fulfilment path.
+export const maxDuration = 30;
 
 type CaptureEvent = {
   event_type?: string;

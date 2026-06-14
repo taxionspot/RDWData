@@ -137,98 +137,45 @@ export async function fulfillFromCapture(args: {
       // best effort
     }
 
-    // Step A: guaranteed link-only thank-you email (fast, no AI/PDF).
+    // Build the PDF best-effort (buildReportPdfForEmail is already capped at ~8s
+    // and returns null on slow/failed builds), then send EXACTLY ONE email: the
+    // thank-you with the report link, PDF attached when it built in time. One
+    // email replaces the old "link mail + separate PDF mail" double send.
+    const pdfBase64 = await buildReportPdfForEmail(args.plate, args.locale);
     const { subject, html } = buildThankYouEmail({
       plate: args.plate,
       amount,
       currency,
       orderId: args.orderId,
-      locale: args.locale
+      locale: args.locale,
+      hasPdf: pdfBase64 !== null
     });
-    const linkMailResult = await sendEmail({ to: email, subject, html });
-    if (!linkMailResult.delivered) {
-      console.error("fulfill: thank-you link mail not delivered", {
+    const mailResult = await sendEmail({
+      to: email,
+      subject,
+      html,
+      attachments: pdfBase64
+        ? [{ filename: `kentekenrapport-${args.plate}.pdf`, content: pdfBase64 }]
+        : undefined
+    });
+    if (!mailResult.delivered) {
+      console.error("fulfill: thank-you mail not delivered", {
         orderId: args.orderId,
         plate: args.plate,
-        reason: linkMailResult.reason
+        reason: mailResult.reason
       });
     }
 
     // Persist email delivery outcome on the PlatePayment record.
-    const emailDelivered = linkMailResult.delivered;
-    const emailReason = linkMailResult.reason;
     try {
       await PlatePaymentModel.updateOne(
         { orderId: args.orderId },
-        { $set: { emailDelivered, ...(emailReason ? { emailReason } : {}) } }
+        { $set: { emailDelivered: mailResult.delivered, ...(mailResult.reason ? { emailReason: mailResult.reason } : {}) } }
       );
     } catch {
       // best effort: persisting the delivery status must not block the response
     }
-
-    // Step B: best-effort PDF attachment. Capped at a hard 6s wall-clock limit
-    // so the capture HTTP response is never blocked for more than ~6s total
-    // (link mail already sent; PDF is bonus-only). This replaces a bare
-    // await that could hold the response for 10-18s.
-    //
-    // Note: unstable_after (Next.js 15+) is not available in this codebase
-    // (Next 14.2.x), so we use the timeout-race fallback instead.
-    await sendPdfEmailWithTimeout({
-      plate: args.plate,
-      locale: args.locale,
-      email,
-      amount,
-      currency,
-      orderId: args.orderId
-    });
   }
 
   return { ok: true, status: "COMPLETED", amount, currency };
-}
-
-/** Maximum wall-clock time the PDF build + PDF send may consume on the capture path. */
-const PDF_EMAIL_TIMEOUT_MS = 6000;
-
-/**
- * Build and send the PDF thank-you email, bounded by a hard 6s timeout.
- * Races the real work against a timer; whichever resolves first wins and
- * the capture response is unblocked. Failures are swallowed (link mail
- * in Step A already guaranteed delivery).
- */
-async function sendPdfEmailWithTimeout(args: {
-  plate: string;
-  locale: "nl" | "en";
-  email: string;
-  amount: string;
-  currency: string;
-  orderId: string;
-}): Promise<void> {
-  const deadline = new Promise<void>((resolve) => setTimeout(resolve, PDF_EMAIL_TIMEOUT_MS));
-  const work = (async () => {
-    try {
-      const pdfBase64 = await buildReportPdfForEmail(args.plate, args.locale);
-      if (pdfBase64) {
-        const pdfSubject = args.locale === "nl"
-          ? `Je kentekenrapport ${args.plate} (PDF)`
-          : `Your vehicle report ${args.plate} (PDF)`;
-        const pdfHtml = buildThankYouEmail({
-          plate: args.plate,
-          amount: args.amount,
-          currency: args.currency,
-          orderId: args.orderId,
-          locale: args.locale
-        }).html;
-        await sendEmail({
-          to: args.email,
-          subject: pdfSubject,
-          html: pdfHtml,
-          attachments: [{ filename: `kentekenrapport-${args.plate}.pdf`, content: pdfBase64 }]
-        });
-      }
-    } catch {
-      // PDF mail failure must never affect the capture response or the link mail.
-    }
-  })();
-  // Race: whichever settles first wins; the other branch is abandoned.
-  await Promise.race([work, deadline]);
 }

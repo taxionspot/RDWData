@@ -39,7 +39,12 @@
   position: sticky;
   top: 58px;
   z-index: 40;
-  margin: 4px 0 20px;
+  margin: 4px 0 12px;
+  /* Opaque page-colour buffer below the pill bar: keeps a clear gap to the first
+     card AND, because it is part of the sticky box, that gap persists while the
+     nav is stuck (content scrolls under the buffer instead of jamming the bar). */
+  padding-bottom: 16px;
+  background: #f3f6fb;
   max-width: 100%;
   min-width: 0;
 }

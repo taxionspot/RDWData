@@ -4,6 +4,8 @@ import { fulfillFromCapture, type PaypalCaptureLike } from "@/lib/payments/fulfi
 import { PAID_COOKIE, PAID_COOKIE_OPTIONS, paidCookieValueWith } from "@/lib/payments/server-access";
 
 export const runtime = "nodejs";
+// PDF build (<=6s) + one email send (<=7.5s) run on the capture path.
+export const maxDuration = 30;
 
 type CaptureBody = {
   orderId: string;

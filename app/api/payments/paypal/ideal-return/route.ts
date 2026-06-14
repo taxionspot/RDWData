@@ -5,6 +5,8 @@ import { PAID_COOKIE, PAID_COOKIE_OPTIONS, paidCookieValueWith } from "@/lib/pay
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// PDF build (<=6s) + one email send (<=7.5s) run on the iDEAL return path.
+export const maxDuration = 30;
 
 function normalizePlate(plate: string): string {
   return plate.replace(/[^A-Z0-9]/gi, "").toUpperCase();

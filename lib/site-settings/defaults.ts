@@ -202,7 +202,7 @@ export const defaultSiteSettings: PublicSiteSettings = {
     ogImage: "",
     googleAnalyticsId: "",
     faviconUrl: "",
-    microsoftClarityId: ""
+    microsoftClarityId: "x73ukoaxs6"
   },
   appearance: {
     primaryColor: "#2563eb",
