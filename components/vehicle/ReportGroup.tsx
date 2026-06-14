@@ -52,7 +52,7 @@ export function ReportGroup({
         id={group.id}
         className={styles.header}
         aria-expanded={open}
-        aria-controls={bodyId}
+        aria-controls={open ? bodyId : undefined}
         onClick={() => onToggle(group.id)}
       >
         <span className={styles.index}>{String(index).padStart(2, "0")}</span>
@@ -62,7 +62,7 @@ export function ReportGroup({
             {group.lockKey ? (
               isPremium ? (
                 <span className={`${styles.chip} ${styles.chipPremium}`}>
-                  <Lock size={9} /> Premium
+                  <Lock size={9} aria-hidden={true} /> Premium
                 </span>
               ) : (
                 <span className={`${styles.chip} ${styles.chipFree}`}>
@@ -82,6 +82,7 @@ export function ReportGroup({
         </span>
         <ChevronDown
           size={20}
+          aria-hidden={true}
           className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}
         />
       </button>

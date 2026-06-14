@@ -27,7 +27,7 @@ type Props = {
  */
 export function ReportSectionNav({ items, onJump, onExpandAll, allOpen }: Props) {
   const [active, setActive] = useState(items[0]?.id ?? "");
-  const navRef = useRef<HTMLDivElement | null>(null);
+  const navRef = useRef<HTMLElement | null>(null);
   const ids = items.map((it) => it.id).join(",");
 
   // Scrollspy: mark the topmost group header currently in the viewport band.
@@ -69,7 +69,7 @@ export function ReportSectionNav({ items, onJump, onExpandAll, allOpen }: Props)
 
   return (
     <div className={styles.navWrap}>
-      <div className={styles.nav} ref={navRef} role="tablist" aria-label="Rapportsecties">
+      <nav className={styles.nav} ref={navRef} aria-label="Rapportsecties">
         {items.map((item) => (
           <button
             key={item.id}
@@ -79,7 +79,7 @@ export function ReportSectionNav({ items, onJump, onExpandAll, allOpen }: Props)
             onClick={() => handleClick(item.id)}
             aria-current={active === item.id ? "true" : undefined}
           >
-            {item.locked ? <Lock size={11} className={styles.navLockIcon} /> : null}
+            {item.locked ? <Lock size={11} aria-hidden={true} className={styles.navLockIcon} /> : null}
             {item.label}
           </button>
         ))}
@@ -89,10 +89,10 @@ export function ReportSectionNav({ items, onJump, onExpandAll, allOpen }: Props)
           onClick={onExpandAll}
           aria-label={allOpen ? "Alles inklappen" : "Alles uitklappen"}
         >
-          {allOpen ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
+          {allOpen ? <ChevronsDownUp size={13} aria-hidden={true} /> : <ChevronsUpDown size={13} aria-hidden={true} />}
           {allOpen ? "Inklappen" : "Alles open"}
         </button>
-      </div>
+      </nav>
     </div>
   );
 }

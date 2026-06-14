@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -22,7 +22,6 @@ import {
   ensurePaidAccessChecked,
   onPlateAccessChanged
 } from "@/lib/payments/access";
-import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
 import { GROUPS, type GroupDef, type GroupId, type ReportSectionId } from "@/lib/vehicle/groups";
 import type { GroupStatus } from "@/lib/vehicle/signals";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
@@ -50,9 +49,6 @@ type Props = { plate: string };
 
 type SectionEntry = {
   component: (plate: string) => React.ReactNode;
-  lockKey: keyof PublicSiteSettings["lockSections"] | null;
-  labelNl: string;
-  labelEn: string;
 };
 
 /**
@@ -64,76 +60,40 @@ type SectionEntry = {
  */
 const SECTIONS: Record<ReportSectionId, SectionEntry> = {
   overzicht: {
-    component: (plate) => <VehicleResultScreen plate={plate} embedded />,
-    lockKey: null,
-    labelNl: "Overzicht",
-    labelEn: "Overview"
+    component: (plate) => <VehicleResultScreen plate={plate} embedded />
   },
   "ai-analyse": {
-    component: (plate) => <AiAnalysisScreen plate={plate} embedded />,
-    lockKey: "riskOverview",
-    labelNl: "Samenvatting & advies",
-    labelEn: "Summary & advice"
+    component: (plate) => <AiAnalysisScreen plate={plate} embedded />
   },
   markt: {
-    component: (plate) => <MarketAnalysisScreen plate={plate} embedded />,
-    lockKey: "marketAnalysis",
-    labelNl: "Marktwaarde",
-    labelEn: "Market value"
+    component: (plate) => <MarketAnalysisScreen plate={plate} embedded />
   },
   "te-koop": {
-    component: (plate) => <ComparableListings plate={plate} />,
-    lockKey: "marketAnalysis",
-    labelNl: "Vergelijkbare auto's te koop",
-    labelEn: "Comparable cars for sale"
+    component: (plate) => <ComparableListings plate={plate} />
   },
   kilometerstand: {
-    component: (plate) => <MileageTimelineScreen plate={plate} embedded />,
-    lockKey: "mileageHistory",
-    labelNl: "Kilometerstand",
-    labelEn: "Mileage"
+    component: (plate) => <MileageTimelineScreen plate={plate} embedded />
   },
   apk: {
-    component: (plate) => <InspectionTimelineScreen plate={plate} embedded />,
-    lockKey: "inspectionTimeline",
-    labelNl: "APK-historie",
-    labelEn: "APK history"
+    component: (plate) => <InspectionTimelineScreen plate={plate} embedded />
   },
   risico: {
-    component: () => null,
-    lockKey: null,
-    labelNl: "Risico's",
-    labelEn: "Risks"
+    component: () => null
   },
   schade: {
-    component: (plate) => <DamageHistoryScreen plate={plate} embedded />,
-    lockKey: "damageHistory",
-    labelNl: "Schadesignalen",
-    labelEn: "Damage signals"
+    component: (plate) => <DamageHistoryScreen plate={plate} embedded />
   },
   eigendom: {
-    component: (plate) => <OwnershipTimelineScreen plate={plate} embedded />,
-    lockKey: "ownershipHistory",
-    labelNl: "Eigendom",
-    labelEn: "Ownership"
+    component: (plate) => <OwnershipTimelineScreen plate={plate} embedded />
   },
   "apk-intelligence": {
-    component: (plate) => <ApkFailureIntelligenceScreen plate={plate} embedded />,
-    lockKey: "riskOverview",
-    labelNl: "APK-inzichten",
-    labelEn: "APK insights"
+    component: (plate) => <ApkFailureIntelligenceScreen plate={plate} embedded />
   },
   specs: {
-    component: (plate) => <TechnicalSpecsScreen plate={plate} embedded />,
-    lockKey: "technicalSpecs",
-    labelNl: "Technische specs",
-    labelEn: "Tech specs"
+    component: (plate) => <TechnicalSpecsScreen plate={plate} embedded />
   },
   acties: {
-    component: () => null,
-    lockKey: null,
-    labelNl: "Volgende stappen",
-    labelEn: "Next steps"
+    component: () => null
   }
 };
 
@@ -361,15 +321,17 @@ export function FullReportScreen({ plate }: Props) {
     setOpenGroups(next);
   };
 
+  const pendingScrollRef = useRef<string | null>(null);
   const jumpToGroup = (id: string) => {
     setOpenGroups((prev) => ({ ...prev, [id as GroupId]: true }));
-    // Open state flips on the next render; defer the scroll one frame so the
-    // header is settled (it is always in the DOM, so this is just polish).
-    requestAnimationFrame(() => {
-      const el = document.getElementById(id);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    pendingScrollRef.current = id;
   };
+  useEffect(() => {
+    const id = pendingScrollRef.current;
+    if (!id) return;
+    pendingScrollRef.current = null;
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [openGroups]);
 
   if (!isValid) {
     return (
