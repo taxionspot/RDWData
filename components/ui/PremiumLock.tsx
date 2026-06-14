@@ -103,7 +103,12 @@ export function PremiumLock({
             </p>
           </div>
 
-          <Button variant="primary" className={styles.unlockButton} onClick={openUnlock}>
+          <Button
+            variant="primary"
+            className={styles.unlockButton}
+            aria-label={nl ? `Ontgrendel ${featureName}` : `Unlock ${featureName}`}
+            onClick={openUnlock}
+          >
             {nl ? "Ontgrendel het volledige rapport" : "Unlock the full report"}
           </Button>
         </div>

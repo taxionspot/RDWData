@@ -74,6 +74,17 @@ test("sanitizeSiteSettings keeps valid reviews and drops malformed entries", () 
   ]);
 });
 
+test("sanitizeSiteSettings caps reviews at 6 items", () => {
+  const manyReviews = Array.from({ length: 8 }, (_, i) => ({
+    quote: `Review ${i + 1}`,
+    author: `Author ${i + 1}`
+  }));
+  const result = sanitizeSiteSettings({ reviews: manyReviews });
+  assert.equal(result.reviews.length, 6);
+  assert.equal(result.reviews[0].quote, "Review 1");
+  assert.equal(result.reviews[5].quote, "Review 6");
+});
+
 test("sanitizeSiteSettings keeps valid values and fixes invalid types in one payload", () => {
   const result = sanitizeSiteSettings({
     paymentEnabled: false,

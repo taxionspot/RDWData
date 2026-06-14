@@ -223,11 +223,11 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
               {locale === "nl" ? (
                 <>
                   Door te betalen ga je akkoord met de{" "}
-                  <Link href="/terms-and-conditions" className={styles.bold} target="_blank">
+                  <Link href="/terms-and-conditions" className={styles.bold} target="_blank" rel="noopener noreferrer">
                     algemene voorwaarden
                   </Link>{" "}
                   en stem je in met directe levering van het rapport, waarmee je afstand doet van je herroepingsrecht. Zie ook ons{" "}
-                  <Link href="/privacy-policy" className={styles.bold} target="_blank">
+                  <Link href="/privacy-policy" className={styles.bold} target="_blank" rel="noopener noreferrer">
                     privacybeleid
                   </Link>
                   .
@@ -235,11 +235,11 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
               ) : (
                 <>
                   By paying you agree to the{" "}
-                  <Link href="/terms-and-conditions" className={styles.bold} target="_blank">
+                  <Link href="/terms-and-conditions" className={styles.bold} target="_blank" rel="noopener noreferrer">
                     terms and conditions
                   </Link>{" "}
                   and consent to immediate delivery of the report, waiving your right of withdrawal. See also our{" "}
-                  <Link href="/privacy-policy" className={styles.bold} target="_blank">
+                  <Link href="/privacy-policy" className={styles.bold} target="_blank" rel="noopener noreferrer">
                     privacy policy
                   </Link>
                   .

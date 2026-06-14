@@ -105,7 +105,8 @@ function reviewItems(
       const author = typeof obj.author === "string" ? obj.author.trim() : "";
       return { quote, author };
     })
-    .filter((item) => item.quote !== "");
+    .filter((item) => item.quote !== "")
+    .slice(0, 6);
 }
 
 export function sanitizeSiteSettings(payload: unknown): PublicSiteSettings {
