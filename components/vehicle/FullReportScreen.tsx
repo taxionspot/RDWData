@@ -215,20 +215,7 @@ export function FullReportScreen({ plate }: Props) {
           allOpen={allOpen}
         />
 
-        <SectionErrorBoundary label="report-teaser">
-          <ReportTeaser
-            plate={normalized}
-            unlocked={unlocked}
-            priceLabel={priceLabel}
-            onUnlockClick={() => setShowPayment(true)}
-          />
-        </SectionErrorBoundary>
-
-        <SectionErrorBoundary label="trust-badges">
-          <TrustBadges plate={normalized} />
-        </SectionErrorBoundary>
-
-        {/* Render order: g1 identity first, then compact verdict, then g2..g9 */}
+        {/* Render order: g1 identity FIRST, then compact verdict/trust cluster, then g2..g9 */}
         {GROUPS.slice(0, 1).map((group, idx) => (
           <ReportGroup
             key={group.id}
@@ -246,8 +233,22 @@ export function FullReportScreen({ plate }: Props) {
           </ReportGroup>
         ))}
 
+        {/* Compact verdict/trust cluster: JudgmentBlock + ReportTeaser + TrustBadges */}
         <SectionErrorBoundary label="judgment-block">
           <JudgmentBlock plate={normalized} locale={locale} onJump={jumpToGroup} />
+        </SectionErrorBoundary>
+
+        <SectionErrorBoundary label="report-teaser">
+          <ReportTeaser
+            plate={normalized}
+            unlocked={unlocked}
+            priceLabel={priceLabel}
+            onUnlockClick={() => setShowPayment(true)}
+          />
+        </SectionErrorBoundary>
+
+        <SectionErrorBoundary label="trust-badges">
+          <TrustBadges plate={normalized} />
         </SectionErrorBoundary>
 
         {GROUPS.slice(1).map((group, idx) => (
