@@ -123,6 +123,35 @@ export function FullReportScreen({ plate }: Props) {
   const searchParams = useSearchParams();
   const { normalized, isValid, data } = useVehicleLookup(plate);
   const [showPayment, setShowPayment] = useState(false);
+  // Track which plates we have already fired a prewarm for so we never send
+  // more than one prewarm per plate per browser session.
+  const prewarmFiredRef = useRef<Set<string>>(new Set());
+
+  // Fire the AI prewarm when the pay modal opens (high-intent signal).
+  // The request is fire-and-forget: the result is never read here. It writes
+  // to the server AI cache so that the post-payment fetch is a cache hit.
+  const openPaymentModal = () => {
+    if (normalized && !prewarmFiredRef.current.has(normalized)) {
+      prewarmFiredRef.current.add(normalized);
+      const sessionKey = `kr_prewarm:${normalized}`;
+      try {
+        if (typeof sessionStorage !== "undefined" && !sessionStorage.getItem(sessionKey)) {
+          sessionStorage.setItem(sessionKey, "1");
+          fetch(`/api/vehicle/${encodeURIComponent(normalized)}/prewarm-ai?lang=${locale}`, {
+            method: "POST"
+          }).catch(() => { /* fire-and-forget, ignore errors */ });
+        }
+      } catch {
+        // sessionStorage may be unavailable (private mode, storage full, etc.).
+        // Fall through: the ref guard above already prevents a second call within
+        // the same React instance.
+        fetch(`/api/vehicle/${encodeURIComponent(normalized)}/prewarm-ai?lang=${locale}`, {
+          method: "POST"
+        }).catch(() => { /* fire-and-forget */ });
+      }
+    }
+    setShowPayment(true);
+  };
 
   const unlocked = usePlateUnlocked(normalized, settings.paymentEnabled);
   const priceLabel = `€ ${settings.payment.amount}`;
@@ -240,7 +269,7 @@ export function FullReportScreen({ plate }: Props) {
   }));
 
   return (
-    <PageUnlockContext.Provider value={() => setShowPayment(true)}>
+    <PageUnlockContext.Provider value={openPaymentModal}>
     <div className={styles.page}>
       <ScanIntro plate={normalized} />
 
@@ -280,7 +309,7 @@ export function FullReportScreen({ plate }: Props) {
             plate={normalized}
             unlocked={unlocked}
             priceLabel={priceLabel}
-            onUnlockClick={() => setShowPayment(true)}
+            onUnlockClick={openPaymentModal}
           />
         </SectionErrorBoundary>
 
@@ -350,7 +379,7 @@ export function FullReportScreen({ plate }: Props) {
               {nl ? "Eenmalig voor dit kenteken" : "One-time for this plate"}
             </span>
           </div>
-          <button type="button" className={styles.stickyBtn} onClick={() => setShowPayment(true)}>
+          <button type="button" className={styles.stickyBtn} onClick={openPaymentModal}>
             {nl ? "Ontgrendel" : "Unlock"}
             <ArrowRight size={15} />
           </button>

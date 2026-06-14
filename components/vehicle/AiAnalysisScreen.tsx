@@ -62,7 +62,11 @@ export function AiAnalysisScreen({ plate, embedded = false }: Props) {
         {loading && !insights ? (
           <div className={styles.loading}>
             <span className={styles.spinner} />
-            {nl ? "We stellen de analyse op..." : "Preparing the analysis..."}
+            <span>
+              {nl
+                ? "Je rapport wordt klaargemaakt, een moment."
+                : "Your report is being prepared, one moment."}
+            </span>
           </div>
         ) : null}
 
