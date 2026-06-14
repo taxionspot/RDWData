@@ -15,7 +15,6 @@ import {
   Gauge,
   RefreshCw,
   Settings2,
-  Share2,
   ShieldCheck,
   TrendingUp,
   Wrench
@@ -35,6 +34,7 @@ import styles from "./VehicleResultScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
 import { UserAuthModal } from "@/components/ui/UserAuthModal";
+import { ShareButton } from "@/components/ui/ShareButton";
 
 type Props = { plate: string; embedded?: boolean };
 
@@ -143,6 +143,8 @@ function InsightCard({
 function ScoreModule({
   score,
   locale,
+  plate,
+  vehicleName,
   onDownload,
   isDownloading,
   onSave,
@@ -151,6 +153,8 @@ function ScoreModule({
 }: {
   score: ScoreResult;
   locale: "nl" | "en";
+  plate: string;
+  vehicleName: string;
   onDownload: () => void;
   isDownloading: boolean;
   onSave: () => void;
@@ -232,10 +236,12 @@ function ScoreModule({
             <Bookmark size={16} />
             {isSaving ? (locale === "nl" ? "Opslaan..." : "Saving...") : isSaved ? (locale === "nl" ? "Opgeslagen" : "Saved") : locale === "nl" ? "Voertuig opslaan" : "Save Vehicle"}
           </button>
-          <button className={styles.actionSecondary} type="button">
-            <Share2 size={16} />
-            {locale === "nl" ? "Delen" : "Share"}
-          </button>
+          <ShareButton
+            plate={plate}
+            vehicleName={vehicleName}
+            locale={locale}
+            triggerClassName={styles.actionSecondary}
+          />
         </div>
       </div>
     </div>
@@ -591,6 +597,8 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
                 <ScoreModule
                   score={score}
                   locale={locale}
+                  plate={normalizedPlate}
+                  vehicleName={[v.brand, v.tradeName].filter(Boolean).join(" ").trim()}
                   onDownload={handleDownload}
                   isDownloading={isDownloading}
                   onSave={() => {

@@ -47,7 +47,7 @@
 .nav {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   overflow-x: auto;
   scrollbar-width: none;
   background: #ffffff;
