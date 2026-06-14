@@ -93,6 +93,21 @@ function workflowItems(
   return items.length > 0 ? items : fallback;
 }
 
+function reviewItems(
+  value: unknown,
+  fallback: PublicSiteSettings["reviews"]
+): PublicSiteSettings["reviews"] {
+  if (!Array.isArray(value)) return fallback;
+  return value
+    .map((item) => {
+      const obj = asRecord(item);
+      const quote = typeof obj.quote === "string" ? obj.quote.trim() : "";
+      const author = typeof obj.author === "string" ? obj.author.trim() : "";
+      return { quote, author };
+    })
+    .filter((item) => item.quote !== "");
+}
+
 export function sanitizeSiteSettings(payload: unknown): PublicSiteSettings {
   const d = defaultSiteSettings;
   const raw = asRecord(payload);
@@ -186,6 +201,7 @@ export function sanitizeSiteSettings(payload: unknown): PublicSiteSettings {
       reportSubjectEn: str(email.reportSubjectEn, d.email.reportSubjectEn),
       welcomeBodyNl: str(email.welcomeBodyNl, d.email.welcomeBodyNl),
       welcomeBodyEn: str(email.welcomeBodyEn, d.email.welcomeBodyEn)
-    }
+    },
+    reviews: reviewItems(raw.reviews, d.reviews)
   };
 }

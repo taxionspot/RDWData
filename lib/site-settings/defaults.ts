@@ -78,6 +78,9 @@ export type PublicSiteSettings = {
     welcomeBodyNl: string;
     welcomeBodyEn: string;
   };
+  // Optional real customer quotes for the paywall. Empty by default: the
+  // reviews slot renders nothing until the owner adds genuine NL quotes here.
+  reviews: Array<{ quote: string; author: string }>;
 };
 
 export const defaultSiteSettings: PublicSiteSettings = {
@@ -215,5 +218,6 @@ export const defaultSiteSettings: PublicSiteSettings = {
     reportSubjectEn: "Your vehicle report",
     welcomeBodyNl: "Bedankt voor het gebruiken van Kentekenrapport. Uw rapport is bijgevoegd.",
     welcomeBodyEn: "Thank you for using Kentekenrapport. Your report is attached."
-  }
+  },
+  reviews: []
 };

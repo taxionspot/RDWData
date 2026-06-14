@@ -52,6 +52,28 @@ test("sanitizeSiteSettings normalizes comma-decimal payment amounts for PayPal",
   assert.equal(sanitizeSiteSettings({ payment: { amount: "-3" } }).payment.amount, defaultSiteSettings.payment.amount);
 });
 
+test("sanitizeSiteSettings defaults reviews to an empty array", () => {
+  assert.deepEqual(sanitizeSiteSettings(null).reviews, []);
+  assert.deepEqual(sanitizeSiteSettings({}).reviews, []);
+  assert.deepEqual(sanitizeSiteSettings({ reviews: "not-an-array" }).reviews, []);
+});
+
+test("sanitizeSiteSettings keeps valid reviews and drops malformed entries", () => {
+  const result = sanitizeSiteSettings({
+    reviews: [
+      { quote: "Snel en duidelijk.", author: "Jeroen K." },
+      { quote: "Bespaarde me een miskoop.", author: "" },
+      { quote: "", author: "Lege quote" },
+      { broken: true },
+      42
+    ]
+  });
+  assert.deepEqual(result.reviews, [
+    { quote: "Snel en duidelijk.", author: "Jeroen K." },
+    { quote: "Bespaarde me een miskoop.", author: "" }
+  ]);
+});
+
 test("sanitizeSiteSettings keeps valid values and fixes invalid types in one payload", () => {
   const result = sanitizeSiteSettings({
     paymentEnabled: false,
