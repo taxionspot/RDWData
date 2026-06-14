@@ -1,22 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertTriangle,
   ArrowRight,
   BellRing,
-  CheckCircle2,
   ChevronRight,
-  Radar,
-  Scale,
-  Unlock
+  Scale
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
-import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import {
   hasPaidAccessForPlate,
   ensurePaidAccessChecked,
@@ -41,6 +36,7 @@ import { ApkFailureIntelligenceScreen } from "./ApkFailureIntelligenceScreen";
 import { TechnicalSpecsScreen } from "./TechnicalSpecsScreen";
 import { ReportGroup } from "./ReportGroup";
 import { ReportSectionNav } from "./ReportSectionNav";
+import { ReportTeaser } from "./ReportTeaser";
 import { TrustBadges } from "./TrustBadges";
 import { ComparableListings } from "./ComparableListings";
 import styles from "./FullReportScreen.module.css";
@@ -110,163 +106,6 @@ function usePlateUnlocked(plate: string, paymentEnabled: boolean) {
   }, [plate]);
 
   return unlocked || !paymentEnabled || isSamplePlate(plate);
-}
-
-/* ── "Records found" banner ─────────────────────────────────────────── */
-function RecordsSummary({
-  plate,
-  unlocked,
-  priceLabel,
-  onUnlockClick
-}: {
-  plate: string;
-  unlocked: boolean;
-  priceLabel: string;
-  onUnlockClick: () => void;
-}) {
-  const { locale } = useI18n();
-  const nl = locale === "nl";
-  const { data } = useVehicleLookup(plate);
-
-  const counts = useMemo(() => {
-    const inspections = Array.isArray(data?.inspections) ? data!.inspections.length : 0;
-    const defects = Array.isArray(data?.defects) ? data!.defects.length : 0;
-    const recalls = Array.isArray(data?.recalls) ? data!.recalls.length : 0;
-    const baseFields = 28; // core register fields always checked
-    return {
-      inspections,
-      defects,
-      recalls,
-      datapoints: baseFields + inspections * 3 + defects + recalls
-    };
-  }, [data]);
-
-  const findings = useMemo(() => {
-    const list: Array<{ label: string; tone: "ok" | "warn" | "danger" }> = [];
-    const v = data?.vehicle;
-    if (!v) return list;
-
-    if (v.wok) {
-      list.push({ label: nl ? "WOK-registratie" : "Salvage (WOK) flag", tone: "danger" });
-    } else {
-      list.push({ label: nl ? "Geen WOK" : "No salvage flag", tone: "ok" });
-    }
-
-    const nap = (v.napVerdict ?? "").toLowerCase();
-    if (nap.includes("onlogisch")) {
-      list.push({ label: nl ? "NAP: onlogisch" : "NAP: illogical", tone: "danger" });
-    } else if (nap.includes("logisch")) {
-      list.push({ label: nl ? "NAP: logisch" : "NAP: logical", tone: "ok" });
-    }
-
-    if (v.hasOpenRecall) {
-      list.push({ label: nl ? "Open terugroepactie" : "Open recall", tone: "warn" });
-    }
-    if (counts.defects > 0) {
-      list.push({
-        label: nl ? `${counts.defects} gebreken geregistreerd` : `${counts.defects} recorded defects`,
-        tone: "warn"
-      });
-    }
-    if (data?.enriched?.isImported) {
-      list.push({ label: nl ? "Importvoertuig" : "Imported vehicle", tone: "warn" });
-    }
-    return list.slice(0, 5);
-  }, [data, counts.defects, nl]);
-
-  const attentionCount = findings.filter((finding) => finding.tone !== "ok").length;
-
-  return (
-    <div className={styles.summary}>
-      <div className={styles.summaryCopy}>
-        <span className={styles.summaryEyebrow}>
-          <Radar size={13} />
-          {nl ? "Scan voltooid" : "Scan complete"} · {formatDisplayPlate(plate)}
-        </span>
-        <div className={styles.summaryTitle}>
-          {nl ? (
-            <>
-              Wij vonden <strong>{counts.datapoints} datapunten</strong>
-              {attentionCount > 0 ? (
-                <>
-                  {" "}waarvan <strong>{attentionCount} {attentionCount === 1 ? "bevinding" : "bevindingen"}</strong> die je
-                  moet zien
-                </>
-              ) : (
-                <> zonder grote rode vlaggen</>
-              )}
-            </>
-          ) : (
-            <>
-              We found <strong>{counts.datapoints} data points</strong>
-              {attentionCount > 0 ? (
-                <>
-                  {" "}including <strong>{attentionCount} {attentionCount === 1 ? "finding" : "findings"}</strong> you should
-                  see
-                </>
-              ) : (
-                <> with no major red flags</>
-              )}
-            </>
-          )}
-        </div>
-        <div className={styles.summaryChips}>
-          <span className={styles.summaryChip}>
-            {counts.inspections} {nl ? "APK-keuringen" : "APK inspections"}
-          </span>
-          <span className={styles.summaryChip}>
-            {counts.defects} {nl ? "gebrekrecords" : "defect records"}
-          </span>
-          <span className={styles.summaryChip}>
-            {counts.recalls} {nl ? "terugroepacties" : "recalls"}
-          </span>
-          {findings.map((finding) => (
-            <span
-              key={finding.label}
-              className={`${styles.summaryChip} ${
-                finding.tone === "danger"
-                  ? styles.summaryChipDanger
-                  : finding.tone === "warn"
-                  ? styles.summaryChipWarn
-                  : styles.summaryChipOk
-              }`}
-            >
-              {finding.tone === "ok" ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
-              {finding.label}
-            </span>
-          ))}
-        </div>
-        {!unlocked ? (
-          <p className={styles.summaryHint}>
-            {nl
-              ? "Hieronder zie je van elk onderdeel een voorproefje. Ontgrendel eenmalig om de volledige analyse, marktwaarde en historie te zien."
-              : "Below you get a preview of every section. Unlock once to see the full analysis, market value and history."}
-          </p>
-        ) : null}
-      </div>
-
-      <div className={styles.summaryAction}>
-        {unlocked ? (
-          <span className={styles.unlockedBadge}>
-            <Unlock size={16} />
-            {nl ? "Volledig rapport ontgrendeld" : "Full report unlocked"}
-          </span>
-        ) : (
-          <>
-            <button type="button" className={styles.unlockBtn} onClick={onUnlockClick}>
-              <Unlock size={16} />
-              {nl ? `Ontgrendel alles · ${priceLabel}` : `Unlock everything · ${priceLabel}`}
-            </button>
-            <span className={styles.unlockMicro}>
-              {nl
-                ? "Eenmalig voor dit kenteken · iDEAL, Apple Pay, Google Pay, PayPal · direct toegang"
-                : "One-time for this plate · iDEAL, Apple Pay, Google Pay, PayPal · instant access"}
-            </span>
-          </>
-        )}
-      </div>
-    </div>
-  );
 }
 
 /* ── Full single-scroll report ──────────────────────────────────────── */
@@ -366,9 +205,8 @@ export function FullReportScreen({ plate }: Props) {
           <JudgmentBlock plate={normalized} locale={locale} onJump={jumpToGroup} />
         </SectionErrorBoundary>
 
-        {/* Phase 3 swaps RecordsSummary for ReportTeaser. */}
-        <SectionErrorBoundary label="records-summary">
-          <RecordsSummary
+        <SectionErrorBoundary label="report-teaser">
+          <ReportTeaser
             plate={normalized}
             unlocked={unlocked}
             priceLabel={priceLabel}
