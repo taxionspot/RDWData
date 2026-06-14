@@ -100,6 +100,17 @@
   opacity: 0.75;
 }
 
+.navExpandPill {
+  margin-left: auto;
+  color: #1d4ed8;
+  background: #eef4ff;
+}
+
+.navExpandPill:hover {
+  background: #dbe8ff;
+  color: #1d4ed8;
+}
+
 /* ---------- Records summary banner ---------- */
 
 .summary {

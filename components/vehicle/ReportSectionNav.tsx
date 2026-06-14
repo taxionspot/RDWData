@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Lock } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, Lock } from "lucide-react";
 import styles from "./FullReportScreen.module.css";
 
 export type ReportNavItem = {
@@ -10,19 +10,27 @@ export type ReportNavItem = {
   locked: boolean;
 };
 
+type Props = {
+  items: ReportNavItem[];
+  onJump: (id: string) => void;
+  onExpandAll: () => void;
+  allOpen: boolean;
+};
+
 /**
- * Sticky in-report navigation with scrollspy. The report is one long page, so
- * this lets visitors jump straight to a section instead of scrolling through
- * everything. The matching CSS (.navWrap/.nav/.navPill) lives in
- * FullReportScreen.module.css and the sections carry scroll-margin-top so a
- * jump lands just below the sticky bar.
+ * Sticky in-report navigation with scrollspy. The report is one long page of
+ * collapsible groups, so this lets visitors jump straight to a group (the
+ * parent opens it, then scrolls its header into view) instead of scrolling
+ * through everything. Scrollspy observes the GROUP HEADER elements, which are
+ * always in the DOM (id={group.id}) even when a group is collapsed. The matching
+ * CSS (.navWrap/.nav/.navPill) lives in FullReportScreen.module.css.
  */
-export function ReportSectionNav({ items }: { items: ReportNavItem[] }) {
+export function ReportSectionNav({ items, onJump, onExpandAll, allOpen }: Props) {
   const [active, setActive] = useState(items[0]?.id ?? "");
   const navRef = useRef<HTMLDivElement | null>(null);
   const ids = items.map((it) => it.id).join(",");
 
-  // Scrollspy: mark the topmost section currently in the viewport band.
+  // Scrollspy: mark the topmost group header currently in the viewport band.
   useEffect(() => {
     const sectionIds = ids ? ids.split(",") : [];
     const sections = sectionIds
@@ -37,7 +45,7 @@ export function ReportSectionNav({ items }: { items: ReportNavItem[] }) {
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         if (visible[0]) setActive(visible[0].target.id);
       },
-      { rootMargin: "-140px 0px -55% 0px", threshold: 0 }
+      { rootMargin: "-132px 0px -55% 0px", threshold: 0 }
     );
 
     sections.forEach((el) => observer.observe(el));
@@ -55,10 +63,8 @@ export function ReportSectionNav({ items }: { items: ReportNavItem[] }) {
   }, [active]);
 
   const handleClick = (id: string) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
     setActive(id);
+    onJump(id);
   };
 
   return (
@@ -77,6 +83,15 @@ export function ReportSectionNav({ items }: { items: ReportNavItem[] }) {
             {item.label}
           </button>
         ))}
+        <button
+          type="button"
+          className={`${styles.navPill} ${styles.navExpandPill}`}
+          onClick={onExpandAll}
+          aria-label={allOpen ? "Alles inklappen" : "Alles uitklappen"}
+        >
+          {allOpen ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
+          {allOpen ? "Inklappen" : "Alles open"}
+        </button>
       </div>
     </div>
   );

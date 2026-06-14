@@ -9,7 +9,6 @@ import {
   BellRing,
   CheckCircle2,
   ChevronRight,
-  Lock,
   Radar,
   Scale,
   Unlock
@@ -24,14 +23,16 @@ import {
   onPlateAccessChanged
 } from "@/lib/payments/access";
 import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
+import { GROUPS, type GroupDef, type GroupId, type ReportSectionId } from "@/lib/vehicle/groups";
+import type { GroupStatus } from "@/lib/vehicle/signals";
 import { SubscriptionModal } from "@/components/ui/SubscriptionModal";
 import { SectionErrorBoundary } from "@/components/ui/SectionErrorBoundary";
 import { isSamplePlate } from "@/lib/sample";
 import { track } from "@/lib/analytics";
 import { ScanIntro } from "./ScanIntro";
+import { JudgmentBlock } from "./JudgmentBlock";
 import { AiAnalysisScreen } from "./AiAnalysisScreen";
 import { VehicleResultScreen } from "./VehicleResultScreen";
-import { RiskOverviewScreen } from "./RiskOverviewScreen";
 import { MarketAnalysisScreen } from "./MarketAnalysisScreen";
 import { InspectionTimelineScreen } from "./InspectionTimelineScreen";
 import { MileageTimelineScreen } from "./MileageTimelineScreen";
@@ -39,122 +40,102 @@ import { DamageHistoryScreen } from "./DamageHistoryScreen";
 import { OwnershipTimelineScreen } from "./OwnershipTimelineScreen";
 import { ApkFailureIntelligenceScreen } from "./ApkFailureIntelligenceScreen";
 import { TechnicalSpecsScreen } from "./TechnicalSpecsScreen";
+import { ReportGroup } from "./ReportGroup";
 import { ReportSectionNav } from "./ReportSectionNav";
 import { TrustBadges } from "./TrustBadges";
 import { ComparableListings } from "./ComparableListings";
-import { JudgmentBlock } from "./JudgmentBlock";
-import { GROUPS } from "@/lib/vehicle/groups";
 import styles from "./FullReportScreen.module.css";
 
 type Props = { plate: string };
 
-type SectionDef = {
-  id: string;
+type SectionEntry = {
+  component: (plate: string) => React.ReactNode;
+  lockKey: keyof PublicSiteSettings["lockSections"] | null;
   labelNl: string;
   labelEn: string;
-  subNl: string;
-  subEn: string;
-  lockKey: keyof PublicSiteSettings["lockSections"] | null;
 };
 
-const SECTIONS: SectionDef[] = [
-  {
-    id: "overzicht",
+/**
+ * Registry of every report section. Layout is driven by GROUPS
+ * (lib/vehicle/groups.ts); this map only says HOW to render each sectionId.
+ * Each screen self-gates with its own PremiumLock (sectionKey), so we do NOT
+ * wrap a second PremiumLock here. The "risico" section (RiskOverviewScreen) is
+ * intentionally absent: its BLUF role moved to JudgmentBlock.
+ */
+const SECTIONS: Record<ReportSectionId, SectionEntry> = {
+  overzicht: {
+    component: (plate) => <VehicleResultScreen plate={plate} embedded />,
+    lockKey: null,
     labelNl: "Overzicht",
-    labelEn: "Overview",
-    subNl: "Identiteit, score en kerngegevens",
-    subEn: "Identity, score and key data",
-    lockKey: null
+    labelEn: "Overview"
   },
-  {
-    id: "ai-analyse",
+  "ai-analyse": {
+    component: (plate) => <AiAnalysisScreen plate={plate} embedded />,
+    lockKey: "riskOverview",
     labelNl: "Samenvatting & advies",
-    labelEn: "Summary & advice",
-    subNl: "Alle bevindingen samengevat in gewone taal",
-    subEn: "All findings summarised in plain language",
-    lockKey: "riskOverview"
+    labelEn: "Summary & advice"
   },
-  {
-    id: "markt",
+  markt: {
+    component: (plate) => <MarketAnalysisScreen plate={plate} embedded />,
+    lockKey: "marketAnalysis",
     labelNl: "Marktwaarde",
-    labelEn: "Market value",
-    subNl: "Waarde, vraagprijs-check en vaste lasten",
-    subEn: "Value, asking-price check and running costs",
-    lockKey: "marketAnalysis"
+    labelEn: "Market value"
   },
-  {
-    id: "te-koop",
+  "te-koop": {
+    component: (plate) => <ComparableListings plate={plate} />,
+    lockKey: "marketAnalysis",
     labelNl: "Vergelijkbare auto's te koop",
-    labelEn: "Comparable cars for sale",
-    subNl: "Dezelfde auto en alternatieven op de grote verkoopsites",
-    subEn: "The same car and alternatives on the big marketplaces",
-    lockKey: "marketAnalysis"
+    labelEn: "Comparable cars for sale"
   },
-  {
-    id: "kilometerstand",
+  kilometerstand: {
+    component: (plate) => <MileageTimelineScreen plate={plate} embedded />,
+    lockKey: "mileageHistory",
     labelNl: "Kilometerstand",
-    labelEn: "Mileage",
-    subNl: "NAP-oordeel en tellertrend",
-    subEn: "NAP verdict and odometer trend",
-    lockKey: "mileageHistory"
+    labelEn: "Mileage"
   },
-  {
-    id: "apk",
+  apk: {
+    component: (plate) => <InspectionTimelineScreen plate={plate} embedded />,
+    lockKey: "inspectionTimeline",
     labelNl: "APK-historie",
-    labelEn: "APK history",
-    subNl: "Alle keuringen en geconstateerde gebreken",
-    subEn: "All inspections and recorded defects",
-    lockKey: "inspectionTimeline"
+    labelEn: "APK history"
   },
-  {
-    id: "risico",
+  risico: {
+    component: () => null,
+    lockKey: null,
     labelNl: "Risico's",
-    labelEn: "Risks",
-    subNl: "De vier kerncontroles in één blik",
-    subEn: "The four core checks at a glance",
-    lockKey: "riskOverview"
+    labelEn: "Risks"
   },
-  {
-    id: "schade",
+  schade: {
+    component: (plate) => <DamageHistoryScreen plate={plate} embedded />,
+    lockKey: "damageHistory",
     labelNl: "Schadesignalen",
-    labelEn: "Damage signals",
-    subNl: "Officiële signalen uit keuringen en registraties",
-    subEn: "Official signals from inspections and registrations",
-    lockKey: "damageHistory"
+    labelEn: "Damage signals"
   },
-  {
-    id: "eigendom",
+  eigendom: {
+    component: (plate) => <OwnershipTimelineScreen plate={plate} embedded />,
+    lockKey: "ownershipHistory",
     labelNl: "Eigendom",
-    labelEn: "Ownership",
-    subNl: "Registratie, overdracht en status",
-    subEn: "Registration, transfer and status",
-    lockKey: "ownershipHistory"
+    labelEn: "Ownership"
   },
-  {
-    id: "apk-intelligence",
+  "apk-intelligence": {
+    component: (plate) => <ApkFailureIntelligenceScreen plate={plate} embedded />,
+    lockKey: "riskOverview",
     labelNl: "APK-inzichten",
-    labelEn: "APK insights",
-    subNl: "Terugkerende gebreken en slaagkans",
-    subEn: "Recurring defects and pass probability",
-    lockKey: "riskOverview"
+    labelEn: "APK insights"
   },
-  {
-    id: "specs",
+  specs: {
+    component: (plate) => <TechnicalSpecsScreen plate={plate} embedded />,
+    lockKey: "technicalSpecs",
     labelNl: "Technische specs",
-    labelEn: "Tech specs",
-    subNl: "Volledige fabrieksgegevens uit het RDW-register",
-    subEn: "Full factory data from the RDW register",
-    lockKey: "technicalSpecs"
+    labelEn: "Tech specs"
   },
-  {
-    id: "acties",
+  acties: {
+    component: () => null,
+    lockKey: null,
     labelNl: "Volgende stappen",
-    labelEn: "Next steps",
-    subNl: "Vergelijken, volgen en downloaden",
-    subEn: "Compare, watch and download",
-    lockKey: null
+    labelEn: "Next steps"
   }
-];
+};
 
 function usePlateUnlocked(plate: string, paymentEnabled: boolean) {
   const [unlocked, setUnlocked] = useState(false);
@@ -328,69 +309,66 @@ function RecordsSummary({
   );
 }
 
-/* ── Section wrapper with numbered header ───────────────────────────── */
-function SectionBlock({
-  section,
-  index,
-  isPremium,
-  locale,
-  children
-}: {
-  section: SectionDef;
-  index: number;
-  isPremium: boolean;
-  locale: "nl" | "en";
-  children: React.ReactNode;
-}) {
-  const nl = locale === "nl";
-  return (
-    <section id={section.id} className={styles.sectionBlock}>
-      <div className={styles.sectionHead}>
-        <span className={styles.sectionIndex}>{String(index).padStart(2, "0")}</span>
-        <div className={styles.sectionMeta}>
-          <span className={styles.sectionTitle}>
-            {nl ? section.labelNl : section.labelEn}
-            {section.lockKey ? (
-              isPremium ? (
-                <span className={`${styles.sectionChip} ${styles.sectionChipPremium}`}>
-                  <Lock size={9} /> Premium
-                </span>
-              ) : (
-                <span className={`${styles.sectionChip} ${styles.sectionChipFree}`}>{nl ? "Inbegrepen" : "Included"}</span>
-              )
-            ) : (
-              <span className={`${styles.sectionChip} ${styles.sectionChipFree}`}>{nl ? "Gratis" : "Free"}</span>
-            )}
-          </span>
-          <span className={styles.sectionSub}>{nl ? section.subNl : section.subEn}</span>
-        </div>
-      </div>
-      <SectionErrorBoundary label={section.id}>{children}</SectionErrorBoundary>
-    </section>
-  );
-}
-
 /* ── Full single-scroll report ──────────────────────────────────────── */
 export function FullReportScreen({ plate }: Props) {
   const { locale } = useI18n();
   const nl = locale === "nl";
   const { settings } = useSiteSettings();
   const searchParams = useSearchParams();
-  const { normalized, isValid } = useVehicleLookup(plate);
+  const { normalized, isValid, data } = useVehicleLookup(plate);
   const [showPayment, setShowPayment] = useState(false);
 
   const unlocked = usePlateUnlocked(normalized, settings.paymentEnabled);
   const priceLabel = `€ ${settings.payment.amount}`;
 
+  const [openGroups, setOpenGroups] = useState<Record<GroupId, boolean>>(() => {
+    const seed = {} as Record<GroupId, boolean>;
+    for (const group of GROUPS) seed[group.id] = group.defaultOpen;
+    return seed;
+  });
+
   useEffect(() => {
     if (isValid && normalized) track("report_viewed", { sample: isSamplePlate(normalized) });
   }, [isValid, normalized]);
 
-  const isPremiumSection = (section: SectionDef) => {
-    if (!section.lockKey) return false;
+  const isPremiumGroup = (group: GroupDef): boolean => {
+    if (!group.lockKey) return false;
     if (!settings.paymentEnabled) return false;
     if (unlocked) return false;
-    return settings.lockSections[section.lockKey];
+    return settings.lockSections[group.lockKey];
+  };
+
+  const groupStatus = (group: GroupDef): GroupStatus => {
+    const fromSignals = data?.signals?.groupStatus?.[group.id];
+    if (fromSignals) return fromSignals;
+    return {
+      tone: "ok",
+      labelNl: "Gegevens beschikbaar",
+      labelEn: "Data available"
+    };
+  };
+
+  const toggleGroup = (id: GroupId) => {
+    setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const allOpen = GROUPS.every((group) => openGroups[group.id]);
+
+  const expandAll = () => {
+    const next = {} as Record<GroupId, boolean>;
+    const target = !allOpen;
+    for (const group of GROUPS) next[group.id] = target;
+    setOpenGroups(next);
+  };
+
+  const jumpToGroup = (id: string) => {
+    setOpenGroups((prev) => ({ ...prev, [id as GroupId]: true }));
+    // Open state flips on the next render; defer the scroll one frame so the
+    // header is settled (it is always in the DOM, so this is just polish).
+    requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   if (!isValid) {
@@ -403,45 +381,30 @@ export function FullReportScreen({ plate }: Props) {
 
   const sharedQuery = searchParams?.toString();
   const withQuery = (href: string) => (sharedQuery ? `${href}?${sharedQuery}` : href);
-  const sectionById = (id: string): SectionDef => SECTIONS.find((section) => section.id === id) ?? SECTIONS[0];
-  const sectionIndex = (id: string): number => {
-    const i = SECTIONS.findIndex((section) => section.id === id);
-    return i >= 0 ? i + 1 : 1;
-  };
 
-  const navItems = SECTIONS.map((section) => ({
-    id: section.id,
-    label: nl ? section.labelNl : section.labelEn,
-    locked: isPremiumSection(section)
+  const navItems = GROUPS.map((group) => ({
+    id: group.id as string,
+    label: nl ? group.labelNl : group.labelEn,
+    locked: isPremiumGroup(group)
   }));
-
-  // Phase 1 temporary jump: the group accordion lands in Phase 2, so map a
-  // group id to its first section id (which exists in the current layout) and
-  // scroll there. Phase 2 will open the group then scroll its header.
-  const jumpToGroup = (groupId: string) => {
-    const group = GROUPS.find((g) => g.id === groupId);
-    const targetId = group?.sectionIds[0] ?? groupId;
-    const el = document.getElementById(targetId);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
   return (
     <div className={styles.page}>
       <ScanIntro plate={normalized} />
 
       <div className={styles.container}>
-        <JudgmentBlock plate={normalized} locale={locale} onJump={jumpToGroup} />
+        <ReportSectionNav
+          items={navItems}
+          onJump={jumpToGroup}
+          onExpandAll={expandAll}
+          allOpen={allOpen}
+        />
 
-        <ReportSectionNav items={navItems} />
+        <SectionErrorBoundary label="judgment-block">
+          <JudgmentBlock plate={normalized} locale={locale} onJump={jumpToGroup} />
+        </SectionErrorBoundary>
 
-        <SectionBlock section={sectionById("overzicht")} index={sectionIndex("overzicht")} isPremium={false} locale={locale}>
-          <VehicleResultScreen plate={plate} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("ai-analyse")} index={sectionIndex("ai-analyse")} isPremium={isPremiumSection(sectionById("ai-analyse"))} locale={locale}>
-          <AiAnalysisScreen plate={normalized} />
-        </SectionBlock>
-
+        {/* Phase 3 swaps RecordsSummary for ReportTeaser. */}
         <SectionErrorBoundary label="records-summary">
           <RecordsSummary
             plate={normalized}
@@ -455,43 +418,24 @@ export function FullReportScreen({ plate }: Props) {
           <TrustBadges plate={normalized} />
         </SectionErrorBoundary>
 
-        <SectionBlock section={sectionById("markt")} index={sectionIndex("markt")} isPremium={isPremiumSection(sectionById("markt"))} locale={locale}>
-          <MarketAnalysisScreen plate={normalized} embedded />
-        </SectionBlock>
+        {GROUPS.map((group, idx) => (
+          <ReportGroup
+            key={group.id}
+            group={group}
+            index={idx + 1}
+            status={groupStatus(group)}
+            isPremium={isPremiumGroup(group)}
+            open={openGroups[group.id]}
+            onToggle={toggleGroup}
+            locale={locale}
+          >
+            {group.sectionIds.map((sectionId) => (
+              <div key={sectionId}>{SECTIONS[sectionId].component(normalized)}</div>
+            ))}
+          </ReportGroup>
+        ))}
 
-        <SectionBlock section={sectionById("te-koop")} index={sectionIndex("te-koop")} isPremium={isPremiumSection(sectionById("te-koop"))} locale={locale}>
-          <ComparableListings plate={normalized} />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("kilometerstand")} index={sectionIndex("kilometerstand")} isPremium={isPremiumSection(sectionById("kilometerstand"))} locale={locale}>
-          <MileageTimelineScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("apk")} index={sectionIndex("apk")} isPremium={isPremiumSection(sectionById("apk"))} locale={locale}>
-          <InspectionTimelineScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("risico")} index={sectionIndex("risico")} isPremium={isPremiumSection(sectionById("risico"))} locale={locale}>
-          <RiskOverviewScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("schade")} index={sectionIndex("schade")} isPremium={isPremiumSection(sectionById("schade"))} locale={locale}>
-          <DamageHistoryScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("eigendom")} index={sectionIndex("eigendom")} isPremium={isPremiumSection(sectionById("eigendom"))} locale={locale}>
-          <OwnershipTimelineScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("apk-intelligence")} index={sectionIndex("apk-intelligence")} isPremium={isPremiumSection(sectionById("apk-intelligence"))} locale={locale}>
-          <ApkFailureIntelligenceScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("specs")} index={sectionIndex("specs")} isPremium={isPremiumSection(sectionById("specs"))} locale={locale}>
-          <TechnicalSpecsScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("acties")} index={sectionIndex("acties")} isPremium={false} locale={locale}>
+        <SectionErrorBoundary label="acties">
           <div className={styles.actionsGrid}>
             <Link href={withQuery(`/search/${normalized}/vehicle-comparison`)} className={styles.actionCard}>
               <span className={styles.actionIcon}>
@@ -522,7 +466,7 @@ export function FullReportScreen({ plate }: Props) {
               <ChevronRight size={18} className={styles.actionChevron} />
             </Link>
           </div>
-        </SectionBlock>
+        </SectionErrorBoundary>
       </div>
 
       {/* Sticky mobile unlock bar */}
