@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { X, Check, ShieldCheck, Zap, Sparkles } from "lucide-react";
+import { X, Check, ShieldCheck, Zap, Sparkles, Lock, Landmark } from "lucide-react";
 import styles from "./SubscriptionModal.module.css";
 import { useI18n } from "@/lib/i18n/context";
 import { CheckoutMethods } from "@/components/payments/CheckoutMethods";
@@ -156,16 +156,38 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
           <div className={`${styles.planCard} ${styles.planActive}`}>
             <div className={styles.planHeader}>
               <div className={styles.planName}>{locale === "nl" ? "Veilig betalen" : "Secure payment"}</div>
-              <div className={styles.planPrice}>
+              <div className={styles.priceSmall}>
                 {settings.payment.currency} {settings.payment.amount}
-                <span>/{locale === "nl" ? "zoekopdracht" : "search"}</span>
+                <span>/{locale === "nl" ? "kenteken" : "plate"}</span>
               </div>
             </div>
-            <ul className={styles.features}>
-              <li><Check size={14} className={styles.checkIcon} /> {locale === "nl" ? "Ontgrendelt alle premium tabbladen voor dit kenteken" : "Unlocks all premium tabs for this plate"}</li>
-              <li><Check size={14} className={styles.checkIcon} /> {locale === "nl" ? "Maakt rapportdownload beschikbaar voor dit kenteken" : "Enables report download for this plate"}</li>
-              <li><Check size={14} className={styles.checkIcon} /> {locale === "nl" ? "Per zoekopdracht betaling" : "Payment per search"}</li>
+            <ul className={styles.valueStack}>
+              <li className={styles.valueRow}>
+                <Check size={15} className={styles.valueIconOk} />
+                {locale === "nl" ? "Koopoordeel: koop, twijfel of pas op" : "Buy verdict: buy, doubt or beware"}
+              </li>
+              <li className={styles.valueRow}>
+                <Check size={15} className={styles.valueIconOk} />
+                {locale === "nl" ? "Vergelijkbare autos en alternatieven" : "Comparable cars and alternatives"}
+              </li>
+              <li className={styles.valueRow}>
+                <Check size={15} className={styles.valueIconOk} />
+                {locale === "nl" ? "Diepte-analyse: APK, kilometerstand en risicos" : "Deep analysis: MOT, mileage and risks"}
+              </li>
+              <li className={`${styles.valueRow} ${styles.valueRowLocked}`}>
+                <Lock size={14} className={styles.valueIconLocked} />
+                {locale === "nl" ? "Marktwaarde en eerlijke prijs (vergrendeld)" : "Market value and fair price (locked)"}
+              </li>
+              <li className={`${styles.valueRow} ${styles.valueRowLocked}`}>
+                <Lock size={14} className={styles.valueIconLocked} />
+                {locale === "nl" ? "Onderhandelhulp met argumenten (vergrendeld)" : "Negotiation help with arguments (locked)"}
+              </li>
             </ul>
+            <p className={styles.stakeLine}>
+              {locale === "nl"
+                ? `Een verkeerde occasion kost zo honderden euros. Dit rapport: ${settings.payment.currency} ${settings.payment.amount}.`
+                : `The wrong used car can cost hundreds of euros. This report: ${settings.payment.currency} ${settings.payment.amount}.`}
+            </p>
             <label className={styles.emailLabel}>
               {locale === "nl" ? "E-mail voor rapportlevering" : "Email for report delivery"}
               <input
@@ -261,6 +283,16 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
                   : locale === "nl" ? "Eigenaar-test: gratis ontgrendelen" : "Owner test: unlock for free"}
               </button>
             ) : null}
+            {settings.reviews.length > 0 ? (
+              <div className={styles.reviews}>
+                {settings.reviews.map((review, index) => (
+                  <figure key={`${review.author}-${index}`} className={styles.reviewCard}>
+                    <blockquote className={styles.reviewQuote}>{review.quote}</blockquote>
+                    {review.author ? <figcaption className={styles.reviewAuthor}>{review.author}</figcaption> : null}
+                  </figure>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
         )}
@@ -268,6 +300,9 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
         <div className={styles.footer}>
           <div className={styles.trustItem}>
             <ShieldCheck size={16} /> {locale === "nl" ? "Geverifieerde RDW-data" : "Verified RDW Data"}
+          </div>
+          <div className={styles.trustItem}>
+            <Landmark size={16} /> {locale === "nl" ? "iDEAL en beveiligd betalen" : "iDEAL and secure payment"}
           </div>
           <div className={styles.trustItem}>
             <Sparkles size={16} /> {locale === "nl" ? "Direct toegang na betaling" : "Instant access after payment"}

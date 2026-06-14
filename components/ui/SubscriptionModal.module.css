@@ -317,13 +317,6 @@
   font-weight: 800;
 }
 
-.guaranteeLine {
-  margin-top: 10px;
-  color: #16a34a;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
 .emailNote {
   margin-top: 8px;
   color: #5b6b84;
@@ -430,4 +423,93 @@
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* Small inline price treatment so the price is present but not shouted. */
+.priceSmall {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.priceSmall span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+/* Honest value stack: what unlocking actually gives you. */
+.valueStack {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.valueRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.valueRowLocked {
+  color: #1d4ed8;
+}
+
+.valueIconOk {
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.valueIconLocked {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+/* Honest stake line. Factual, no guarantee. */
+.stakeLine {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f2;
+  border-radius: 12px;
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 600;
+}
+
+/* Optional real reviews. Hidden entirely when settings.reviews is empty. */
+.reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.reviewCard {
+  border: 1px solid #e2e8f2;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.reviewQuote {
+  margin: 0;
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.reviewAuthor {
+  margin: 6px 0 0;
+  color: #5b6b84;
+  font-size: 12px;
+  font-weight: 700;
 }
