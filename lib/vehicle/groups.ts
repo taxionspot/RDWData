@@ -50,7 +50,7 @@ export const GROUPS: GroupDef[] = [
   },
   {
     id: "g3-risico",
-    labelNl: "Risicos & schade",
+    labelNl: "Risico's & schade",
     labelEn: "Risks & damage",
     lockKey: "damageHistory",
     defaultOpen: false,

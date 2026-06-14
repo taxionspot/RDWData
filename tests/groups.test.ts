@@ -21,7 +21,7 @@ test("GROUPS labels are exact NL and EN strings", () => {
   assert.equal(byId("g1-verdict").labelEn, "Overview & verdict");
   assert.equal(byId("g2-markt").labelNl, "Marktwaarde & eerlijke prijs");
   assert.equal(byId("g2-markt").labelEn, "Market value & fair price");
-  assert.equal(byId("g3-risico").labelNl, "Risicos & schade");
+  assert.equal(byId("g3-risico").labelNl, "Risico's & schade");
   assert.equal(byId("g3-risico").labelEn, "Risks & damage");
   assert.equal(byId("g4-km").labelNl, "Kilometerstand & NAP");
   assert.equal(byId("g4-km").labelEn, "Mileage & NAP");

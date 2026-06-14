@@ -155,6 +155,7 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
   const cached = await readAiCache(cacheKey);
   if (cached) {
     return {
+      profile,
       localized,
       // sanitizeDeep cleans dashes from entries cached before the sanitizer
       // existed, so stale cache can never show en/em-dashes.
@@ -181,6 +182,7 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
     });
     await writeAiCache(cacheKey, aiReport.insights, aiReport.valuation);
     return {
+      profile,
       localized,
       aiInsights: aiReport.insights,
       aiValuation: aiReport.valuation
@@ -188,6 +190,7 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
   } catch {
     const fallback = buildFallbackVehicleAiReport({ locale, vehicleData: localized });
     return {
+      profile,
       localized,
       aiInsights: fallback.insights,
       aiValuation: fallback.valuation
@@ -306,10 +309,11 @@ export async function GET(request: Request, { params }: Params) {
       });
     }
 
-    const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
+    // buildLocalizedWithAi also returns the raw profile it fetched (24h-cached),
+    // so we can compute signals without a second getVehicleProfile call.
+    const { profile: rawProfile, localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
     // hasAiAccess is true on this branch -> fairPrice may appear. Signals run on
     // the RAW (cache-served) profile, not the localized/AI-overridden object.
-    const rawProfile = await getVehicleProfile(plate);
     const signals = computeVehicleSignals({ profile: rawProfile, nowMs: Date.now(), hasAccess: true });
     return NextResponse.json({
       ...localized,

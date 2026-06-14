@@ -3,7 +3,7 @@
 import { AlertTriangle, CheckCircle2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 import { useAiReport } from "@/hooks/useAiReport";
-import type { Signal, SignalTone, VehicleSignalReport } from "@/lib/vehicle/signals";
+import type { Signal, SignalTone } from "@/lib/vehicle/signals";
 import type { GroupId } from "@/lib/vehicle/groups";
 import styles from "./JudgmentBlock.module.css";
 
@@ -43,7 +43,7 @@ export function JudgmentBlock({ plate, locale, onJump }: Props) {
   const { data } = useVehicleLookup(plate);
   const { insights } = useAiReport(plate);
 
-  const report = (data as { signals?: VehicleSignalReport } | undefined)?.signals;
+  const report = data?.signals;
   if (!report) return null;
 
   const { verdict, signals, alerts, summary } = report;
@@ -83,6 +83,9 @@ export function JudgmentBlock({ plate, locale, onJump }: Props) {
               type="button"
               className={`${styles.row} ${styles[signal.tone]}`}
               onClick={() => onJump(signal.group as GroupId)}
+              aria-label={nl
+                ? `${signal.labelNl}, ga naar sectie`
+                : `${signal.labelEn}, go to section`}
             >
               <span className={styles.rowIcon}>
                 <ToneIcon tone={signal.tone} size={17} />
@@ -99,7 +102,7 @@ export function JudgmentBlock({ plate, locale, onJump }: Props) {
 
       {alerts.length > 0 ? (
         <div className={styles.alerts}>
-          <span className={styles.alertsTitle}>{nl ? "Risicos bij uitzondering" : "Exception risks"}</span>
+          <span className={styles.alertsTitle}>{nl ? "Risico's bij uitzondering" : "Exception risks"}</span>
           {alerts.map((alert) => (
             <span
               key={alert.key}
@@ -118,7 +121,9 @@ export function JudgmentBlock({ plate, locale, onJump }: Props) {
         {teaserParts.join(" ")}
         {summary.priceAffecting > 0 ? (
           <span className={styles.teaserStrong}>
-            {nl ? " 1 raakt de eerlijke prijs." : " 1 affects the fair price."}
+            {nl
+              ? ` ${summary.priceAffecting} ${summary.priceAffecting === 1 ? "raakt" : "raken"} de eerlijke prijs.`
+              : ` ${summary.priceAffecting} affect${summary.priceAffecting === 1 ? "s" : ""} the fair price.`}
           </span>
         ) : null}
       </p>
