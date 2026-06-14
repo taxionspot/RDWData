@@ -10,6 +10,10 @@ export type PlatePaymentDoc = {
   status: "COMPLETED" | "PENDING" | "FAILED";
   provider: "paypal";
   createdAt: Date;
+  /** Whether the thank-you email was delivered successfully. Absent = not attempted. */
+  emailDelivered?: boolean;
+  /** Failure reason from the email transport, e.g. "EMAIL_SEND_FAILED:..." */
+  emailReason?: string;
 };
 
 const platePaymentSchema = new Schema<PlatePaymentDoc>(
@@ -22,7 +26,9 @@ const platePaymentSchema = new Schema<PlatePaymentDoc>(
     currency: { type: String, required: true, default: "EUR" },
     status: { type: String, enum: ["COMPLETED", "PENDING", "FAILED"], required: true },
     provider: { type: String, enum: ["paypal"], required: true, default: "paypal" },
-    createdAt: { type: Date, default: Date.now, required: true }
+    createdAt: { type: Date, default: Date.now, required: true },
+    emailDelivered: { type: Boolean, required: false },
+    emailReason: { type: String, required: false }
   },
   {
     versionKey: false
