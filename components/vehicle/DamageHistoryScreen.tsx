@@ -83,6 +83,9 @@ export function DamageHistoryScreen({ plate, embedded = false }: Props) {
     return wrap(<div className={styles.loadingCard}>{nl ? "Schadesignalen laden..." : "Loading damage signals..."}</div>);
   }
 
+  // Section chip ordering (WOK -> danger, defects -> review, else clean) mirrors
+  // the g3 safety signal that drives the ReportGroup status line, so the group
+  // line and this chip agree on the WOK and defects cases by construction.
   const hasSignals = wok || events.length > 0;
   const statusClass = wok ? styles.statusDanger : events.length > 0 ? styles.statusReview : styles.statusClean;
   const statusLabel = wok
