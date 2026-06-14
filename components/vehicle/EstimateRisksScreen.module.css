@@ -1,0 +1,58 @@
+.estimatesSection {
+  background: #ffffff;
+  border: 1px solid #e2e8f2;
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.estimatesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.estimatesTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.estimatesNote {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.estimatesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.estimatesItem {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f2;
+  background: #eef3f8;
+}
+
+.estimatesLabel {
+  font-size: 12px;
+  color: #64748b;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.estimatesValue {
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .estimatesGrid {
+    grid-template-columns: 1fr;
+  }
+}
