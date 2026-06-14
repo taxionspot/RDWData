@@ -204,9 +204,9 @@ const AI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
  */
 function aiCacheKey(plate: string, locale: Locale, userMileage: number | null): string {
   const bucket = userMileage === null ? "" : String(Math.round(userMileage / 5000) * 5000);
-  // v2: invalidates entries from before the valuation was forced to follow
-  // our own formula (old explanations could mention AI-invented amounts).
-  return `v2|${plate}|${locale}|${bucket}`;
+  // v3: invalidates entries from before the AI summary was shortened to
+  // 35-60 words (old entries could carry 200-word blobs).
+  return `v3|${plate}|${locale}|${bucket}`;
 }
 
 async function readAiCache(key: string): Promise<{ insights: unknown; valuation: unknown } | null> {

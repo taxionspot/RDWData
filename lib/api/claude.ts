@@ -177,7 +177,7 @@ Geef exact dit JSON-formaat terug:
 }
 Regels:
 - Baseer analyse op alle data (identiteit, APK/defecten, recalls, onderhoudsrisico, kilometrage-signalen, markt/fuel/gewicht).
-- summary 120-220 woorden, concreet en overtuigend
+- summary 35-60 woorden, max 3 korte zinnen, geen herhaling
 - positives max 6, risks max 6, recommendations max 8, factors max 12
 - GEBRUIK voor estimatedValueNow, estimatedValueMin en estimatedValueMax EXACT de waarden uit enriched.estimatedValueNow, enriched.estimatedValueMin en enriched.estimatedValueMax in DATA (onze eigen taxatieformule). Verzin NOOIT eigen bedragen. Leg in explanation en factors uit welke factoren deze waarde verklaren.
 - De tekstvelden (summary, positives, risks, recommendation, explanation) mogen NOOIT een bedrag in euro's noemen. Spreek over waarde uitsluitend kwalitatief (laag, marktconform, hoog). De enige bron van marktwaarde-getallen zijn de numerieke velden estimatedValueNow/Min/Max uit enriched in DATA.
@@ -213,7 +213,7 @@ Return exactly this JSON shape:
 }
 Rules:
 - Use all available data (identity, inspections/defects, recalls, maintenance risk, mileage signals, market/fuel/weight indicators).
-- summary 120-220 words, concrete and convincing
+- summary 35-60 words, max 3 short sentences, no repetition
 - positives max 6, risks max 6, recommendations max 8, factors max 12
 - USE the exact values from enriched.estimatedValueNow, enriched.estimatedValueMin and enriched.estimatedValueMax in DATA (our own valuation formula) for estimatedValueNow/Min/Max. NEVER invent your own amounts. Use explanation and factors to explain what drives this value.
 - The prose fields (summary, positives, risks, recommendation, explanation) must NEVER state a euro amount. Refer to value only qualitatively (low, in line with the market, high). The only source of market-value numbers is the numeric estimatedValueNow/Min/Max fields from enriched in DATA.
