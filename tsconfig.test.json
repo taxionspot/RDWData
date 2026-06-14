@@ -24,7 +24,8 @@
     "lib/rdw/mapper.ts",
     "lib/rdw/types.ts",
     "lib/vehicle/groups.ts",
-    "lib/vehicle/signals.ts"
+    "lib/vehicle/signals.ts",
+    "lib/vehicle/pdf-presentation.ts"
   ],
   "exclude": ["node_modules", ".next", ".test-dist"]
 }
