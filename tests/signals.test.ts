@@ -127,7 +127,7 @@ test("wok: danger safety + danger apk + verdict danger + wok/apk alerts", () => 
   assert.equal(tones.apk, "danger");
   assert.equal(report.verdict.tone, "danger");
   assert.equal(report.verdict.headingNl, "Pas op: serieuze aandachtspunten");
-  assert.equal(report.alerts.some((a) => a.key === "wok" && a.tone === "danger" && a.group === "g5-apk"), true);
+  assert.equal(report.alerts.some((a) => a.key === "wok" && a.tone === "danger" && a.group === "g8-apk"), true);
   // wok also makes the apk tone danger -> APK verloopt soon/expired may or may not fire;
   // the apkExpiryDate fixture is 365 days out, so no apk date alert, only the wok alert.
   assert.equal(report.alerts.some((a) => a.key === "apkExpired"), false);
@@ -139,7 +139,7 @@ test("CONTRACT-NOTE transferPossible===false is danger (mapper bool: false = not
   const safety = report.signals.find((s) => s.key === "safety");
   assert.equal(safety?.tone, "danger");
   assert.equal(
-    report.alerts.some((a) => a.key === "transferBlocked" && a.tone === "danger" && a.group === "g3-risico"),
+    report.alerts.some((a) => a.key === "transferBlocked" && a.tone === "danger" && a.group === "g6-risico"),
     true
   );
 });
@@ -162,7 +162,7 @@ test("recallsCount > 0 also triggers warn safety + openRecall alert", () => {
 test("isTaxi triggers warn safety + taxi alert in g3", () => {
   const report = computeVehicleSignals(input(makeProfile({ isTaxi: true })));
   assert.equal(report.signals.find((s) => s.key === "safety")?.tone, "warn");
-  assert.equal(report.alerts.some((a) => a.key === "taxi" && a.group === "g3-risico"), true);
+  assert.equal(report.alerts.some((a) => a.key === "taxi" && a.group === "g6-risico"), true);
 });
 
 test("defects present triggers warn safety", () => {
@@ -173,7 +173,7 @@ test("defects present triggers warn safety", () => {
 test("napVerdict Onlogisch: danger mileage + napImplausible alert + priceAffecting", () => {
   const report = computeVehicleSignals(input(makeProfile({ napVerdict: "Onlogisch" })));
   assert.equal(report.signals.find((s) => s.key === "mileage")?.tone, "danger");
-  assert.equal(report.alerts.some((a) => a.key === "napImplausible" && a.tone === "danger" && a.group === "g4-km"), true);
+  assert.equal(report.alerts.some((a) => a.key === "napImplausible" && a.tone === "danger" && a.group === "g7-km"), true);
   assert.equal(report.summary.priceAffecting >= 1, true); // mileageTone !== ok
 });
 
@@ -211,7 +211,7 @@ test("napVerdict EN Plausible token is ok", () => {
 test("apk expired (yesterday): danger apk + apkExpired alert + verdict danger", () => {
   const report = computeVehicleSignals(input(makeProfile({ apkExpiryDate: isoDaysFromBase(-1) })));
   assert.equal(report.signals.find((s) => s.key === "apk")?.tone, "danger");
-  assert.equal(report.alerts.some((a) => a.key === "apkExpired" && a.tone === "danger" && a.group === "g5-apk"), true);
+  assert.equal(report.alerts.some((a) => a.key === "apkExpired" && a.tone === "danger" && a.group === "g8-apk"), true);
   assert.equal(report.verdict.tone, "danger");
 });
 
@@ -235,9 +235,9 @@ test("apk null expiry: warn apk", () => {
 test("import: warn safety + g6 import status + imported alert + priceAffecting", () => {
   const report = computeVehicleSignals(input(makeProfile({}, { enriched: { isImported: true } })));
   assert.equal(report.signals.find((s) => s.key === "safety")?.tone, "warn");
-  assert.equal(report.groupStatus["g6-voertuig"].tone, "warn");
-  assert.equal(report.groupStatus["g6-voertuig"].labelNl, "Geimporteerd, controleer papieren");
-  assert.equal(report.alerts.some((a) => a.key === "imported" && a.group === "g6-voertuig"), true);
+  assert.equal(report.groupStatus["g9-eigendom"].tone, "warn");
+  assert.equal(report.groupStatus["g9-eigendom"].labelNl, "Geimporteerd, controleer papieren");
+  assert.equal(report.alerts.some((a) => a.key === "imported" && a.group === "g9-eigendom"), true);
   assert.equal(report.summary.priceAffecting >= 1, true); // isImported counts
 });
 
@@ -263,7 +263,7 @@ test("fairPrice signal included only when hasAccess AND estimatedValueNow presen
   assert.equal(fp?.tone, "ok");
   assert.equal(fp?.labelNl, "Marktwaarde berekend");
   assert.equal(fp?.subNl, "vul je vraagprijs in voor een prijsoordeel");
-  assert.equal(fp?.group, "g2-markt");
+  assert.equal(fp?.group, "g3-markt");
   assert.equal(fp?.affectsPrice, true);
 });
 
@@ -316,43 +316,43 @@ test("verdict tone is worst of safety/mileage/apk (danger beats warn)", () => {
   assert.equal(report.verdict.tone, "danger");
 });
 
-test("groupStatus has all six group ids present", () => {
+test("groupStatus has all nine group ids present", () => {
   const report = computeVehicleSignals(input(makeProfile()));
   const ids = Object.keys(report.groupStatus).sort();
-  assert.deepEqual(ids, ["g1-verdict", "g2-markt", "g3-risico", "g4-km", "g5-apk", "g6-voertuig"]);
+  assert.deepEqual(ids, ["g1-overzicht", "g2-oordeel", "g3-markt", "g4-tekoop", "g5-schatting", "g6-risico", "g7-km", "g8-apk", "g9-eigendom"]);
 });
 
-test("groupStatus g1 mirrors verdict; g2 reflects access; g3/g4/g5 mirror signals", () => {
+test("groupStatus g2 mirrors verdict; g3 reflects access; g6/g7/g8 mirror signals", () => {
   const report = computeVehicleSignals(input(makeProfile()));
-  assert.equal(report.groupStatus["g1-verdict"].tone, report.verdict.tone);
-  assert.equal(report.groupStatus["g1-verdict"].labelNl, report.verdict.headingNl);
+  assert.equal(report.groupStatus["g2-oordeel"].tone, report.verdict.tone);
+  assert.equal(report.groupStatus["g2-oordeel"].labelNl, report.verdict.headingNl);
 
-  // no access -> g2 unlock prompt
-  assert.equal(report.groupStatus["g2-markt"].labelNl, "Ontgrendel de marktwaarde-analyse");
+  // no access -> g3 unlock prompt
+  assert.equal(report.groupStatus["g3-markt"].labelNl, "Ontgrendel de marktwaarde-analyse");
 
-  assert.equal(report.groupStatus["g3-risico"].tone, report.signals.find((s) => s.key === "safety")?.tone);
-  assert.equal(report.groupStatus["g4-km"].tone, report.signals.find((s) => s.key === "mileage")?.tone);
-  assert.equal(report.groupStatus["g5-apk"].tone, report.signals.find((s) => s.key === "apk")?.tone);
+  assert.equal(report.groupStatus["g6-risico"].tone, report.signals.find((s) => s.key === "safety")?.tone);
+  assert.equal(report.groupStatus["g7-km"].tone, report.signals.find((s) => s.key === "mileage")?.tone);
+  assert.equal(report.groupStatus["g8-apk"].tone, report.signals.find((s) => s.key === "apk")?.tone);
 });
 
-test("groupStatus g2 reads 'Marktwaarde berekend' when hasAccess AND estimatedValueNow present", () => {
+test("groupStatus g3 reads 'Marktwaarde berekend' when hasAccess AND estimatedValueNow present", () => {
   const report = computeVehicleSignals(
     input(makeProfile({}, { enriched: { estimatedValueNow: 12000 } }), { hasAccess: true })
   );
-  assert.equal(report.groupStatus["g2-markt"].labelNl, "Marktwaarde berekend");
+  assert.equal(report.groupStatus["g3-markt"].labelNl, "Marktwaarde berekend");
 });
 
-test("groupStatus g2 reads unlock label when hasAccess but estimatedValueNow is null", () => {
+test("groupStatus g3 reads unlock label when hasAccess but estimatedValueNow is null", () => {
   const report = computeVehicleSignals(
     input(makeProfile({}, { enriched: { estimatedValueNow: null } }), { hasAccess: true })
   );
-  assert.equal(report.groupStatus["g2-markt"].labelNl, "Ontgrendel de marktwaarde-analyse");
+  assert.equal(report.groupStatus["g3-markt"].labelNl, "Ontgrendel de marktwaarde-analyse");
 });
 
-test("clean car: groupStatus g6 reads RDW data complete (not imported)", () => {
+test("clean car: groupStatus g9 reads RDW data complete (not imported)", () => {
   const report = computeVehicleSignals(input(makeProfile()));
-  assert.equal(report.groupStatus["g6-voertuig"].tone, "ok");
-  assert.equal(report.groupStatus["g6-voertuig"].labelNl, "RDW-voertuiggegevens compleet");
+  assert.equal(report.groupStatus["g9-eigendom"].tone, "ok");
+  assert.equal(report.groupStatus["g9-eigendom"].labelNl, "RDW-voertuiggegevens compleet");
 });
 
 test("no alert label across the suite contains em-dash or en-dash", () => {
@@ -380,7 +380,7 @@ test("C1a: enriched.mileageVerdict ONLOGISCH with napVerdict Logisch -> mileage 
   );
   assert.equal(report.signals.find((s) => s.key === "mileage")?.tone, "danger");
   assert.equal(
-    report.alerts.some((a) => a.key === "napImplausible" && a.tone === "danger" && a.group === "g4-km"),
+    report.alerts.some((a) => a.key === "napImplausible" && a.tone === "danger" && a.group === "g7-km"),
     true
   );
   assert.equal(report.verdict.tone, "danger");
@@ -392,7 +392,7 @@ test("C1b: enriched.mileageVerdict TWIJFELACHTIG with napVerdict Logisch -> mile
   );
   assert.equal(report.signals.find((s) => s.key === "mileage")?.tone, "warn");
   assert.equal(
-    report.alerts.some((a) => a.key === "napNoVerdict" && a.tone === "warn" && a.group === "g4-km"),
+    report.alerts.some((a) => a.key === "napNoVerdict" && a.tone === "warn" && a.group === "g7-km"),
     true
   );
 });
@@ -415,5 +415,5 @@ test("m2: enriched absent (null) -> report produced without throwing, sane defau
   assert.equal(report.signals.find((s) => s.key === "safety")?.tone, "ok");
   assert.equal(report.signals.find((s) => s.key === "mileage")?.tone, "ok");
   assert.equal(report.signals.some((s) => s.key === "fairPrice"), false);
-  assert.equal(report.groupStatus["g6-voertuig"].labelNl, "RDW-voertuiggegevens compleet");
+  assert.equal(report.groupStatus["g9-eigendom"].labelNl, "RDW-voertuiggegevens compleet");
 });

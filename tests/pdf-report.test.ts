@@ -9,16 +9,33 @@ test("toneToPdfWord maps tones to ASCII status words (no glyphs, survives graysc
   assert.equal(toneToPdfWord("danger"), "SLECHT");
 });
 
-test("pdfGroupOrder lists every GROUPS section id in G1..G6 order", () => {
+test("pdfGroupOrder lists every GROUPS section id in G1..G9 order", () => {
   const expected = GROUPS.flatMap((g) => g.sectionIds);
   assert.deepEqual(pdfGroupOrder(), expected);
 });
 
-test("pdfGroupOrder starts with the verdict group and never contains the dropped risico section", () => {
+test("pdfGroupOrder starts with the identity group and never contains the dropped risico section", () => {
   const order = pdfGroupOrder();
   assert.equal(order[0], "overzicht");
   assert.equal(order[1], "ai-analyse");
   assert.equal(order.includes("risico" as never), false);
+});
+
+test("pdfGroupOrder 9-group order: overzicht, ai-analyse, markt, te-koop, schatting, schade, kilometerstand, apk, apk-intelligence, eigendom, specs", () => {
+  const order = pdfGroupOrder();
+  assert.deepEqual(order, [
+    "overzicht",
+    "ai-analyse",
+    "markt",
+    "te-koop",
+    "schatting",
+    "schade",
+    "kilometerstand",
+    "apk",
+    "apk-intelligence",
+    "eigendom",
+    "specs"
+  ]);
 });
 
 test("pdfSectionTitle returns honest Dutch and English titles for each section id", () => {
@@ -27,4 +44,6 @@ test("pdfSectionTitle returns honest Dutch and English titles for each section i
   assert.equal(pdfSectionTitle("markt", "nl"), "Marktwaarde en eerlijke prijs");
   assert.equal(pdfSectionTitle("kilometerstand", "en"), "Mileage and NAP");
   assert.equal(pdfSectionTitle("schade", "nl"), "Risicos en schade");
+  assert.equal(pdfSectionTitle("schatting", "nl"), "Schatting en risico");
+  assert.equal(pdfSectionTitle("schatting", "en"), "Estimate and risk");
 });
