@@ -89,17 +89,18 @@ function toNumber(value: unknown): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
-function verdictColor(verdict: AiInsights["purchaseVerdict"]) {
-  if (verdict === "BUY") return rgb(0.08, 0.55, 0.28);
-  if (verdict === "CONSIDER") return rgb(0.07, 0.44, 0.63);
-  if (verdict === "CAUTION") return rgb(0.78, 0.5, 0.08);
-  return rgb(0.72, 0.12, 0.18);
+/** Maps purchaseVerdict to a signal tone for the calmer accentForTone palette. */
+function verdictTone(verdict: AiInsights["purchaseVerdict"]): "ok" | "warn" | "danger" {
+  if (verdict === "BUY") return "ok";
+  if (verdict === "CONSIDER" || verdict === "CAUTION") return "warn";
+  return "danger";
 }
 
-function riskColor(level: AiInsights["riskLevel"]) {
-  if (level === "LOW") return rgb(0.08, 0.55, 0.28);
-  if (level === "MEDIUM") return rgb(0.78, 0.5, 0.08);
-  return rgb(0.72, 0.12, 0.18);
+/** Maps riskLevel to a signal tone for the calmer accentForTone palette. */
+function riskTone(level: AiInsights["riskLevel"]): "ok" | "warn" | "danger" {
+  if (level === "LOW") return "ok";
+  if (level === "MEDIUM") return "warn";
+  return "danger";
 }
 
 function splitText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
@@ -648,33 +649,35 @@ function drawHeroVisuals(args: {
     size: 11,
     color: rgb(0.08, 0.2, 0.45)
   });
+  const vTone = verdictTone(ai?.purchaseVerdict ?? "AVOID");
+  const rTone = riskTone(ai?.riskLevel ?? "HIGH");
   args.page.drawRectangle({
     x: leftX + 10,
     y: heroTop - 44,
     width: 120,
     height: 18,
-    color: verdictColor(ai?.purchaseVerdict ?? "AVOID")
+    color: rgb(...accentForTone(vTone))
   });
   args.page.drawText(`${args.locale === "nl" ? "Verdict" : "Verdict"}: ${verdictLabel}`, {
     x: leftX + 15,
     y: heroTop - 38,
     font: args.bold,
     size: 9,
-    color: rgb(1, 1, 1)
+    color: rgb(...inkForTone(vTone))
   });
   args.page.drawRectangle({
     x: leftX + 138,
     y: heroTop - 44,
     width: 95,
     height: 18,
-    color: riskColor(ai?.riskLevel ?? "HIGH")
+    color: rgb(...accentForTone(rTone))
   });
   args.page.drawText(`${args.locale === "nl" ? "Risico" : "Risk"}: ${riskLabel}`, {
     x: leftX + 143,
     y: heroTop - 38,
     font: args.bold,
     size: 9,
-    color: rgb(1, 1, 1)
+    color: rgb(...inkForTone(rTone))
   });
 
   splitText(summary, args.regular, 9.5, leftW - 20)
