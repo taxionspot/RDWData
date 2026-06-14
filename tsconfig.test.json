@@ -22,7 +22,9 @@
     "lib/api/plate.ts",
     "lib/rdw/normalize.ts",
     "lib/rdw/mapper.ts",
-    "lib/rdw/types.ts"
+    "lib/rdw/types.ts",
+    "lib/vehicle/groups.ts",
+    "lib/vehicle/signals.ts"
   ],
   "exclude": ["node_modules", ".next", ".test-dist"]
 }
