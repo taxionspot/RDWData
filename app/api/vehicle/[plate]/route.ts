@@ -89,10 +89,26 @@ async function logMarketAggregate(plate: string, locale: Locale, localized: Reco
 }
 
 /**
+ * Resolves to null after `ms` milliseconds, regardless of what `promise` does.
+ * This guarantees that even if the underlying fetch ignores its AbortSignal,
+ * the PDF pipeline never waits longer than `ms` for any single enrichment call.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise<T | null>((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      () => { clearTimeout(timer); resolve(null); }
+    );
+  });
+}
+
+/**
  * Fetch the extra data that makes the PDF a 1:1 twin of the online report:
  * comparable cars, model cohort statistics, and the Kentekenrapport Score.
- * All three are wrapped in individual try/catch with a shared 8-second
- * AbortController so a slow or absent Apify run NEVER blocks PDF generation.
+ * Each fetch is wrapped in a Promise.race against an 8s timeout so a slow or
+ * absent Apify run NEVER blocks PDF generation. Additionally, an AbortSignal
+ * is forwarded into fetchComparablePool as a defense-in-depth abort hint.
  * Returns nulls on failure; PDF degrades gracefully (no "-" placeholders).
  */
 async function fetchPdfEnrichment(localized: Record<string, unknown>, locale: "nl" | "en") {
@@ -103,50 +119,61 @@ async function fetchPdfEnrichment(localized: Record<string, unknown>, locale: "n
   const year = typeof vehicle.year === "number" ? vehicle.year : null;
   const defects = Array.isArray(localized.defects) ? (localized.defects as unknown[]) : [];
 
+  // One AbortController per enrichment run: abort after 8s as a defense-in-depth
+  // hint to fetchComparablePool. The real hard cap is the withTimeout race below.
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 8000);
+  const acTimer = setTimeout(() => ac.abort(), 8000);
 
-  const comparablesPromise = (async () => {
-    if (!brand || !tradeName) return null;
-    try {
-      const pool = await fetchComparablePool(brand, tradeName, 12);
-      const subject: Subject = {
-        year,
-        valueNow: typeof enriched.estimatedValueNow === "number" ? enriched.estimatedValueNow : null,
-        mileage: typeof enriched.estimatedMileageNow === "number" ? enriched.estimatedMileageNow : null,
-        fuel: typeof vehicle.fuelType === "string" ? vehicle.fuelType : null,
-        bodyType: typeof vehicle.bodyType === "string" ? vehicle.bodyType : null
-      };
-      return selectComparables(pool, subject);
-    } catch {
-      return null;
-    }
-  })();
+  const comparablesPromise = withTimeout(
+    (async () => {
+      if (!brand || !tradeName) return null;
+      try {
+        const pool = await fetchComparablePool(brand, tradeName, 12, ac.signal);
+        const subject: Subject = {
+          year,
+          valueNow: typeof enriched.estimatedValueNow === "number" ? enriched.estimatedValueNow : null,
+          mileage: typeof enriched.estimatedMileageNow === "number" ? enriched.estimatedMileageNow : null,
+          fuel: typeof vehicle.fuelType === "string" ? vehicle.fuelType : null,
+          bodyType: typeof vehicle.bodyType === "string" ? vehicle.bodyType : null
+        };
+        return selectComparables(pool, subject);
+      } catch {
+        return null;
+      }
+    })(),
+    8000
+  );
 
-  const modelStatsPromise = (async () => {
-    try {
-      return await getModelStats(brand, tradeName, year);
-    } catch {
-      return null;
-    }
-  })();
+  const modelStatsPromise = withTimeout(
+    (async () => {
+      try {
+        return await getModelStats(brand, tradeName, year);
+      } catch {
+        return null;
+      }
+    })(),
+    8000
+  );
 
-  const scorePromise = (async () => {
-    try {
-      return buildScoreResult({
-        defects: defects.length,
-        riskScore: typeof enriched.maintenanceRiskScore === "number" ? enriched.maintenanceRiskScore : 6,
-        apkPassChance: typeof enriched.apkPassChance === "number" ? enriched.apkPassChance : null,
-        wok: vehicle.wok === true,
-        imported: enriched.isImported === true,
-        napOnlogisch: String(vehicle.napVerdict ?? "").toLowerCase().includes("onlogisch"),
-        openRecall: vehicle.hasOpenRecall === true,
-        locale
-      });
-    } catch {
-      return null;
-    }
-  })();
+  const scorePromise = withTimeout(
+    (async () => {
+      try {
+        return buildScoreResult({
+          defects: defects.length,
+          riskScore: typeof enriched.maintenanceRiskScore === "number" ? enriched.maintenanceRiskScore : 6,
+          apkPassChance: typeof enriched.apkPassChance === "number" ? enriched.apkPassChance : null,
+          wok: vehicle.wok === true,
+          imported: enriched.isImported === true,
+          napOnlogisch: String(vehicle.napVerdict ?? "").toLowerCase().includes("onlogisch"),
+          openRecall: vehicle.hasOpenRecall === true,
+          locale
+        });
+      } catch {
+        return null;
+      }
+    })(),
+    8000
+  );
 
   try {
     const [comparables, modelStats, score] = await Promise.all([
@@ -156,7 +183,7 @@ async function fetchPdfEnrichment(localized: Record<string, unknown>, locale: "n
     ]);
     return { comparables, modelStats, score };
   } finally {
-    clearTimeout(timer);
+    clearTimeout(acTimer);
   }
 }
 

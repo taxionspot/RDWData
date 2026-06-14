@@ -42,12 +42,15 @@ function normalize(item: Record<string, unknown>): ComparableCar | null {
  * shape), so callers fall back to plain marketplace deeplinks. The actor has no
  * price/year filter, so we fetch by brand+model and rank by similarity upstream.
  */
-export async function fetchComparablePool(brand: string, model: string, maxResults = 12): Promise<ComparableCar[]> {
+export async function fetchComparablePool(brand: string, model: string, maxResults = 12, signal?: AbortSignal): Promise<ComparableCar[]> {
   const token = (process.env.APIFY_TOKEN || "").trim();
   if (!token || !brand || !model) return [];
   const url = `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45000);
+  // If an outer signal is provided, forward abort to our controller.
+  const onOuterAbort = () => controller.abort();
+  if (signal) signal.addEventListener("abort", onOuterAbort, { once: true });
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -65,6 +68,7 @@ export async function fetchComparablePool(brand: string, model: string, maxResul
     return [];
   } finally {
     clearTimeout(timer);
+    if (signal) signal.removeEventListener("abort", onOuterAbort);
   }
 }
 

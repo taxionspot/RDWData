@@ -1290,8 +1290,9 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     layout.keyValue(locale === "nl" ? "Onderhoudsrisico" : "Maintenance risk", `${s(enriched.maintenanceRiskScore)}/10`);
   }
 
-  // Model cohort statistics table
-  if (modelStats && modelStats.topDefects && modelStats.topDefects.length > 0) {
+  // Model cohort statistics table: only rendered when sampleSize > 0 to avoid
+  // division-by-zero producing "NaN%" or "Infinity%" in the defect-rate row.
+  if (modelStats && modelStats.sampleSize > 0 && modelStats.topDefects && modelStats.topDefects.length > 0) {
     layout.section(locale === "nl" ? "Modelstatistieken cohort" : "Model cohort statistics");
     layout.keyValue(
       locale === "nl" ? "Steekproef" : "Sample",
@@ -1309,7 +1310,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
       ],
       modelStats.topDefects.map((d) => [
         d.description,
-        `${d.pctOfVehicles}%`,
+        modelStats.sampleSize > 0 ? `${d.pctOfVehicles}%` : "-",
         String(d.count)
       ])
     );
