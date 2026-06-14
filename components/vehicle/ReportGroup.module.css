@@ -102,10 +102,10 @@
 }
 
 .statusOk {
-  color: #166534;
+  color: #5b6b84;
 }
 .statusOk .statusDot {
-  background: #16a34a;
+  background: #94a3b8;
 }
 
 .statusWarn {

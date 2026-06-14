@@ -46,13 +46,17 @@
   line-height: 1.4;
 }
 
-.ok {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
+/* ok tone is intentionally not styled here: individual ok badges are collapsed
+   into the .okCollapsed pill below so they don't create noisy green blocks. */
+
+.okCollapsed {
+  border-color: #e2e8f2;
+  background: #f8fafc;
+  flex: 0 1 auto;
 }
-.ok .icon {
-  background: #dcfce7;
-  color: #16a34a;
+.okCollapsed .icon {
+  background: #eef3f8;
+  color: #5b6b84;
 }
 
 .warn {

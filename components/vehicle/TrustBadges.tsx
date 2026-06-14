@@ -9,6 +9,11 @@ import styles from "./TrustBadges.module.css";
 type Tone = "ok" | "warn" | "danger";
 type Badge = { key: string; tone: Tone; icon: "gauge" | "recall-ok" | "recall-bad" | "leaf" | "import" | "taxi"; title: string; sub: string };
 
+/** Count ok badges and label for the collapsed pill. */
+function okPillLabel(count: number, nl: boolean): string {
+  return nl ? `${count} controles in orde` : `${count} checks passed`;
+}
+
 /** Parse the Euro emission class number from RDW's "EURO 5 F" style string. */
 function euroClass(emissionStandard: string | null | undefined): number | null {
   if (!emissionStandard) return null;
@@ -131,9 +136,14 @@ export function TrustBadges({ plate }: { plate: string }) {
 
   if (!v || badges.length === 0) return null;
 
+  // Separate ok from warn/danger: only warn/danger get color; ok badges collapse
+  // into one calm neutral pill so the "all-green" case doesn't shout.
+  const alertBadges = badges.filter((b) => b.tone !== "ok");
+  const okCount = badges.filter((b) => b.tone === "ok").length;
+
   return (
     <div className={styles.row} aria-label={nl ? "Belangrijkste controles" : "Key checks"}>
-      {badges.map((b) => {
+      {alertBadges.map((b) => {
         const Icon = ICONS[b.icon];
         return (
           <div key={b.key} className={`${styles.badge} ${styles[b.tone]}`}>
@@ -147,6 +157,16 @@ export function TrustBadges({ plate }: { plate: string }) {
           </div>
         );
       })}
+      {okCount > 0 ? (
+        <div className={`${styles.badge} ${styles.okCollapsed}`}>
+          <span className={styles.icon}>
+            <ShieldCheck size={18} />
+          </span>
+          <span className={styles.text}>
+            <span className={styles.title}>{okPillLabel(okCount, nl)}</span>
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

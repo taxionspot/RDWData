@@ -102,7 +102,7 @@
   align-items: center;
   gap: 8px;
   font-weight: 800;
-  color: #0f172a;
+  color: #334155;
   font-size: 0.88rem;
 }
 
@@ -110,6 +110,7 @@
   flex: 0 0 auto;
 }
 
+/* Icons get color; the text label stays neutral */
 .positiveIcon {
   color: #16a34a;
 }

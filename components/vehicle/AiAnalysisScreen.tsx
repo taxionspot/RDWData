@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Lightbulb, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lightbulb } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { useAiReport } from "@/hooks/useAiReport";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
@@ -52,10 +52,6 @@ export function AiAnalysisScreen({ plate, embedded = false }: Props) {
       <div className={styles.panel}>
         <div className={styles.header}>
           <div className={styles.headerCopy}>
-            <span className={styles.eyebrow}>
-              <Sparkles size={13} />
-              {nl ? "Analyse op basis van officiele data" : "Analysis based on official data"}
-            </span>
             <div className={styles.title}>
               {nl ? "Wat betekent dit rapport voor jou?" : "What does this report mean for you?"}
             </div>
