@@ -3,6 +3,9 @@ import { connectMongo } from "@/lib/db/mongodb";
 import { PlatePaymentModel } from "@/models/PlatePayment";
 import { CheckoutLeadModel } from "@/models/CheckoutLead";
 import { hasPaidPlateAccess, isDemoAccessEnabled, isCompEmail, COMP_COOKIE } from "@/lib/payments/server-access";
+import { sendEmail } from "@/lib/email/resend";
+import { buildThankYouEmail } from "@/lib/email/templates";
+import { buildReportPdfForEmail } from "@/lib/api/report-email";
 
 export const runtime = "nodejs";
 
@@ -66,6 +69,54 @@ export async function POST(request: Request, { params }: Params) {
         path: "/",
         maxAge: 60 * 60 * 24 * 180
       });
+
+      // Send the report email to the owner's allowlisted address so they can
+      // verify delivery and the Gmail/Vercel config. Mirrors the pattern in
+      // lib/payments/fulfill.ts (link mail + best-effort PDF, both non-blocking,
+      // failures logged but never thrown). The grant cookie above is already set
+      // so even a total mail failure returns ok:true.
+      if (email) {
+        const orderId = `comp-${plate}-${Date.now()}`;
+        const locale = "nl" as const;
+
+        // Step A: guaranteed link-only thank-you (fast).
+        try {
+          const { subject, html } = buildThankYouEmail({ plate, amount: "0.00", currency: "EUR", orderId, locale });
+          const linkResult = await sendEmail({ to: email, subject, html });
+          if (!linkResult.delivered) {
+            console.error("comp access: thank-you link mail not delivered", { plate, email, reason: linkResult.reason });
+          }
+        } catch (err) {
+          console.error("comp access: thank-you link mail threw", { plate, email, err });
+        }
+
+        // Step B: best-effort PDF, capped at 6s so it never delays the grant response.
+        const PDF_TIMEOUT_MS = 6000;
+        const deadline = new Promise<void>((resolve) => setTimeout(resolve, PDF_TIMEOUT_MS));
+        const pdfWork = (async () => {
+          try {
+            const pdfBase64 = await buildReportPdfForEmail(plate, locale);
+            if (pdfBase64) {
+              const pdfSubject = `Je kentekenrapport ${plate} (PDF) — eigenaar-test`;
+              const { html: pdfHtml } = buildThankYouEmail({ plate, amount: "0.00", currency: "EUR", orderId, locale });
+              const pdfResult = await sendEmail({
+                to: email,
+                subject: pdfSubject,
+                html: pdfHtml,
+                attachments: [{ filename: `kentekenrapport-${plate}.pdf`, content: pdfBase64 }]
+              });
+              if (!pdfResult.delivered) {
+                console.error("comp access: PDF mail not delivered", { plate, email, reason: pdfResult.reason });
+              }
+            }
+          } catch (err) {
+            console.error("comp access: PDF mail threw", { plate, email, err });
+          }
+        })();
+        // Race: whichever settles first wins; the response is returned regardless.
+        await Promise.race([pdfWork, deadline]);
+      }
+
       return res;
     }
 

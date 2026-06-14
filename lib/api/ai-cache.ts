@@ -57,3 +57,53 @@ export async function writeAiCache(key: string, insights: unknown, valuation: un
     // best effort
   }
 }
+
+/**
+ * In-flight dedup map: one Promise per cache key, active only while the
+ * generation is in progress within THIS serverless instance. Concurrent
+ * requests for the same uncached plate coalesce onto a single Claude call
+ * instead of each starting their own generation.
+ *
+ * Note: this dedups within one serverless instance (the common case for a
+ * single browser's bursty requests: mount + refetch + poll + prewarm).
+ * Cross-instance dedup would require a DB-level advisory lock; that is an
+ * acceptable residual given serverless cold-start isolation.
+ */
+const inFlight = new Map<string, Promise<{ insights: unknown; valuation: unknown }>>();
+
+/**
+ * Read from the persistent cache or start exactly ONE generation per cache key
+ * per instance. Concurrent callers that arrive while a generation is running
+ * receive the same Promise (no second Claude call is started).
+ *
+ * @param cacheKey  - The key returned by `aiCacheKey(...)`.
+ * @param generate  - Factory called at most once; must return raw {insights, valuation}.
+ *                    The result is written to the persistent cache before the
+ *                    Promise resolves, so any subsequent caller will get a DB hit.
+ */
+export async function getOrGenerateAiReport(
+  cacheKey: string,
+  generate: () => Promise<{ insights: unknown; valuation: unknown }>
+): Promise<{ insights: unknown; valuation: unknown }> {
+  // 1. Persistent cache hit: skip generation entirely.
+  const cached = await readAiCache(cacheKey);
+  if (cached) return { insights: cached.insights, valuation: cached.valuation };
+
+  // 2. In-flight hit: another caller in this instance is already generating.
+  const existing = inFlight.get(cacheKey);
+  if (existing) return existing;
+
+  // 3. Miss: start ONE generation, register in the dedup map, persist on success.
+  const p = (async () => {
+    const r = await generate();
+    await writeAiCache(cacheKey, r.insights, r.valuation);
+    return r;
+  })();
+
+  inFlight.set(cacheKey, p);
+  // Remove from the map whether the generation succeeded or failed, so a
+  // transient failure does not permanently block future attempts.
+  p.finally(() => inFlight.delete(cacheKey));
+
+  return p;
+}

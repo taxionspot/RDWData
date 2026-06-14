@@ -23,7 +23,7 @@ import { getVehicleProfile } from "@/lib/rdw/service";
 import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
 import { generateVehicleAiReport } from "@/lib/api/claude";
-import { aiCacheKey, readAiCache, writeAiCache } from "@/lib/api/ai-cache";
+import { aiCacheKey, getOrGenerateAiReport } from "@/lib/api/ai-cache";
 import { connectMongo } from "@/lib/db/mongodb";
 import { PrewarmRateLimitModel } from "@/models/PrewarmRateLimit";
 
@@ -94,12 +94,6 @@ export async function POST(request: Request, { params }: Params) {
     // but the client currently does not send one.
     const cacheKey = aiCacheKey(plate, locale, "");
 
-    // Idempotent: if the cache already has a valid entry do nothing.
-    const cached = await readAiCache(cacheKey);
-    if (cached) {
-      return NextResponse.json({ ok: true, cached: true });
-    }
-
     // Validate the plate with RDW (24h-cached). This ensures we never call
     // Claude for plates that do not correspond to a real Dutch vehicle.
     // getVehicleProfile throws an ApiError for invalid/unknown plates.
@@ -114,16 +108,16 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ ok: true, skipped: true });
     }
 
-    // Run the same generation the paid branch uses; share the cache module so
-    // a hit written here is immediately readable by the paid GET handler.
-    const aiReport = await generateVehicleAiReport({
-      plate,
-      locale,
-      vehicleData: localized
-    });
-    await writeAiCache(cacheKey, aiReport.insights, aiReport.valuation);
-
+    // getOrGenerateAiReport is idempotent: it checks the persistent cache first
+    // (returns immediately on a hit), then deduplicates concurrent in-flight
+    // generations within this instance. If the paid GET handler or the email
+    // builder is already generating for this key, the prewarm coalesces onto
+    // that Promise instead of starting a second Claude call.
     // NEVER return AI content. Write-to-cache only.
+    await getOrGenerateAiReport(cacheKey, () =>
+      generateVehicleAiReport({ plate, locale, vehicleData: localized })
+    );
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     // Swallow errors gracefully: a failed prewarm just means the buyer waits

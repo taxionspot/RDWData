@@ -24,7 +24,7 @@ import { selectComparables } from "@/lib/listings/comparable";
 import type { Subject } from "@/lib/listings/comparable";
 import { getModelStats } from "@/lib/stats/modelStats";
 import { buildScoreResult } from "@/lib/vehicle/score";
-import { aiCacheKey as _aiCacheKey, readAiCache, writeAiCache } from "@/lib/api/ai-cache";
+import { aiCacheKey as _aiCacheKey, getOrGenerateAiReport } from "@/lib/api/ai-cache";
 
 type Params = { params: { plate: string } };
 
@@ -228,41 +228,23 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
   }
 
   const cacheKey = aiCacheKey(plate, locale, userMileage);
-  const cached = await readAiCache(cacheKey);
-  if (cached) {
-    return {
-      profile,
-      localized,
-      // sanitizeDeep cleans dashes from entries cached before the sanitizer
-      // existed, so stale cache can never show en/em-dashes.
-      aiInsights: sanitizeDeep(cached.insights as ReturnType<typeof buildFallbackVehicleAiReport>["insights"]),
-      // Cached valuations also get the formula amounts forced in, so stale
-      // cache entries can never show AI-invented values.
-      aiValuation: sanitizeDeep(
-        alignValuationWithFormula(
-          localized,
-          cached.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
-        )
-      )
-    };
-  }
 
+  // getOrGenerateAiReport deduplicates concurrent in-flight generations for the
+  // same cacheKey within this serverless instance (prewarm + mount + refetch +
+  // poll all coalesce onto a single Claude call). The returned value is always
+  // the RAW generation output; post-processing is applied uniformly below.
+  let raw: { insights: unknown; valuation: unknown };
   try {
-    const aiReport = await generateVehicleAiReport({
-      plate,
-      locale,
-      vehicleData: {
-        ...localized,
-        userContext: userMileage !== null ? { mileageInput: userMileage } : undefined
-      }
-    });
-    await writeAiCache(cacheKey, aiReport.insights, aiReport.valuation);
-    return {
-      profile,
-      localized,
-      aiInsights: aiReport.insights,
-      aiValuation: aiReport.valuation
-    };
+    raw = await getOrGenerateAiReport(cacheKey, () =>
+      generateVehicleAiReport({
+        plate,
+        locale,
+        vehicleData: {
+          ...localized,
+          userContext: userMileage !== null ? { mileageInput: userMileage } : undefined
+        }
+      })
+    );
   } catch {
     const fallback = buildFallbackVehicleAiReport({ locale, vehicleData: localized });
     return {
@@ -272,6 +254,22 @@ async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: 
       aiValuation: fallback.valuation
     };
   }
+
+  // Apply the same post-processing that the old cached path used, now uniformly
+  // for BOTH cache-hit and fresh-generate. This preserves the previous output
+  // shape exactly: sanitizeDeep strips any stale dashes; alignValuationWithFormula
+  // forces our own formula amounts in so AI-invented prices can never surface.
+  return {
+    profile,
+    localized,
+    aiInsights: sanitizeDeep(raw.insights as ReturnType<typeof buildFallbackVehicleAiReport>["insights"]),
+    aiValuation: sanitizeDeep(
+      alignValuationWithFormula(
+        localized,
+        raw.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
+      )
+    )
+  };
 }
 
 async function trackReportIfUserLoggedIn(args: {

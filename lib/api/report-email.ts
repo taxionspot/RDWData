@@ -17,7 +17,7 @@ import { generateVehicleReportPdf } from "@/lib/api/pdf-report";
 import { alignValuationWithFormula, applyMileageValuationOverride } from "@/lib/api/market-value";
 import { sanitizeDeep } from "@/lib/api/sanitize-text";
 import { computeVehicleSignals } from "@/lib/vehicle/signals";
-import { aiCacheKey, readAiCache, writeAiCache } from "@/lib/api/ai-cache";
+import { aiCacheKey, getOrGenerateAiReport } from "@/lib/api/ai-cache";
 
 /** Resolves to null after `ms` milliseconds, regardless of what `promise` does. */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
@@ -40,30 +40,32 @@ async function buildReportData(plate: string, locale: Locale) {
   localized = applyMileageValuationOverride(localized, null);
 
   // No user mileage here: thank-you emails use the formula estimate (empty bucket).
+  // getOrGenerateAiReport deduplicates concurrent generations within this instance,
+  // so a prewarm running in parallel with the post-payment email build coalesces
+  // onto a single Claude call. Post-processing mirrors route.ts exactly.
   const cacheKey = aiCacheKey(plate, locale, "");
-  const cached = await readAiCache(cacheKey);
-  if (cached) {
-    return {
-      profile,
-      localized,
-      aiInsights: sanitizeDeep(cached.insights as ReturnType<typeof buildFallbackVehicleAiReport>["insights"]),
-      aiValuation: sanitizeDeep(
-        alignValuationWithFormula(
-          localized,
-          cached.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
-        )
-      )
-    };
-  }
 
+  let raw: { insights: unknown; valuation: unknown };
   try {
-    const aiReport = await generateVehicleAiReport({ plate, locale, vehicleData: localized });
-    await writeAiCache(cacheKey, aiReport.insights, aiReport.valuation);
-    return { profile, localized, aiInsights: aiReport.insights, aiValuation: aiReport.valuation };
+    raw = await getOrGenerateAiReport(cacheKey, () =>
+      generateVehicleAiReport({ plate, locale, vehicleData: localized })
+    );
   } catch {
     const fallback = buildFallbackVehicleAiReport({ locale, vehicleData: localized });
     return { profile, localized, aiInsights: fallback.insights, aiValuation: fallback.valuation };
   }
+
+  return {
+    profile,
+    localized,
+    aiInsights: sanitizeDeep(raw.insights as ReturnType<typeof buildFallbackVehicleAiReport>["insights"]),
+    aiValuation: sanitizeDeep(
+      alignValuationWithFormula(
+        localized,
+        raw.valuation as ReturnType<typeof buildFallbackVehicleAiReport>["valuation"]
+      )
+    )
+  };
 }
 
 /**
