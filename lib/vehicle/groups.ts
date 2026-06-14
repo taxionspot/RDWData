@@ -1,18 +1,22 @@
 import type { PublicSiteSettings } from "../site-settings/defaults";
 
 export type GroupId =
-  | "g1-verdict"
-  | "g2-markt"
-  | "g3-risico"
-  | "g4-km"
-  | "g5-apk"
-  | "g6-voertuig";
+  | "g1-overzicht"
+  | "g2-oordeel"
+  | "g3-markt"
+  | "g4-tekoop"
+  | "g5-schatting"
+  | "g6-risico"
+  | "g7-km"
+  | "g8-apk"
+  | "g9-eigendom";
 
 export type ReportSectionId =
   | "overzicht"
   | "ai-analyse"
   | "markt"
   | "te-koop"
+  | "schatting"
   | "kilometerstand"
   | "apk"
   | "risico"
@@ -33,23 +37,47 @@ export type GroupDef = {
 
 export const GROUPS: GroupDef[] = [
   {
-    id: "g1-verdict",
-    labelNl: "Overzicht & oordeel",
-    labelEn: "Overview & verdict",
+    id: "g1-overzicht",
+    labelNl: "Voertuig & kerngegevens",
+    labelEn: "Vehicle & key data",
     lockKey: null,
     defaultOpen: true,
-    sectionIds: ["overzicht", "ai-analyse"]
+    sectionIds: ["overzicht"]
   },
   {
-    id: "g2-markt",
-    labelNl: "Marktwaarde & eerlijke prijs",
-    labelEn: "Market value & fair price",
+    id: "g2-oordeel",
+    labelNl: "Oordeel & inzicht",
+    labelEn: "Verdict & insight",
+    lockKey: "riskOverview",
+    defaultOpen: true,
+    sectionIds: ["ai-analyse"]
+  },
+  {
+    id: "g3-markt",
+    labelNl: "Marktwaarde",
+    labelEn: "Market value",
     lockKey: "marketAnalysis",
     defaultOpen: true,
-    sectionIds: ["markt", "te-koop"]
+    sectionIds: ["markt"]
   },
   {
-    id: "g3-risico",
+    id: "g4-tekoop",
+    labelNl: "Vergelijkbaar aanbod",
+    labelEn: "Comparable listings",
+    lockKey: "marketAnalysis",
+    defaultOpen: true,
+    sectionIds: ["te-koop"]
+  },
+  {
+    id: "g5-schatting",
+    labelNl: "Schatting & risico",
+    labelEn: "Estimate & risk",
+    lockKey: "marketAnalysis",
+    defaultOpen: false,
+    sectionIds: ["schatting"]
+  },
+  {
+    id: "g6-risico",
     labelNl: "Risico's & schade",
     labelEn: "Risks & damage",
     lockKey: "damageHistory",
@@ -57,7 +85,7 @@ export const GROUPS: GroupDef[] = [
     sectionIds: ["schade"]
   },
   {
-    id: "g4-km",
+    id: "g7-km",
     labelNl: "Kilometerstand & NAP",
     labelEn: "Mileage & NAP",
     lockKey: "mileageHistory",
@@ -65,15 +93,15 @@ export const GROUPS: GroupDef[] = [
     sectionIds: ["kilometerstand"]
   },
   {
-    id: "g5-apk",
-    labelNl: "APK-historie & rijwaardigheid",
-    labelEn: "MOT history & roadworthiness",
+    id: "g8-apk",
+    labelNl: "APK-historie + statistiek",
+    labelEn: "MOT history + statistics",
     lockKey: "inspectionTimeline",
     defaultOpen: false,
     sectionIds: ["apk", "apk-intelligence"]
   },
   {
-    id: "g6-voertuig",
+    id: "g9-eigendom",
     labelNl: "Eigendom & voertuiggegevens",
     labelEn: "Ownership & vehicle data",
     lockKey: "ownershipHistory",

@@ -45,7 +45,7 @@ export function inkForTone(tone: SignalTone): [number, number, number] {
 /**
  * The PDF section order, driven from the SAME GROUPS definition as the web
  * report so the paper version is the fully-expanded twin of the on-screen
- * groups (G1..G6). The dropped "risico" RiskOverview section is absent because
+ * groups (G1..G9). The dropped "risico" RiskOverview section is absent because
  * it is not mapped to any group's sectionIds in groups.ts.
  */
 export function pdfGroupOrder(): ReportSectionId[] {
@@ -53,7 +53,7 @@ export function pdfGroupOrder(): ReportSectionId[] {
 }
 
 /**
- * Ordered list of group ids from GROUPS (G1..G6).
+ * Ordered list of group ids from GROUPS (G1..G9).
  * Useful for iterating groups in PDF render order.
  */
 export function pdfGroupIds(): GroupId[] {
@@ -67,6 +67,7 @@ export function pdfSectionTitle(id: ReportSectionId, locale: "nl" | "en"): strin
     "ai-analyse": "Analyse",
     markt: "Marktwaarde en eerlijke prijs",
     "te-koop": "Vergelijkbaar aanbod",
+    schatting: "Schatting en risico",
     kilometerstand: "Kilometerstand en NAP",
     apk: "APK-historie",
     risico: "Risico-overzicht",
@@ -81,6 +82,7 @@ export function pdfSectionTitle(id: ReportSectionId, locale: "nl" | "en"): strin
     "ai-analyse": "Analysis",
     markt: "Market value and fair price",
     "te-koop": "Comparable listings",
+    schatting: "Estimate and risk",
     kilometerstand: "Mileage and NAP",
     apk: "MOT history",
     risico: "Risk overview",

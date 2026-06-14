@@ -139,7 +139,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       labelEn: "Safety and status",
       subNl: "Officiele RDW-statusvlaggen",
       subEn: "Official RDW status flags",
-      group: "g3-risico",
+      group: "g6-risico",
       affectsPrice: false
     },
     {
@@ -149,7 +149,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       labelEn: "Mileage (NAP)",
       subNl: "Nationale APK-tellerstandcontrole",
       subEn: "National odometer check",
-      group: "g4-km",
+      group: "g7-km",
       affectsPrice: true
     },
     {
@@ -159,7 +159,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       labelEn: "MOT validity",
       subNl: "Geldigheid van de keuring",
       subEn: "Inspection validity",
-      group: "g5-apk",
+      group: "g8-apk",
       affectsPrice: false
     }
   ];
@@ -172,7 +172,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       labelEn: "Market value calculated",
       subNl: "vul je vraagprijs in voor een prijsoordeel",
       subEn: "enter the asking price for a price verdict",
-      group: "g2-markt",
+      group: "g3-markt",
       affectsPrice: true
     });
   }
@@ -185,7 +185,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       tone: "danger",
       labelNl: "Geen geldige APK (WOK)",
       labelEn: "No valid MOT (WOK)",
-      group: "g5-apk"
+      group: "g8-apk"
     });
   }
   if (v.transferPossible === false) {
@@ -194,7 +194,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       tone: "danger",
       labelNl: "Tenaamstelling niet mogelijk",
       labelEn: "Registration transfer not possible",
-      group: "g3-risico"
+      group: "g6-risico"
     });
   }
   if (v.hasOpenRecall || v.recallsCount > 0) {
@@ -203,7 +203,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       tone: "warn",
       labelNl: "Openstaande terugroepactie",
       labelEn: "Open recall",
-      group: "g3-risico"
+      group: "g6-risico"
     });
   }
   if (enriched?.isImported) {
@@ -212,7 +212,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       tone: "warn",
       labelNl: "Geimporteerd voertuig",
       labelEn: "Imported vehicle",
-      group: "g6-voertuig"
+      group: "g9-eigendom"
     });
   }
   if (v.isTaxi) {
@@ -221,7 +221,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       tone: "warn",
       labelNl: "Taxiverleden",
       labelEn: "Taxi history",
-      group: "g3-risico"
+      group: "g6-risico"
     });
   }
   if (isImplausibleNap(v.napVerdict) || enriched?.mileageVerdict === "ONLOGISCH") {
@@ -230,7 +230,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       tone: "danger",
       labelNl: "Tellerstand onlogisch",
       labelEn: "Implausible mileage",
-      group: "g4-km"
+      group: "g7-km"
     });
   } else if (isNoNapVerdict(v.napVerdict) || enriched?.mileageVerdict === "TWIJFELACHTIG") {
     alerts.push({
@@ -238,7 +238,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       tone: "warn",
       labelNl: "Geen NAP-oordeel",
       labelEn: "No NAP verdict",
-      group: "g4-km"
+      group: "g7-km"
     });
   }
   const apkExpiry = parseApkMs(v.apkExpiryDate);
@@ -248,7 +248,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       tone: "danger",
       labelNl: "APK verlopen",
       labelEn: "MOT expired",
-      group: "g5-apk"
+      group: "g8-apk"
     });
   } else if (apkExpiry !== null && apkExpiry - nowMs <= 30 * DAY_MS) {
     alerts.push({
@@ -256,7 +256,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       tone: "warn",
       labelNl: "APK verloopt binnenkort",
       labelEn: "MOT expires soon",
-      group: "g5-apk"
+      group: "g8-apk"
     });
   }
 
@@ -314,18 +314,29 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
   };
 
   const groupStatus: Record<GroupId, GroupStatus> = {
-    "g1-verdict": { tone: verdictTone, labelNl: headingNl, labelEn: headingEn },
-    "g2-markt": hasAccess && enriched?.estimatedValueNow != null
+    "g1-overzicht": { tone: "ok", labelNl: "Voertuiggegevens compleet", labelEn: "Vehicle data complete" },
+    "g2-oordeel": { tone: verdictTone, labelNl: headingNl, labelEn: headingEn },
+    "g3-markt": hasAccess && enriched?.estimatedValueNow != null
       ? { tone: "ok", labelNl: "Marktwaarde berekend", labelEn: "Market value calculated" }
       : {
           tone: "ok",
           labelNl: "Ontgrendel de marktwaarde-analyse",
           labelEn: "Unlock the market value analysis"
         },
-    "g3-risico": safetyStatus,
-    "g4-km": mileageStatus,
-    "g5-apk": apkStatus,
-    "g6-voertuig": enriched?.isImported
+    "g4-tekoop": {
+      tone: "ok",
+      labelNl: "Vergelijkbaar aanbod",
+      labelEn: "Comparable listings"
+    },
+    "g5-schatting": {
+      tone: "ok",
+      labelNl: "Schatting & risico",
+      labelEn: "Estimate & risk"
+    },
+    "g6-risico": safetyStatus,
+    "g7-km": mileageStatus,
+    "g8-apk": apkStatus,
+    "g9-eigendom": enriched?.isImported
       ? {
           tone: "warn",
           labelNl: "Geimporteerd, controleer papieren",
