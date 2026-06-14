@@ -47,11 +47,14 @@ function sourceLabel(car: ApiCar): string {
   return car.source ?? "verkoper";
 }
 
-export function ComparableListings({ plate }: { plate: string }) {
+export function ComparableListings({ plate, embedded = false }: { plate: string; embedded?: boolean }) {
   const { locale } = useI18n();
   const nl = locale === "nl";
   const { normalized, data } = useVehicleLookup(plate);
   const v = data?.vehicle;
+  // No standalone chrome (nav bar / back link) on this screen, so embedded does
+  // not change the markup; consumed for call-site consistency with the others.
+  void embedded;
 
   const [cars, setCars] = useState<ApiCar[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,7 +97,10 @@ export function ComparableListings({ plate }: { plate: string }) {
   const hasCards = Boolean(cars && cars.length > 0);
 
   // Nothing to show at all: not loading, no cards, and we cannot even build links.
-  if (!loading && !hasCards && (!model.brand || !model.model || exact.length === 0)) return null;
+  // We still render a short honest line (behind the same PremiumLock) so the
+  // group body is never an empty panel. Live listings are currently unavailable
+  // (no working marketplace feed), so this is the expected path for most plates.
+  const nothingToShow = !loading && !hasCards && (!model.brand || !model.model || exact.length === 0);
 
   const moreLinks =
     exact.length > 0 ? (
@@ -120,7 +126,17 @@ export function ComparableListings({ plate }: { plate: string }) {
     ) : null;
 
   let inner: React.ReactNode;
-  if (loading) {
+  if (nothingToShow) {
+    inner = (
+      <div className={styles.wrap}>
+        <p className={styles.intro}>
+          {nl
+            ? "We konden voor dit voertuig op dit moment geen vergelijkbaar aanbod ophalen. Zoek dezelfde auto handmatig op de grote verkoopsites en vergelijk met onze geschatte marktwaarde."
+            : "We could not retrieve comparable listings for this vehicle right now. Search for the same car manually on the big marketplaces and compare against our estimated market value."}
+        </p>
+      </div>
+    );
+  } else if (loading) {
     inner = (
       <div className={styles.wrap}>
         <p className={styles.intro}>{nl ? "Vergelijkbaar aanbod laden..." : "Loading comparable listings..."}</p>
