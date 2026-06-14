@@ -94,6 +94,7 @@ const emptySettings: PublicSiteSettings = {
   seo: { metaTitle: "", metaDescription: "", ogImage: "", googleAnalyticsId: "", faviconUrl: "", microsoftClarityId: "" },
   appearance: { primaryColor: "#2563eb", accentColor: "#dbeafe", fontFamily: "Inter", logoUrl: "", logoText: "Kentekenrapport" },
   email: { fromName: "Kentekenrapport", fromAddress: "noreply@kentekenrapport.nl", reportSubjectNl: "", reportSubjectEn: "", welcomeBodyNl: "", welcomeBodyEn: "" },
+  reviews: [],
 };
 
 // ─────────────────────── Micro Components ───────────────────────

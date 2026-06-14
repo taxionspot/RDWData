@@ -90,7 +90,8 @@ export async function upsertSiteSettings(input: Partial<PublicSiteSettings>): Pr
     },
     seo: { ...current.seo, ...(input.seo ?? {}) },
     appearance: { ...current.appearance, ...(input.appearance ?? {}) },
-    email: { ...current.email, ...(input.email ?? {}) }
+    email: { ...current.email, ...(input.email ?? {}) },
+    reviews: input.reviews ?? current.reviews
   };
 
   await SiteSettingsModel.updateOne({ key: "global" }, { $set: { ...next } }, { upsert: true });
