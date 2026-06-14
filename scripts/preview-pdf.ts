@@ -2,6 +2,8 @@
 // Usage: npx tsx scripts/preview-pdf.ts [output.pdf]
 import { writeFileSync } from "node:fs";
 import { generateVehicleReportPdf } from "../lib/api/pdf-report";
+import { computeVehicleSignals } from "../lib/vehicle/signals";
+import type { VehicleProfile } from "../lib/rdw/types";
 
 const mockData = {
   vehicle: {
@@ -150,13 +152,30 @@ const aiValuation = {
 };
 
 async function main() {
+  // The preview mock is shaped like a localized payload; reuse its vehicle +
+  // enriched as a minimal VehicleProfile so the page-1 judgment block renders.
+  const previewProfile = {
+    plate: "HF001B",
+    displayPlate: "HF-001-B",
+    fromCache: false,
+    enriched: mockData.enriched,
+    vehicle: mockData.vehicle,
+    inspections: mockData.inspections,
+    defects: mockData.defects,
+    defectDescriptions: mockData.defectDescriptions,
+    recalls: mockData.recalls,
+    typeApprovals: [],
+    raw: mockData.raw
+  } as unknown as VehicleProfile;
+  const signals = computeVehicleSignals({ profile: previewProfile, nowMs: Date.now(), hasAccess: true });
   const pdf = await generateVehicleReportPdf({
     plate: "HF001B",
     locale: "nl",
     generatedAt: new Date(),
     data: mockData as unknown as Record<string, unknown>,
     aiInsights,
-    aiValuation
+    aiValuation,
+    signals
   });
   const output = process.argv[2] ?? "preview-report.pdf";
   writeFileSync(output, pdf);

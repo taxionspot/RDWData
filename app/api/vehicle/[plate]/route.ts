@@ -269,13 +269,20 @@ export async function GET(request: Request, { params }: Params) {
         return NextResponse.json({ error: "Payment required for report download.", code: "PAYMENT_REQUIRED" }, { status: 402 });
       }
       const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
+      // Same server-side signal report the web JudgmentBlock uses, computed on
+      // the RAW profile so the PDF page 1 mirrors the site exactly. hasAccess is
+      // true here (the 402 gate above already passed). getVehicleProfile is 24h-
+      // cached so this is a cache hit, not a second RDW fetch.
+      const profileForSignals = await getVehicleProfile(plate);
+      const signals = computeVehicleSignals({ profile: profileForSignals, nowMs: Date.now(), hasAccess: true });
       const pdf = await generateVehicleReportPdf({
         plate,
         locale,
         generatedAt: new Date(),
         data: localized,
         aiInsights,
-        aiValuation
+        aiValuation,
+        signals
       });
       await trackReportIfUserLoggedIn({ plate, locale, channel: "download" });
       // Sample report opens inline in the browser; paid reports download.
@@ -357,13 +364,18 @@ export async function POST(request: Request, { params }: Params) {
       aiInsights,
       aiValuation
     });
+    // Signals for the PDF judgment block; hasAccess is true (402 gate passed above).
+    // getVehicleProfile is 24h-cached so this is a cache hit, not a second RDW fetch.
+    const profileForSignals = await getVehicleProfile(plate);
+    const signals = computeVehicleSignals({ profile: profileForSignals, nowMs: Date.now(), hasAccess: true });
     const pdf = await generateVehicleReportPdf({
       plate,
       locale,
       generatedAt: new Date(),
       data: localized,
       aiInsights,
-      aiValuation
+      aiValuation,
+      signals
     });
     const result = await sendReportEmail({
       to: email,

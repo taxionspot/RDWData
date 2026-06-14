@@ -2,6 +2,15 @@ import { PDFDocument, rgb, StandardFonts, type PDFPage, type PDFFont, type PDFIm
 import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import { getVehicleImageUrl } from "@/lib/utils/imagin";
 import { computeNegotiationPricing } from "@/lib/api/negotiation-pricing";
+import type { VehicleSignalReport } from "@/lib/vehicle/signals";
+import { GROUPS, type ReportSectionId } from "@/lib/vehicle/groups";
+import {
+  toneToPdfWord,
+  accentForTone,
+  inkForTone,
+  pdfSectionTitle,
+  pdfGroupOrder
+} from "@/lib/vehicle/pdf-presentation";
 
 type AiInsights = {
   summary: string;
@@ -30,6 +39,7 @@ type ReportArgs = {
   data: Record<string, unknown>;
   aiInsights?: AiInsights | null;
   aiValuation?: AiValuation | null;
+  signals?: VehicleSignalReport | null;
 };
 
 type Row = Record<string, unknown>;
