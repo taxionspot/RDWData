@@ -42,6 +42,8 @@ import { TechnicalSpecsScreen } from "./TechnicalSpecsScreen";
 import { ReportSectionNav } from "./ReportSectionNav";
 import { TrustBadges } from "./TrustBadges";
 import { ComparableListings } from "./ComparableListings";
+import { JudgmentBlock } from "./JudgmentBlock";
+import { GROUPS } from "@/lib/vehicle/groups";
 import styles from "./FullReportScreen.module.css";
 
 type Props = { plate: string };
@@ -413,11 +415,23 @@ export function FullReportScreen({ plate }: Props) {
     locked: isPremiumSection(section)
   }));
 
+  // Phase 1 temporary jump: the group accordion lands in Phase 2, so map a
+  // group id to its first section id (which exists in the current layout) and
+  // scroll there. Phase 2 will open the group then scroll its header.
+  const jumpToGroup = (groupId: string) => {
+    const group = GROUPS.find((g) => g.id === groupId);
+    const targetId = group?.sectionIds[0] ?? groupId;
+    const el = document.getElementById(targetId);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className={styles.page}>
       <ScanIntro plate={normalized} />
 
       <div className={styles.container}>
+        <JudgmentBlock plate={normalized} locale={locale} onJump={jumpToGroup} />
+
         <ReportSectionNav items={navItems} />
 
         <SectionBlock section={sectionById("overzicht")} index={sectionIndex("overzicht")} isPremium={false} locale={locale}>
