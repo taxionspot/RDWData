@@ -185,7 +185,7 @@ export function TechnicalSpecsScreen({ plate, embedded = false }: Props) {
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     performance: true,
-    efficiency: true,
+    efficiency: false,
     dimensions: false,
     registration: false
   });
