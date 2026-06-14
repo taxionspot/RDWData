@@ -183,7 +183,8 @@ Regels:
 - De tekstvelden (summary, positives, risks, recommendation, explanation) mogen NOOIT een bedrag in euro's noemen. Spreek over waarde uitsluitend kwalitatief (laag, marktconform, hoog). De enige bron van marktwaarde-getallen zijn de numerieke velden estimatedValueNow/Min/Max uit enriched in DATA.
 - estimatedValueMin <= estimatedValueNow <= estimatedValueMax
 - waardes als gehele EUR getallen
-- recommendation moet expliciet advies geven: kopen/wachten/onderhandelen/extra inspectie
+- recommendation moet expliciet advies geven: kopen/wachten/onderhandelen
+- Adviseer NOOIT een externe keuring of inspectie (BOVAG, ANWB, onafhankelijke garage, monteur, aankoopkeuring). WIJ zijn de keuring; baseer advies uitsluitend op de data in dit rapport.
 - alleen JSON, geen markdown, geen extra tekst
 
 DATA:
@@ -218,7 +219,8 @@ Rules:
 - The prose fields (summary, positives, risks, recommendation, explanation) must NEVER state a euro amount. Refer to value only qualitatively (low, in line with the market, high). The only source of market-value numbers is the numeric estimatedValueNow/Min/Max fields from enriched in DATA.
 - estimatedValueMin <= estimatedValueNow <= estimatedValueMax
 - integer EUR values
-- recommendation must explicitly guide buy/wait/negotiate/inspect
+- recommendation must explicitly guide buy/wait/negotiate
+- NEVER recommend an external inspection or check (BOVAG, ANWB, independent garage, mechanic, pre-purchase inspection). WE are the inspection; base advice solely on the data in this report.
 - JSON only, no markdown, no extra text
 
 DATA:
@@ -595,8 +597,8 @@ export function buildFallbackVehicleAiReport(args: {
     : `${brand || "Vehicle"} ${tradeName}`.trim() +
       `${year ? ` (${year})` : ""}: estimated market value is computed with our own valuation formula, based on age, inspection signals, and maintenance profile.`;
   const recommendation = isNl
-    ? "Gebruik deze indicatie als onderhandelingsbasis en combineer met fysieke inspectie en proefrit."
-    : "Use this estimate as negotiation guidance and combine it with physical inspection and test drive.";
+    ? "Gebruik deze indicatie actief als onderbouwing in de prijsonderhandeling."
+    : "Use this estimate actively as leverage in the price negotiation.";
   const explanation = isNl
     ? "Dit is een data-gedreven schatting, geen taxatierapport. Bandbreedte is vergroot bij hogere onzekerheid."
     : "This is a data-driven estimate, not a formal appraisal. The range widens as uncertainty increases.";
@@ -611,7 +613,7 @@ export function buildFallbackVehicleAiReport(args: {
       riskLevel: maintenanceRisk < 5.5 ? "LOW" : maintenanceRisk < 7.5 ? "MEDIUM" : "HIGH",
       recommendations: sanitizeList([
         isNl ? "Controleer onderhoudsboekje en facturen op volledigheid." : "Verify maintenance history and invoices for consistency.",
-        isNl ? "Plan een onafhankelijke aankoopkeuring voor definitieve beslissing." : "Schedule an independent pre-purchase inspection before final decision.",
+        isNl ? "Vraag de verkoper om onderhoudsfacturen en een toelichting op eventuele gebreken." : "Ask the seller for maintenance invoices and an explanation of any defects.",
         isNl ? "Gebruik de geschatte marktwaarde actief in de prijsonderhandeling." : "Use the estimated market value actively during negotiation."
       ])
     },

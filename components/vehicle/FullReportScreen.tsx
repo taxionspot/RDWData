@@ -66,6 +66,14 @@ const SECTIONS: SectionDef[] = [
     lockKey: null
   },
   {
+    id: "ai-analyse",
+    labelNl: "Samenvatting & advies",
+    labelEn: "Summary & advice",
+    subNl: "Alle bevindingen samengevat in gewone taal",
+    subEn: "All findings summarised in plain language",
+    lockKey: "riskOverview"
+  },
+  {
     id: "markt",
     labelNl: "Marktwaarde",
     labelEn: "Market value",
@@ -144,14 +152,6 @@ const SECTIONS: SectionDef[] = [
     subNl: "Volledige fabrieksgegevens uit het RDW-register",
     subEn: "Full factory data from the RDW register",
     lockKey: "technicalSpecs"
-  },
-  {
-    id: "ai-analyse",
-    labelNl: "Samenvatting & advies",
-    labelEn: "Summary & advice",
-    subNl: "Alle bevindingen samengevat in gewone taal",
-    subEn: "All findings summarised in plain language",
-    lockKey: "riskOverview"
   },
   {
     id: "acties",
@@ -433,6 +433,10 @@ export function FullReportScreen({ plate }: Props) {
           <VehicleResultScreen plate={plate} embedded />
         </SectionBlock>
 
+        <SectionBlock section={sectionById("ai-analyse")} index={sectionIndex("ai-analyse")} isPremium={isPremiumSection(sectionById("ai-analyse"))} locale={locale}>
+          <AiAnalysisScreen plate={normalized} />
+        </SectionBlock>
+
         <SectionErrorBoundary label="records-summary">
           <RecordsSummary
             plate={normalized}
@@ -484,10 +488,6 @@ export function FullReportScreen({ plate }: Props) {
 
         <SectionBlock section={sectionById("specs")} index={sectionIndex("specs")} isPremium={isPremiumSection(sectionById("specs"))} locale={locale}>
           <TechnicalSpecsScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("ai-analyse")} index={sectionIndex("ai-analyse")} isPremium={isPremiumSection(sectionById("ai-analyse"))} locale={locale}>
-          <AiAnalysisScreen plate={normalized} />
         </SectionBlock>
 
         <SectionBlock section={sectionById("acties")} index={sectionIndex("acties")} isPremium={false} locale={locale}>

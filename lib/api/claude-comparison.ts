@@ -96,8 +96,8 @@ function buildFallback(locale: "nl" | "en", args: { base: Record<string, unknown
     verdict,
     summary: stripEmbeddedEuro(
       locale === "nl"
-        ? "Vergelijking is gebaseerd op onderhoudsrisico, defecthistorie en marktwaarde. Controleer altijd onderhoudsbewijs en plan een onafhankelijke inspectie."
-        : "Comparison is based on maintenance risk, defect history, and market value. Always verify maintenance records and perform an independent inspection."
+        ? "Vergelijking is gebaseerd op onderhoudsrisico, defecthistorie en marktwaarde. Controleer altijd het onderhoudsbewijs en de facturen."
+        : "Comparison is based on maintenance risk, defect history, and market value. Always verify the maintenance records and invoices."
     ),
     basePros: [
       locale === "nl" ? `Onderhoudsrisico: ${bRisk.toFixed(1)}/10` : `Maintenance risk: ${bRisk.toFixed(1)}/10`,

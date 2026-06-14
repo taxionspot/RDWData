@@ -139,8 +139,8 @@ export function AiAnalysisScreen({ plate }: Props) {
 
         <p className={styles.disclaimer}>
           {nl
-            ? "Automatische analyse op basis van officiële RDW-data en onze rekenmodellen. Dit is informatie, geen aankoopadvies. Laat bij twijfel altijd een aankoopkeuring uitvoeren."
-            : "Automated analysis based on official RDW data and our models. This is information, not purchase advice. When in doubt, get a professional inspection."}
+            ? "Automatische analyse op basis van officiële RDW-data en onze rekenmodellen. Dit is informatie, geen bindend aankoopadvies."
+            : "Automated analysis based on official RDW data and our models. This is information, not binding purchase advice."}
         </p>
       </div>
     </PremiumLock>
