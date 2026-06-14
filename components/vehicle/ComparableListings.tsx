@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
@@ -9,16 +9,71 @@ import { buildAlternativeLinks, buildExactLinks, type ListingVehicle } from "@/l
 import styles from "./ComparableListings.module.css";
 
 /**
- * "Comparable cars for sale, with links." Sends the buyer to pre-filtered public
- * searches on the big NL marketplaces for the same make/model around our
- * estimated value, with a same-make fallback. Free section (drives engagement +
- * future affiliate clicks); only renders when we know make + model.
+ * "Comparable cars for sale." Shows real NL listing CARDS (photo, price, km,
+ * year) from /api/listings/comparable, sorted by similarity to the looked-up
+ * vehicle, with a deeplink to the source listing. Falls back to plain
+ * pre-filtered marketplace search links when no listings are available (no
+ * Apify token, zero results, or an error). Free section. Legal: minimal facts +
+ * a thumbnail + a prominent source deeplink, never claiming the cars as our own.
  */
+
+type ApiCar = {
+  title: string | null;
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  priceEur: number | null;
+  mileageKm: number | null;
+  fuelType: string | null;
+  city: string | null;
+  imageUrl: string | null;
+  sourceUrl: string | null;
+  source: string | null;
+};
+
+function eur(value: number | null): string {
+  if (value == null) return "";
+  return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value);
+}
+
+function sourceLabel(car: ApiCar): string {
+  try {
+    if (car.sourceUrl) return new URL(car.sourceUrl).hostname.replace(/^www\./, "");
+  } catch {
+    // ignore
+  }
+  return car.source ?? "verkoper";
+}
+
 export function ComparableListings({ plate }: { plate: string }) {
   const { locale } = useI18n();
   const nl = locale === "nl";
-  const { data } = useVehicleLookup(plate);
+  const { normalized, data } = useVehicleLookup(plate);
   const v = data?.vehicle;
+
+  const [cars, setCars] = useState<ApiCar[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!normalized) return;
+    let active = true;
+    setLoading(true);
+    fetch(`/api/listings/comparable/${encodeURIComponent(normalized)}?lang=${locale}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { cars: [] }))
+      .then((d) => {
+        if (!active) return;
+        setCars(Array.isArray(d.cars) ? (d.cars as ApiCar[]) : []);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setCars([]);
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [normalized, locale]);
 
   const model: ListingVehicle = useMemo(
     () => ({
@@ -33,10 +88,100 @@ export function ComparableListings({ plate }: { plate: string }) {
   const exact = useMemo(() => buildExactLinks(model), [model]);
   const alternatives = useMemo(() => buildAlternativeLinks(model), [model]);
 
-  if (!model.brand || !model.model || exact.length === 0) return null;
+  const label = model.brand && model.model ? `${model.brand} ${model.model}`.replace(/\s+/g, " ").trim() : null;
+  const hasCards = Boolean(cars && cars.length > 0);
 
-  const label = `${model.brand} ${model.model}`.replace(/\s+/g, " ").trim();
+  // Nothing to show: not loading, no cards, and we cannot even build search links.
+  if (!loading && !hasCards && (!model.brand || !model.model || exact.length === 0)) return null;
 
+  const moreLinks =
+    exact.length > 0 ? (
+      <div className={styles.moreRow}>
+        <span className={styles.altLabel}>{nl ? "Meer aanbod:" : "More listings:"}</span>
+        <span className={styles.altLinks}>
+          {exact.map((link, i) => (
+            <span key={link.provider}>
+              {i > 0 ? <span className={styles.altDot}> · </span> : null}
+              <a
+                className={styles.altLink}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer nofollow sponsored"
+                onClick={() => track("listing_click", { provider: link.provider, tier: "more" })}
+              >
+                {link.provider}
+              </a>
+            </span>
+          ))}
+        </span>
+      </div>
+    ) : null;
+
+  if (loading) {
+    return (
+      <div className={styles.wrap}>
+        <p className={styles.intro}>{nl ? "Vergelijkbaar aanbod laden..." : "Loading comparable listings..."}</p>
+        <div className={styles.grid}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className={`${styles.card} ${styles.skeleton}`} aria-hidden="true" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (hasCards) {
+    return (
+      <div className={styles.wrap}>
+        <p className={styles.intro}>
+          {nl
+            ? `Vergelijkbaar aanbod, gesorteerd op gelijkenis met deze ${label}.`
+            : `Comparable listings, sorted by similarity to this ${label}.`}
+        </p>
+        <div className={styles.grid}>
+          {cars!.slice(0, 6).map((car, i) => (
+            <a
+              key={i}
+              className={styles.card}
+              href={car.sourceUrl ?? "#"}
+              target="_blank"
+              rel="noopener noreferrer nofollow sponsored"
+              onClick={() => track("listing_click", { provider: sourceLabel(car), tier: "card" })}
+            >
+              <div className={styles.cardImg}>
+                {car.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={car.imageUrl} alt={car.title ?? label ?? "auto"} loading="lazy" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className={styles.noImg}>{label}</span>
+                )}
+              </div>
+              <div className={styles.cardBody}>
+                <div className={styles.cardPrice}>{eur(car.priceEur) || (nl ? "Prijs op aanvraag" : "Price on request")}</div>
+                <div className={styles.cardMeta}>
+                  {[car.year, car.mileageKm != null ? `${car.mileageKm.toLocaleString("nl-NL")} km` : null, car.fuelType]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+                <div className={styles.cardTitle}>{car.title}</div>
+                <div className={styles.cardSource}>
+                  {nl ? "Bekijk op" : "View on"} {sourceLabel(car)} <ExternalLink size={13} />
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+        {moreLinks}
+        <p className={styles.disclosure}>
+          {nl
+            ? "Aanbod via Gaspedaal en de bronsites. Klik door naar de verkoper voor de actuele prijs en details."
+            : "Listings via Gaspedaal and source sites. Click through to the seller for the current price and details."}
+        </p>
+      </div>
+    );
+  }
+
+  // Fallback: pre-filtered marketplace search links (no live listings available).
   return (
     <div className={styles.wrap}>
       <p className={styles.intro}>
@@ -44,7 +189,6 @@ export function ComparableListings({ plate }: { plate: string }) {
           ? `Bekijk dezelfde ${label} rond onze geschatte marktwaarde op de grootste verkoopsites.`
           : `Browse the same ${label} around our estimated market value on the biggest marketplaces.`}
       </p>
-
       <div className={styles.links}>
         {exact.map((link) => (
           <a
@@ -64,7 +208,9 @@ export function ComparableListings({ plate }: { plate: string }) {
       {alternatives.length > 0 ? (
         <div className={styles.altRow}>
           <span className={styles.altLabel}>
-            {nl ? `Geen passende ${model.model}? Andere ${model.brand} in deze prijsklasse:` : `No matching ${model.model}? Other ${model.brand} in this price range:`}
+            {nl
+              ? `Geen passende ${model.model}? Andere ${model.brand} in deze prijsklasse:`
+              : `No matching ${model.model}? Other ${model.brand} in this price range:`}
           </span>
           <span className={styles.altLinks}>
             {alternatives.map((link, i) => (
