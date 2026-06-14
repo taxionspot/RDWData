@@ -63,13 +63,13 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport;
 ```
 Thresholds (computed on the RAW profile; EN napVerdict tokens accepted defensively):
 - **safety** (g3, affectsPrice false): danger if `wok` or `transferPossible === false`; warn if `hasOpenRecall` or `recallsCount > 0` or `isTaxi` or `enriched.isImported` or `defects.length > 0`; else ok.
-- **mileage** (g4, affectsPrice true): danger if `napVerdict` Onlogisch/Implausible; warn if null/"Geen oordeel"/"No verdict" or `enriched.mileageVerdict === "TWIJFELACHTIG"`; ok if Logisch/Plausible.
+- **mileage** (g4, affectsPrice true): danger if `napVerdict` Onlogisch/Implausible OR `enriched.mileageVerdict === "ONLOGISCH"` (our own rollback detection); warn if null/"Geen oordeel"/"No verdict" or `enriched.mileageVerdict === "TWIJFELACHTIG"`; ok if Logisch/Plausible. The mileage alert mirrors the tone (danger alert on the danger condition, warn alert on the warn condition).
 - **apk** (g5, affectsPrice false): danger if expiry < now or `wok`; warn if within 30 days or date null; else ok. (Never colored by the fabricated `apkPassChance`.)
 - **fairPrice** (g2, affectsPrice true): present ONLY when `hasAccess && enriched.estimatedValueNow != null`; tone ok; the euro number never leaves the client.
 - **summary**: checked = 3; needAttention = non-ok among safety/mileage/apk; priceAffecting = truthy count of [isImported, mileage != ok, wok].
 - **verdict.tone** = worst of safety/mileage/apk.
 - **alerts** = only the real exceptions (risico-bij-uitzondering); empty when verdict ok.
-- **groupStatus** = every GroupId; g1 mirrors verdict, g2 reflects access, g3/g4/g5 mirror the signals, g6 reflects import.
+- **groupStatus** = every GroupId; g1 mirrors verdict, g2 shows "Marktwaarde berekend" only when `hasAccess && estimatedValueNow != null` (else the unlock prompt), g3/g4/g5 mirror the signals (looked up by key, not position), g6 reflects import.
 
 ### Response carrier
 The vehicle API attaches `signals` as a free top-level field. The RTK query return type widens to `VehicleLookupResponse = VehicleProfile & { signals?: VehicleSignalReport; aiInsights?: unknown; aiValuation?: unknown }` (Phase 1 Task 1.4). Components read `data.signals` defensively (optional-chained). The signals object is locale-agnostic in transit (it carries labelNl/labelEn/subNl/subEn); the component picks by locale.
