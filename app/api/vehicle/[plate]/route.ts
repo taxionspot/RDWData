@@ -12,6 +12,7 @@ import { generateVehicleReportPdf } from "@/lib/api/pdf-report";
 import { alignValuationWithFormula, applyMileageValuationOverride } from "@/lib/api/market-value";
 import { sanitizeDeep } from "@/lib/api/sanitize-text";
 import { hasPaidPlateAccess } from "@/lib/payments/server-access";
+import { redactPremiumValue } from "@/lib/api/premium-value";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
@@ -33,6 +34,52 @@ function parseUserMileage(input: string | null): number | null {
   const value = Number(input);
   if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value);
+}
+
+// redactPremiumValue + PREMIUM_VALUE_FIELDS live in lib/api/premium-value.ts so
+// the single-plate and comparison routes enforce the same premium-value rule.
+
+/**
+ * Logs OUR derived market value (not any third-party listing) once per
+ * plate+locale+day, building a lawfully owned NL price time-series for a future
+ * market-index data product. Best-effort: it must never block or fail the
+ * lookup response.
+ */
+async function logMarketAggregate(plate: string, locale: Locale, localized: Record<string, unknown>): Promise<void> {
+  try {
+    const vehicle = (localized.vehicle ?? {}) as Record<string, unknown>;
+    const enriched = (localized.enriched ?? {}) as Record<string, unknown>;
+    const value = enriched.estimatedValueNow;
+    // Only log real valuations with an identifiable model; skip empty lookups.
+    if (typeof value !== "number" || !Number.isFinite(value)) return;
+    if (!vehicle.brand || !vehicle.tradeName) return;
+    const now = new Date();
+    const day = now.toISOString().slice(0, 10);
+    const id = `${plate}|${locale}|${day}`;
+    await connectMongo();
+    const { MarketValueAggregateModel } = await import("@/models/MarketValueAggregate");
+    await MarketValueAggregateModel.findByIdAndUpdate(
+      id,
+      {
+        _id: id,
+        plate,
+        make: (vehicle.brand as string) ?? null,
+        model: (vehicle.tradeName as string) ?? null,
+        year: typeof vehicle.year === "number" ? (vehicle.year as number) : null,
+        fuel: (vehicle.fuelType as string) ?? null,
+        bodyType: (vehicle.bodyType as string) ?? null,
+        mileage: typeof enriched.estimatedMileageNow === "number" ? (enriched.estimatedMileageNow as number) : null,
+        estimatedValueNow: value,
+        marketValueConfidence: (enriched.marketValueConfidence as string) ?? null,
+        locale,
+        day,
+        updatedAt: now
+      },
+      { upsert: true, setDefaultsOnInsert: true }
+    );
+  } catch {
+    // best effort: aggregate logging must never affect the lookup response
+  }
 }
 
 async function hasPaidReportAccess(plate: string): Promise<boolean> {
@@ -196,7 +243,14 @@ export async function GET(request: Request, { params }: Params) {
     if (!includeAi && !downloadReport) {
       const profile = await getVehicleProfile(plate);
       const localized = localizeVehicleProfile(profile, locale) as Record<string, unknown>;
-      return NextResponse.json(localized);
+      // Log our derived value (full, pre-redaction) for the market time-series,
+      // and resolve access in parallel. The market value is premium: strip it
+      // unless this browser paid for the plate.
+      const [hasAccess] = await Promise.all([
+        hasPaidPlateAccess(plate),
+        logMarketAggregate(plate, locale, localized)
+      ]);
+      return NextResponse.json(redactPremiumValue(localized, hasAccess));
     }
 
     if (downloadReport) {
@@ -236,8 +290,9 @@ export async function GET(request: Request, { params }: Params) {
       const profile = await getVehicleProfile(plate);
       let localized = localizeVehicleProfile(profile, locale) as Record<string, unknown>;
       localized = applyMileageValuationOverride(localized, userMileage);
+      // No access: also strip the premium market value from this (AI) branch.
       return NextResponse.json({
-        ...localized,
+        ...redactPremiumValue(localized, false),
         aiInsights: null,
         aiValuation: null
       });

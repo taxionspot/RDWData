@@ -106,7 +106,10 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
     // Otherwise the server value (enriched.estimatedValueNow, which already uses
     // the formula's estimated mileage) is the single source of truth, so the
     // displayed value matches the API, AI analysis and PDF everywhere.
-    if (!data?.vehicle || appliedMileage == null) return null;
+    // Guard on a present server value: it is stripped for unpaid visitors, so we
+    // must not reconstruct the premium value client-side from the catalogue
+    // price (the value is premium only).
+    if (!data?.vehicle || appliedMileage == null || data?.enriched?.estimatedValueNow == null) return null;
     const first = data.vehicle.firstRegistrationWorld ? new Date(data.vehicle.firstRegistrationWorld) : null;
     const ageYears =
       first && !Number.isNaN(first.getTime())

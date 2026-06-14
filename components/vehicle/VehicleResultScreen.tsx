@@ -726,8 +726,16 @@ export function VehicleResultScreen({ plate, embedded = false }: Props) {
               <InsightCard
                 icon={Coins}
                 title={locale === "nl" ? "Geschatte waarde" : "Estimated value"}
-                value={e.estimatedValueNow != null ? formatCurrency(e.estimatedValueNow) : marketLabel}
-                isLoading={isCalculatingClaude && e.estimatedValueNow == null}
+                value={
+                  e.estimatedValueNow != null
+                    ? formatCurrency(e.estimatedValueNow)
+                    : isPaidForPlate
+                    ? marketLabel
+                    : locale === "nl"
+                    ? "Premium"
+                    : "Premium"
+                }
+                isLoading={isPaidForPlate && isCalculatingClaude && e.estimatedValueNow == null}
               />
               <InsightCard
                 icon={Clock3}

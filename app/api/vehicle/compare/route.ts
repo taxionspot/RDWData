@@ -6,9 +6,9 @@ import type { Locale } from "@/lib/i18n/messages";
 import { generateVehicleComparisonAi } from "@/lib/api/claude-comparison";
 import { generateVehicleComparisonPdf } from "@/lib/api/pdf-comparison-report";
 import { getSiteSettings } from "@/lib/site-settings/service";
-import { connectMongo } from "@/lib/db/mongodb";
-import { PlatePaymentModel } from "@/models/PlatePayment";
 import { applyMileageValuationOverride } from "@/lib/api/market-value";
+import { hasPaidPlateAccess } from "@/lib/payments/server-access";
+import { redactPremiumValue } from "@/lib/api/premium-value";
 
 export const runtime = "nodejs";
 
@@ -38,18 +38,18 @@ function withMileageContext(localized: Record<string, unknown>, userMileage: num
   };
 }
 
-async function hasPaidReportAccess(plateA: string, plateB: string): Promise<boolean> {
-  const demoBypassEnabled =
-    process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_SKIP_PAYMENT === "true";
-  if (demoBypassEnabled) return true;
-
+/**
+ * Comparison PDF access: BOTH plates must be paid for, resolved via the
+ * per-browser cookie-aware hasPaidPlateAccess (passed in), unless the admin has
+ * unlocked report downloads globally. Requiring both (not OR) and using the
+ * cookie model, not a global PlatePayment lookup, stops a visitor pivoting off
+ * the always-free sample plate to read an unpaid plate's value, and stops one
+ * payment from unlocking globally.
+ */
+async function hasComparePdfAccess(baseAccess: boolean, compareAccess: boolean): Promise<boolean> {
   const settings = await getSiteSettings();
-  const paymentRequired = settings.paymentEnabled && settings.lockSections.reportDownload;
-  if (!paymentRequired) return true;
-  await connectMongo();
-  const hasPaidA = await PlatePaymentModel.exists({ plate: plateA, status: "COMPLETED", provider: "paypal" });
-  const hasPaidB = await PlatePaymentModel.exists({ plate: plateB, status: "COMPLETED", provider: "paypal" });
-  return Boolean(hasPaidA || hasPaidB);
+  if (settings.paymentEnabled && !settings.lockSections.reportDownload) return true;
+  return baseAccess && compareAccess;
 }
 
 export async function GET(request: Request) {
@@ -76,21 +76,25 @@ export async function GET(request: Request) {
     const baseLocalized = withMileageContext(localizeVehicleProfile(baseProfile, locale) as Record<string, unknown>, baseMileage);
     const compareLocalized = withMileageContext(localizeVehicleProfile(compareProfile, locale) as Record<string, unknown>, compareMileage);
 
-    const ai = includeAi || download
-      ? await generateVehicleComparisonAi({
-          locale,
-          basePlate,
-          comparePlate,
-          base: baseLocalized,
-          compare: compareLocalized
-        })
-      : null;
+    // The comparison restates the market value (raw enriched + the AI pros
+    // text), so it is premium too. Resolve per-plate, cookie-aware access first.
+    const [baseAccess, compareAccess] = await Promise.all([
+      hasPaidPlateAccess(basePlate),
+      hasPaidPlateAccess(comparePlate)
+    ]);
 
     if (download) {
-      const access = await hasPaidReportAccess(basePlate, comparePlate);
+      const access = await hasComparePdfAccess(baseAccess, compareAccess);
       if (!access) {
         return NextResponse.json({ error: "Payment required for report download.", code: "PAYMENT_REQUIRED" }, { status: 402 });
       }
+      const ai = await generateVehicleComparisonAi({
+        locale,
+        basePlate,
+        comparePlate,
+        base: baseLocalized,
+        compare: compareLocalized
+      });
       const pdf = await generateVehicleComparisonPdf({
         locale,
         generatedAt: new Date(),
@@ -115,9 +119,21 @@ export async function GET(request: Request) {
       });
     }
 
+    // AI restates the value in its pros text, so only generate it when BOTH
+    // plates are paid; otherwise the JSON would leak the value via the AI block.
+    const ai = includeAi && baseAccess && compareAccess
+      ? await generateVehicleComparisonAi({
+          locale,
+          basePlate,
+          comparePlate,
+          base: baseLocalized,
+          compare: compareLocalized
+        })
+      : null;
+
     return NextResponse.json({
-      base: baseLocalized,
-      compare: compareLocalized,
+      base: redactPremiumValue(baseLocalized, baseAccess),
+      compare: redactPremiumValue(compareLocalized, compareAccess),
       ai
     });
   } catch (error) {

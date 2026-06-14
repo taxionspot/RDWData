@@ -298,6 +298,50 @@ als annuleren.com/thankyou:
    uitgebreidere templates uit lib/cms/legal-pages.ts kunnen desgewenst via
    /admin/legal worden overgenomen.
 
+## Sessie 14 juni 2026: marktwaarde = PREMIUM-ONLY + Carapis dood + aggregaten-logging
+NOG NIET GEDEPLOYED (user beslist push naar main). `npm run build` slaagt (exit 0).
+- **Carapis-key getest, API DOOD**: `https://api.carapis.com/v2/listings` geeft 404 op
+  alles (mét/zonder key, ook hun eigen encar-voorbeeld); dashboard = "Asian Car
+  Market Data"; NL-platformpagina's zijn SEO, geen live dataset. -> Carapis laten
+  vallen. Visuele "vergelijkbare auto's te koop" kan alleen veilig-synthetisch
+  (RDW + generiek/OEM-plaatje + dieplink); echte advertentiefoto's = hoog
+  juridisch risico ongeacht de bron (foto-auteursrecht + databankenrecht).
+- **MARKTWAARDE NU PREMIUM-ONLY (server-side)**: de eigen formulewaarde mag alleen
+  zichtbaar zijn voor wie het kenteken betaalde. Nieuw `lib/api/premium-value.ts`:
+  `PREMIUM_VALUE_FIELDS` = estimatedValueNow/Min/Max/NextYear + marketValueConfidence
+  + marketValueSe; `redactPremiumValue(localized, hasAccess)` nullt die velden in
+  `enriched` als geen toegang. Toegepast in:
+  - `app/api/vehicle/[plate]/route.ts`: basis-tak (was ONGEGATE -> nu hasPaidPlateAccess
+    + redactie) en de onbetaalde include_ai-tak. Betaald/sample houden de waarde.
+  - `app/api/vehicle/compare/route.ts` (de tweede deur, gevonden door de audit, had
+    3 HIGH-lekken): rauwe JSON nu per-kenteken geredigeerd; AI draait alleen als
+    BEIDE kentekens betaald zijn (anders eurobedrag-lek via basePros/comparePros);
+    PDF vereist nu BEIDE betaald via cookie-bewuste `hasPaidPlateAccess` i.p.v.
+    OR-gating + globale `PlatePayment.exists` -> geen pivot meer via het gratis
+    sample-kenteken, geen "1 betaling = globaal" gat.
+  - Client: `hooks/useVehicleLookup.ts` refetcht na unlock (onPlateAccessChanged);
+    `MarketAnalysisScreen.tsx` herberekent client-side alleen bij een AANWEZIGE
+    serverwaarde (geen reconstructie uit cataloguePrice voor niet-betalers);
+    `VehicleResultScreen.tsx` gratis hero toont "Premium" i.p.v. de waarde.
+  - `cataloguePrice` (RDW-catalogusprijs/nieuwprijs) blijft GRATIS (legit RDW-spec,
+    getoond in VehicleCard/VehicleComparison); is wel de formule-input.
+- **Prijsoordeel**: bestond al in MarketAnalysisScreen ("Controleer vraagprijs" +
+  verdict-meter), zit achter PremiumLock -> niet dubbel gebouwd.
+- **Aggregaten-logging (data-product stap 1)**: nieuw `models/MarketValueAggregate.ts`
+  (_id = `plate|locale|YYYY-MM-DD` dag-bucket; ONZE eigen waarde, GEEN advertentie-
+  data) + `logMarketAggregate()` in de basis-tak (best-effort, blokkeert de respons
+  niet). Bouwt een rechtmatige NL-prijstijdreeks voor een later dealer-prijsindex.
+- **Verificatie**: adversariele audit (workflow, 5 agents) -> alleen compare-route lekte
+  -> gefixt; hoofd-changeset 0 blokkerende regressies (betalers/sample houden waarde,
+  null-safe, refetch klopt). Build exit 0.
+- **POST-DEPLOY polish (niet-blokkerend)**: (a) redactie uitlijnen met
+  `lockSections.marketAnalysis` (als admin die sectie gratis zet bij payments-aan
+  ziet de bezoeker nu een leeg "-"-panel i.p.v. open data); (b) compound index +
+  evt. TTL op MarketValueAggregate vóór het prijsindex-product; (c) RESIDUAL:
+  computeMarketValueV3 zit in de client-bundle en cataloguePrice is gratis -> de
+  waarde is met devtools+console theoretisch tot op de euro reconstrueerbaar
+  (bewust geaccepteerd; echte fix = waardering server-only, buiten scope).
+
 ## Branch & deploy
 Productie = `main` op kentekenrapport.com; push naar main deployt automatisch.
 Laatste stand: commit ade9ee3 (13 juni, livegang-feedback + sample-fix). Volledige go-live-stappen staan
