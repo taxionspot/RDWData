@@ -26,6 +26,7 @@ import { track } from "@/lib/analytics";
 import { ScanIntro } from "./ScanIntro";
 import { JudgmentBlock } from "./JudgmentBlock";
 import { AiAnalysisScreen } from "./AiAnalysisScreen";
+import { EstimateRisksScreen } from "./EstimateRisksScreen";
 import { VehicleResultScreen } from "./VehicleResultScreen";
 import { MarketAnalysisScreen } from "./MarketAnalysisScreen";
 import { InspectionTimelineScreen } from "./InspectionTimelineScreen";
@@ -67,6 +68,9 @@ const SECTIONS: Record<ReportSectionId, SectionEntry> = {
   },
   "te-koop": {
     component: (plate) => <ComparableListings plate={plate} embedded />
+  },
+  schatting: {
+    component: (plate) => <EstimateRisksScreen plate={plate} embedded />
   },
   kilometerstand: {
     component: (plate) => <MileageTimelineScreen plate={plate} embedded />
@@ -203,10 +207,6 @@ export function FullReportScreen({ plate }: Props) {
           allOpen={allOpen}
         />
 
-        <SectionErrorBoundary label="judgment-block">
-          <JudgmentBlock plate={normalized} locale={locale} onJump={jumpToGroup} />
-        </SectionErrorBoundary>
-
         <SectionErrorBoundary label="report-teaser">
           <ReportTeaser
             plate={normalized}
@@ -220,11 +220,33 @@ export function FullReportScreen({ plate }: Props) {
           <TrustBadges plate={normalized} />
         </SectionErrorBoundary>
 
-        {GROUPS.map((group, idx) => (
+        {/* Render order: g1 identity first, then compact verdict, then g2..g9 */}
+        {GROUPS.slice(0, 1).map((group, idx) => (
           <ReportGroup
             key={group.id}
             group={group}
             index={idx + 1}
+            status={groupStatus(group)}
+            isPremium={isPremiumGroup(group)}
+            open={openGroups[group.id]}
+            onToggle={toggleGroup}
+            locale={locale}
+          >
+            {group.sectionIds.map((sectionId) => (
+              <div key={sectionId}>{SECTIONS[sectionId].component(normalized)}</div>
+            ))}
+          </ReportGroup>
+        ))}
+
+        <SectionErrorBoundary label="judgment-block">
+          <JudgmentBlock plate={normalized} locale={locale} onJump={jumpToGroup} />
+        </SectionErrorBoundary>
+
+        {GROUPS.slice(1).map((group, idx) => (
+          <ReportGroup
+            key={group.id}
+            group={group}
+            index={idx + 2}
             status={groupStatus(group)}
             isPremium={isPremiumGroup(group)}
             open={openGroups[group.id]}

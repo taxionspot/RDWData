@@ -14,7 +14,6 @@ import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import styles from "./MarketAnalysisScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { PremiumLock } from "../ui/PremiumLock";
-import { NegotiationBlock } from "./NegotiationBlock";
 import { useI18n } from "@/lib/i18n/context";
 import { computeMarketValueV3 } from "@/lib/rdw/heuristics";
 
@@ -204,54 +203,6 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
   }
 
   const v = data.vehicle;
-  const enriched = data.enriched;
-  const nl = locale === "nl";
-  const confidenceLabel =
-    marketConfidence === "HIGH"
-      ? nl ? "Hoog" : "High"
-      : marketConfidence === "MEDIUM"
-      ? nl ? "Gemiddeld" : "Medium"
-      : marketConfidence === "LOW"
-      ? nl ? "Laag" : "Low"
-      : null;
-  const mileageSignalLabel =
-    enriched.mileageVerdict === "LOGISCH"
-      ? nl ? "Kilometerstand logisch" : "Mileage plausible"
-      : enriched.mileageVerdict === "TWIJFELACHTIG"
-      ? nl ? "Kilometerstand twijfelachtig" : "Mileage questionable"
-      : enriched.mileageVerdict === "ONLOGISCH"
-      ? nl ? "Kilometerstand onlogisch" : "Mileage implausible"
-      : enriched.estimatedMileageNow
-      ? nl ? "Schatting via formule" : "Formula estimate"
-      : null;
-  const estimateRows = [
-    { label: nl ? "Geschatte waarde" : "Estimated value", value: formatCurrency(marketValue) },
-    {
-      label: nl ? "Verwachte prijsrange" : "Expected price range",
-      value:
-        marketValueMin && marketValueMax
-          ? `${formatCurrency(marketValueMin)} - ${formatCurrency(marketValueMax)}`
-          : null
-    },
-    { label: nl ? "Betrouwbaarheid schatting" : "Estimate confidence", value: confidenceLabel },
-    {
-      label: nl ? "Geschatte kilometerstand" : "Estimated mileage",
-      value: enriched.estimatedMileageNow ? `${enriched.estimatedMileageNow.toLocaleString("nl-NL")} km` : null
-    },
-    { label: nl ? "Kilometersignaal" : "Mileage signal", value: mileageSignalLabel },
-    { label: nl ? "APK slagingskans" : "APK pass chance", value: `${enriched.apkPassChance}%` },
-    {
-      label: nl ? "Wegenbelasting (per kwartaal)" : "Road tax (per quarter)",
-      value:
-        enriched.roadTaxEstQuarter
-          ? `${formatCurrency(enriched.roadTaxEstQuarter.min)} - ${formatCurrency(enriched.roadTaxEstQuarter.max)}`
-          : null
-    },
-    { label: nl ? "Brandstofschatting / maand" : "Fuel est. / month", value: formatCurrency(enriched.fuelEstMonth) },
-    { label: nl ? "Verzekering schatting / maand" : "Insurance est. / month", value: formatCurrency(enriched.insuranceEstMonth) },
-    { label: nl ? "Onderhoudsrisico" : "Maintenance risk", value: `${enriched.maintenanceRiskScore.toFixed(1)} / 10` }
-    // Hide rows without real data instead of showing dashes.
-  ].filter((row) => row.value && row.value !== "-");
   const displayPlate = formatDisplayPlate(normalized);
   const title = [v.brand, v.tradeName, v.year].filter(Boolean).join(" ");
 
@@ -390,33 +341,6 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
             </div>
           </div>
 
-          <div className={styles.estimatesSection}>
-            <div className={styles.estimatesHeader}>
-              <div>
-                <h3 className={styles.estimatesTitle}>{locale === "nl" ? "Schattingen & financien" : "Estimates & finances"}</h3>
-                <p className={styles.estimatesNote}>{locale === "nl" ? "Marktwaarde, belasting en onderhoudssignaal." : "Market value, tax and the service signal."}</p>
-              </div>
-            </div>
-            <div className={styles.estimatesGrid}>
-              {estimateRows.map((row) => (
-                <div key={row.label} className={styles.estimatesItem}>
-                  <div className={styles.estimatesLabel}>{row.label}</div>
-                  <div className={styles.estimatesValue}>{row.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <NegotiationBlock
-            locale={locale === "nl" ? "nl" : "en"}
-            marketNow={marketValue}
-            marketMin={marketValueMin}
-            marketMax={marketValueMax}
-            defects={data.defects?.length ?? 0}
-            recalls={data.recalls?.length ?? 0}
-            riskScore={Number(enriched.maintenanceRiskScore ?? 6)}
-            mileagePlausible={((enriched as Record<string, unknown>).userMileagePlausible ?? null) as boolean | null}
-          />
         </PremiumLock>
 
       </div>

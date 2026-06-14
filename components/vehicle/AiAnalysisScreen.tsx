@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, BadgeEuro, CheckCircle2, Lightbulb, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lightbulb, Sparkles } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { useAiReport } from "@/hooks/useAiReport";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
@@ -11,14 +11,11 @@ import styles from "./AiAnalysisScreen.module.css";
 
 type Props = { plate: string; embedded?: boolean };
 
-function formatCurrency(amount: number | null | undefined) {
-  if (amount == null || !Number.isFinite(amount)) return null;
-  return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(amount);
-}
-
 /**
- * Claude-analyse van het volledige voertuigprofiel: samenvatting in gewone
- * taal, sterke punten, aandachtspunten en een onderbouwde waardering.
+ * Analyse van het volledige voertuigprofiel: samenvatting in gewone
+ * taal, sterke punten en aandachtspunten.
+ * Marktwaarde leeft in zijn eigen groep (g3-markt / MarketAnalysisScreen);
+ * de valuationRow is hier bewust verwijderd om duplicatie te voorkomen.
  */
 export function AiAnalysisScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
@@ -31,8 +28,8 @@ export function AiAnalysisScreen({ plate, embedded = false }: Props) {
     return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
   }, [searchParams]);
 
-  const { normalized, isValid, data } = useVehicleLookup(plate, mileageInput);
-  const { insights, valuation, loading } = useAiReport(isValid ? normalized : "", mileageInput);
+  const { normalized, isValid } = useVehicleLookup(plate, mileageInput);
+  const { insights, loading } = useAiReport(isValid ? normalized : "", mileageInput);
 
   if (!isValid) return null;
 
@@ -50,14 +47,6 @@ export function AiAnalysisScreen({ plate, embedded = false }: Props) {
       ? nl ? "Hoog aandachtsniveau" : "High attention level"
       : nl ? "Gemiddeld aandachtsniveau" : "Medium attention level";
 
-  // Single source of truth: the formula value (enriched), which respects the
-  // entered mileage, so this matches the Marktprijsanalyse and the PDF exactly.
-  // The AI only supplies the qualitative explanation, never the numbers.
-  const enriched = data?.enriched;
-  const valueNow = formatCurrency(enriched?.estimatedValueNow);
-  const valueMin = formatCurrency(enriched?.estimatedValueMin);
-  const valueMax = formatCurrency(enriched?.estimatedValueMax);
-
   return (
     <PremiumLock featureName={nl ? "Analyse" : "Analysis"} isLocked={true} plate={normalized} sectionKey="riskOverview">
       <div className={styles.panel}>
@@ -65,7 +54,7 @@ export function AiAnalysisScreen({ plate, embedded = false }: Props) {
           <div className={styles.headerCopy}>
             <span className={styles.eyebrow}>
               <Sparkles size={13} />
-              {nl ? "Analyse op basis van officiële data" : "Analysis based on official data"}
+              {nl ? "Analyse op basis van officiele data" : "Analysis based on official data"}
             </span>
             <div className={styles.title}>
               {nl ? "Wat betekent dit rapport voor jou?" : "What does this report mean for you?"}
@@ -116,25 +105,6 @@ export function AiAnalysisScreen({ plate, embedded = false }: Props) {
           </div>
         ) : null}
 
-        {valueNow ? (
-          <div className={styles.valuationRow}>
-            <BadgeEuro size={26} color="#1d4ed8" />
-            <div className={styles.valuationMeta}>
-              <span className={styles.valuationLabel}>{nl ? "Geschatte marktwaarde" : "Estimated market value"}</span>
-              <span className={styles.valuationValue}>{valueNow}</span>
-            </div>
-            {valueMin && valueMax ? (
-              <div className={styles.valuationMeta}>
-                <span className={styles.valuationLabel}>{nl ? "Verwachte prijsrange" : "Expected price range"}</span>
-                <span className={styles.valuationRange}>
-                  {valueMin} - {valueMax}
-                </span>
-              </div>
-            ) : null}
-            {valuation?.explanation ? <p className={styles.valuationExplanation}>{valuation.explanation}</p> : null}
-          </div>
-        ) : null}
-
         {insights?.recommendation ? (
           <div className={styles.recommendation}>
             <Lightbulb size={18} />
@@ -144,7 +114,7 @@ export function AiAnalysisScreen({ plate, embedded = false }: Props) {
 
         <p className={styles.disclaimer}>
           {nl
-            ? "Automatische analyse op basis van officiële RDW-data en onze rekenmodellen. Dit is informatie, geen bindend aankoopadvies."
+            ? "Automatische analyse op basis van officiele RDW-data en onze rekenmodellen. Dit is informatie, geen bindend aankoopadvies."
             : "Automated analysis based on official RDW data and our models. This is information, not binding purchase advice."}
         </p>
       </div>
