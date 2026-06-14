@@ -6,15 +6,17 @@ import { useI18n } from "@/lib/i18n/context";
 import { useVehicleLookup } from "@/hooks/useVehicleLookup";
 import { track } from "@/lib/analytics";
 import { buildAlternativeLinks, buildExactLinks, type ListingVehicle } from "@/lib/listings/deeplinks";
+import { PremiumLock } from "../ui/PremiumLock";
 import styles from "./ComparableListings.module.css";
 
 /**
- * "Comparable cars for sale." Shows real NL listing CARDS (photo, price, km,
- * year) from /api/listings/comparable, sorted by similarity to the looked-up
- * vehicle, with a deeplink to the source listing. Falls back to plain
- * pre-filtered marketplace search links when no listings are available (no
- * Apify token, zero results, or an error). Free section. Legal: minimal facts +
- * a thumbnail + a prominent source deeplink, never claiming the cars as our own.
+ * "Comparable cars for sale." Premium section: shows real NL listing CARDS
+ * (photo, price, km, year) from /api/listings/comparable, sorted by similarity,
+ * with a deeplink to the source listing. The route returns listings only for
+ * paid plates (so the paid Apify actor is never called for free visitors), and
+ * the whole block sits behind PremiumLock. Falls back to plain marketplace
+ * search links when no listings are available. Legal: minimal facts + a
+ * thumbnail + a prominent source deeplink, never claiming the cars as our own.
  */
 
 type ApiCar = {
@@ -91,7 +93,7 @@ export function ComparableListings({ plate }: { plate: string }) {
   const label = model.brand && model.model ? `${model.brand} ${model.model}`.replace(/\s+/g, " ").trim() : null;
   const hasCards = Boolean(cars && cars.length > 0);
 
-  // Nothing to show: not loading, no cards, and we cannot even build search links.
+  // Nothing to show at all: not loading, no cards, and we cannot even build links.
   if (!loading && !hasCards && (!model.brand || !model.model || exact.length === 0)) return null;
 
   const moreLinks =
@@ -117,8 +119,9 @@ export function ComparableListings({ plate }: { plate: string }) {
       </div>
     ) : null;
 
+  let inner: React.ReactNode;
   if (loading) {
-    return (
+    inner = (
       <div className={styles.wrap}>
         <p className={styles.intro}>{nl ? "Vergelijkbaar aanbod laden..." : "Loading comparable listings..."}</p>
         <div className={styles.grid}>
@@ -128,10 +131,8 @@ export function ComparableListings({ plate }: { plate: string }) {
         </div>
       </div>
     );
-  }
-
-  if (hasCards) {
-    return (
+  } else if (hasCards) {
+    inner = (
       <div className={styles.wrap}>
         <p className={styles.intro}>
           {nl
@@ -179,63 +180,74 @@ export function ComparableListings({ plate }: { plate: string }) {
         </p>
       </div>
     );
+  } else {
+    // Fallback: pre-filtered marketplace search links (no live listings available).
+    inner = (
+      <div className={styles.wrap}>
+        <p className={styles.intro}>
+          {nl
+            ? `Bekijk dezelfde ${label} rond onze geschatte marktwaarde op de grootste verkoopsites.`
+            : `Browse the same ${label} around our estimated market value on the biggest marketplaces.`}
+        </p>
+        <div className={styles.links}>
+          {exact.map((link) => (
+            <a
+              key={link.provider}
+              className={styles.linkBtn}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer nofollow sponsored"
+              onClick={() => track("listing_click", { provider: link.provider, tier: "exact" })}
+            >
+              <span className={styles.provider}>{link.provider}</span>
+              <ExternalLink size={15} className={styles.extIcon} />
+            </a>
+          ))}
+        </div>
+
+        {alternatives.length > 0 ? (
+          <div className={styles.altRow}>
+            <span className={styles.altLabel}>
+              {nl
+                ? `Geen passende ${model.model}? Andere ${model.brand} in deze prijsklasse:`
+                : `No matching ${model.model}? Other ${model.brand} in this price range:`}
+            </span>
+            <span className={styles.altLinks}>
+              {alternatives.map((link, i) => (
+                <span key={link.provider}>
+                  {i > 0 ? <span className={styles.altDot}> · </span> : null}
+                  <a
+                    className={styles.altLink}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow sponsored"
+                    onClick={() => track("listing_click", { provider: link.provider, tier: "alt" })}
+                  >
+                    {link.provider}
+                  </a>
+                </span>
+              ))}
+            </span>
+          </div>
+        ) : null}
+
+        <p className={styles.disclosure}>
+          {nl
+            ? "Externe links naar verkoopsites. Aanbod en prijzen kunnen afwijken."
+            : "External links to marketplaces. Offers and prices may differ."}
+        </p>
+      </div>
+    );
   }
 
-  // Fallback: pre-filtered marketplace search links (no live listings available).
   return (
-    <div className={styles.wrap}>
-      <p className={styles.intro}>
-        {nl
-          ? `Bekijk dezelfde ${label} rond onze geschatte marktwaarde op de grootste verkoopsites.`
-          : `Browse the same ${label} around our estimated market value on the biggest marketplaces.`}
-      </p>
-      <div className={styles.links}>
-        {exact.map((link) => (
-          <a
-            key={link.provider}
-            className={styles.linkBtn}
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer nofollow sponsored"
-            onClick={() => track("listing_click", { provider: link.provider, tier: "exact" })}
-          >
-            <span className={styles.provider}>{link.provider}</span>
-            <ExternalLink size={15} className={styles.extIcon} />
-          </a>
-        ))}
-      </div>
-
-      {alternatives.length > 0 ? (
-        <div className={styles.altRow}>
-          <span className={styles.altLabel}>
-            {nl
-              ? `Geen passende ${model.model}? Andere ${model.brand} in deze prijsklasse:`
-              : `No matching ${model.model}? Other ${model.brand} in this price range:`}
-          </span>
-          <span className={styles.altLinks}>
-            {alternatives.map((link, i) => (
-              <span key={link.provider}>
-                {i > 0 ? <span className={styles.altDot}> · </span> : null}
-                <a
-                  className={styles.altLink}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer nofollow sponsored"
-                  onClick={() => track("listing_click", { provider: link.provider, tier: "alt" })}
-                >
-                  {link.provider}
-                </a>
-              </span>
-            ))}
-          </span>
-        </div>
-      ) : null}
-
-      <p className={styles.disclosure}>
-        {nl
-          ? "Externe links naar verkoopsites. Aanbod en prijzen kunnen afwijken."
-          : "External links to marketplaces. Offers and prices may differ."}
-      </p>
-    </div>
+    <PremiumLock
+      featureName={nl ? "Vergelijkbare auto's te koop" : "Comparable cars for sale"}
+      isLocked={true}
+      plate={normalized}
+      sectionKey="marketAnalysis"
+    >
+      {inner}
+    </PremiumLock>
   );
 }

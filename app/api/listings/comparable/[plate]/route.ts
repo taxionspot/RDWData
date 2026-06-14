@@ -5,6 +5,7 @@ import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
 import { connectMongo } from "@/lib/db/mongodb";
 import { fetchComparablePool, probeComparable, type ComparableCar } from "@/lib/listings/apify";
+import { hasPaidPlateAccess } from "@/lib/payments/server-access";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -118,7 +119,14 @@ export async function GET(request: Request, { params }: { params: { plate: strin
     // token presence + the raw Apify response (no secrets). Remove once verified.
     if (url.searchParams.get("debug") === "1") {
       const probe = await probeComparable(brand, model);
-      return NextResponse.json({ brand, model, ...probe });
+      return NextResponse.json({ marker: "v2", brand, model, ...probe });
+    }
+
+    // Comparable listings are premium: only paying visitors (and the sample
+    // plate) get them. This also means the paid Apify actor is never called for
+    // unpaid visitors, which keeps the cost down.
+    if (!(await hasPaidPlateAccess(plate))) {
+      return NextResponse.json({ cars: [] });
     }
 
     const pool = await getPool(brand, model);

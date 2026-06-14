@@ -86,7 +86,7 @@ const SECTIONS: SectionDef[] = [
     labelEn: "Comparable cars for sale",
     subNl: "Dezelfde auto en alternatieven op de grote verkoopsites",
     subEn: "The same car and alternatives on the big marketplaces",
-    lockKey: null
+    lockKey: "marketAnalysis"
   },
   {
     id: "kilometerstand",
@@ -445,7 +445,7 @@ export function FullReportScreen({ plate }: Props) {
           <MarketAnalysisScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("te-koop")} index={sectionIndex("te-koop")} isPremium={false} locale={locale}>
+        <SectionBlock section={sectionById("te-koop")} index={sectionIndex("te-koop")} isPremium={isPremiumSection(sectionById("te-koop"))} locale={locale}>
           <ComparableListings plate={normalized} />
         </SectionBlock>
 
