@@ -66,7 +66,7 @@ const SECTIONS: Record<ReportSectionId, SectionEntry> = {
     component: (plate) => <MarketAnalysisScreen plate={plate} embedded />
   },
   "te-koop": {
-    component: (plate) => <ComparableListings plate={plate} />
+    component: (plate) => <ComparableListings plate={plate} embedded />
   },
   kilometerstand: {
     component: (plate) => <MileageTimelineScreen plate={plate} embedded />
