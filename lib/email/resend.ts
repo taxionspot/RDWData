@@ -44,7 +44,12 @@ export async function sendEmail(args: {
       host: "smtp.gmail.com",
       port: 465,
       secure: true,
-      auth: { user, pass }
+      auth: { user, pass },
+      // Hard bounds so a slow or unresponsive Gmail SMTP server can never hang
+      // a request indefinitely (e.g. the PayPal capture HTTP response).
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000
     });
 
     await transporter.sendMail({

@@ -24,6 +24,7 @@ import { selectComparables } from "@/lib/listings/comparable";
 import type { Subject } from "@/lib/listings/comparable";
 import { getModelStats } from "@/lib/stats/modelStats";
 import { buildScoreResult } from "@/lib/vehicle/score";
+import { aiCacheKey as _aiCacheKey, readAiCache, writeAiCache } from "@/lib/api/ai-cache";
 
 type Params = { params: { plate: string } };
 
@@ -195,46 +196,17 @@ async function hasPaidReportAccess(plate: string): Promise<boolean> {
   return hasPaidPlateAccess(plate);
 }
 
-const AI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
 /**
  * AI output is cached per plate+locale (mileage rounded to 5.000 km buckets)
  * and shared across all visitors: the same car yields the same analysis, so
  * one Claude call serves everyone for a week.
+ *
+ * Delegates to the shared ai-cache module so the vehicle API and the email
+ * builder always use the same key schema and the same TTL.
  */
 function aiCacheKey(plate: string, locale: Locale, userMileage: number | null): string {
   const bucket = userMileage === null ? "" : String(Math.round(userMileage / 5000) * 5000);
-  // v3: invalidates entries from before the AI summary was shortened to
-  // 35-60 words (old entries could carry 200-word blobs).
-  return `v3|${plate}|${locale}|${bucket}`;
-}
-
-async function readAiCache(key: string): Promise<{ insights: unknown; valuation: unknown } | null> {
-  try {
-    await connectMongo();
-    const { AiReportCacheModel } = await import("@/models/AiReportCache");
-    const doc = await AiReportCacheModel.findById(key).lean();
-    if (doc && doc.expiresAt && new Date(doc.expiresAt).getTime() > Date.now() && doc.insights) {
-      return { insights: doc.insights, valuation: doc.valuation };
-    }
-  } catch {
-    // cache unavailable: fall through to live generation
-  }
-  return null;
-}
-
-async function writeAiCache(key: string, insights: unknown, valuation: unknown): Promise<void> {
-  try {
-    await connectMongo();
-    const { AiReportCacheModel } = await import("@/models/AiReportCache");
-    await AiReportCacheModel.findByIdAndUpdate(
-      key,
-      { _id: key, insights, valuation, createdAt: new Date(), expiresAt: new Date(Date.now() + AI_CACHE_TTL_MS) },
-      { upsert: true }
-    );
-  } catch {
-    // best effort
-  }
+  return _aiCacheKey(plate, locale, bucket);
 }
 
 async function buildLocalizedWithAi(plate: string, locale: Locale, userMileage: number | null) {

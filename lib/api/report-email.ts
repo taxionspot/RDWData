@@ -13,11 +13,11 @@ import { getVehicleProfile } from "@/lib/rdw/service";
 import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
 import { buildFallbackVehicleAiReport, generateVehicleAiReport } from "@/lib/api/claude";
-import { connectMongo } from "@/lib/db/mongodb";
 import { generateVehicleReportPdf } from "@/lib/api/pdf-report";
 import { alignValuationWithFormula, applyMileageValuationOverride } from "@/lib/api/market-value";
 import { sanitizeDeep } from "@/lib/api/sanitize-text";
 import { computeVehicleSignals } from "@/lib/vehicle/signals";
+import { aiCacheKey, readAiCache, writeAiCache } from "@/lib/api/ai-cache";
 
 /** Resolves to null after `ms` milliseconds, regardless of what `promise` does. */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
@@ -30,41 +30,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   });
 }
 
-const AI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
-function aiCacheKey(plate: string, locale: Locale): string {
-  // No mileage bucket here: thank-you emails use the formula estimate only.
-  return `v3|${plate}|${locale}|`;
-}
-
-async function readAiCache(key: string): Promise<{ insights: unknown; valuation: unknown } | null> {
-  try {
-    await connectMongo();
-    const { AiReportCacheModel } = await import("@/models/AiReportCache");
-    const doc = await AiReportCacheModel.findById(key).lean();
-    if (doc && doc.expiresAt && new Date(doc.expiresAt).getTime() > Date.now() && doc.insights) {
-      return { insights: doc.insights, valuation: doc.valuation };
-    }
-  } catch {
-    // cache unavailable: fall through to live generation
-  }
-  return null;
-}
-
-async function writeAiCache(key: string, insights: unknown, valuation: unknown): Promise<void> {
-  try {
-    await connectMongo();
-    const { AiReportCacheModel } = await import("@/models/AiReportCache");
-    await AiReportCacheModel.findByIdAndUpdate(
-      key,
-      { _id: key, insights, valuation, createdAt: new Date(), expiresAt: new Date(Date.now() + AI_CACHE_TTL_MS) },
-      { upsert: true }
-    );
-  } catch {
-    // best effort
-  }
-}
-
 /**
  * Build localized vehicle data + AI insights (with cache), mirroring the
  * vehicle API's buildLocalizedWithAi but without user-mileage input.
@@ -74,7 +39,8 @@ async function buildReportData(plate: string, locale: Locale) {
   let localized = localizeVehicleProfile(profile, locale) as Record<string, unknown>;
   localized = applyMileageValuationOverride(localized, null);
 
-  const cacheKey = aiCacheKey(plate, locale);
+  // No user mileage here: thank-you emails use the formula estimate (empty bucket).
+  const cacheKey = aiCacheKey(plate, locale, "");
   const cached = await readAiCache(cacheKey);
   if (cached) {
     return {
