@@ -42,8 +42,10 @@
 
   html {
     /* Account for the sticky site header + report section-nav so anchor jumps
-       and scroll-into-view never land a heading hidden behind them. */
-    scroll-padding-top: 120px;
+       and scroll-into-view never land a heading hidden behind them. Single
+       source of truth: 132px, matching ReportGroup scroll-margin-top and the
+       scrollspy observer rootMargin. */
+    scroll-padding-top: 132px;
   }
 
   ::selection {
