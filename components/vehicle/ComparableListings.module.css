@@ -1,0 +1,93 @@
+.wrap {
+  background: #fff;
+  border: 1px solid #e2e8f2;
+  border-radius: 16px;
+  padding: 20px 22px;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.intro {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  color: #5b6b84;
+  line-height: 1.5;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.linkBtn {
+  flex: 1 1 160px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  padding: 0 16px;
+  border-radius: 11px;
+  border: 1.5px solid #e2e8f2;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 15px;
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.linkBtn:hover {
+  border-color: #2563eb;
+  background: #f5f8ff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.provider {
+  white-space: nowrap;
+}
+
+.extIcon {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.altRow {
+  margin-top: 14px;
+  font-size: 13px;
+  color: #5b6b84;
+  line-height: 1.6;
+}
+
+.altLabel {
+  margin-right: 6px;
+}
+
+.altLink {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.altLink:hover {
+  text-decoration: underline;
+}
+
+.altDot {
+  color: #94a3b8;
+}
+
+.disclosure {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.4;
+}

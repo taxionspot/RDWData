@@ -42,6 +42,7 @@ import { NegotiationCopilotScreen } from "./NegotiationCopilotScreen";
 import { TechnicalSpecsScreen } from "./TechnicalSpecsScreen";
 import { ReportSectionNav } from "./ReportSectionNav";
 import { TrustBadges } from "./TrustBadges";
+import { ComparableListings } from "./ComparableListings";
 import styles from "./FullReportScreen.module.css";
 
 type Props = { plate: string };
@@ -71,6 +72,14 @@ const SECTIONS: SectionDef[] = [
     subNl: "Waarde, vraagprijs-check en vaste lasten",
     subEn: "Value, asking-price check and running costs",
     lockKey: "marketAnalysis"
+  },
+  {
+    id: "te-koop",
+    labelNl: "Vergelijkbare auto's te koop",
+    labelEn: "Comparable cars for sale",
+    subNl: "Dezelfde auto en alternatieven op de grote verkoopsites",
+    subEn: "The same car and alternatives on the big marketplaces",
+    lockKey: null
   },
   {
     id: "kilometerstand",
@@ -402,6 +411,10 @@ export function FullReportScreen({ plate }: Props) {
   const sharedQuery = searchParams?.toString();
   const withQuery = (href: string) => (sharedQuery ? `${href}?${sharedQuery}` : href);
   const sectionById = (id: string): SectionDef => SECTIONS.find((section) => section.id === id) ?? SECTIONS[0];
+  const sectionIndex = (id: string): number => {
+    const i = SECTIONS.findIndex((section) => section.id === id);
+    return i >= 0 ? i + 1 : 1;
+  };
 
   const navItems = SECTIONS.map((section) => ({
     id: section.id,
@@ -416,7 +429,7 @@ export function FullReportScreen({ plate }: Props) {
       <div className={styles.container}>
         <ReportSectionNav items={navItems} />
 
-        <SectionBlock section={sectionById("overzicht")} index={1} isPremium={false} locale={locale}>
+        <SectionBlock section={sectionById("overzicht")} index={sectionIndex("overzicht")} isPremium={false} locale={locale}>
           <VehicleResultScreen plate={plate} embedded />
         </SectionBlock>
 
@@ -433,47 +446,51 @@ export function FullReportScreen({ plate }: Props) {
           <TrustBadges plate={normalized} />
         </SectionErrorBoundary>
 
-        <SectionBlock section={sectionById("markt")} index={2} isPremium={isPremiumSection(sectionById("markt"))} locale={locale}>
+        <SectionBlock section={sectionById("markt")} index={sectionIndex("markt")} isPremium={isPremiumSection(sectionById("markt"))} locale={locale}>
           <MarketAnalysisScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("kilometerstand")} index={3} isPremium={isPremiumSection(sectionById("kilometerstand"))} locale={locale}>
+        <SectionBlock section={sectionById("te-koop")} index={sectionIndex("te-koop")} isPremium={false} locale={locale}>
+          <ComparableListings plate={normalized} />
+        </SectionBlock>
+
+        <SectionBlock section={sectionById("kilometerstand")} index={sectionIndex("kilometerstand")} isPremium={isPremiumSection(sectionById("kilometerstand"))} locale={locale}>
           <MileageTimelineScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("apk")} index={4} isPremium={isPremiumSection(sectionById("apk"))} locale={locale}>
+        <SectionBlock section={sectionById("apk")} index={sectionIndex("apk")} isPremium={isPremiumSection(sectionById("apk"))} locale={locale}>
           <InspectionTimelineScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("risico")} index={5} isPremium={isPremiumSection(sectionById("risico"))} locale={locale}>
+        <SectionBlock section={sectionById("risico")} index={sectionIndex("risico")} isPremium={isPremiumSection(sectionById("risico"))} locale={locale}>
           <RiskOverviewScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("schade")} index={6} isPremium={isPremiumSection(sectionById("schade"))} locale={locale}>
+        <SectionBlock section={sectionById("schade")} index={sectionIndex("schade")} isPremium={isPremiumSection(sectionById("schade"))} locale={locale}>
           <DamageHistoryScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("eigendom")} index={7} isPremium={isPremiumSection(sectionById("eigendom"))} locale={locale}>
+        <SectionBlock section={sectionById("eigendom")} index={sectionIndex("eigendom")} isPremium={isPremiumSection(sectionById("eigendom"))} locale={locale}>
           <OwnershipTimelineScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("apk-intelligence")} index={8} isPremium={isPremiumSection(sectionById("apk-intelligence"))} locale={locale}>
+        <SectionBlock section={sectionById("apk-intelligence")} index={sectionIndex("apk-intelligence")} isPremium={isPremiumSection(sectionById("apk-intelligence"))} locale={locale}>
           <ApkFailureIntelligenceScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("onderhandeling")} index={9} isPremium={isPremiumSection(sectionById("onderhandeling"))} locale={locale}>
+        <SectionBlock section={sectionById("onderhandeling")} index={sectionIndex("onderhandeling")} isPremium={isPremiumSection(sectionById("onderhandeling"))} locale={locale}>
           <NegotiationCopilotScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("specs")} index={10} isPremium={isPremiumSection(sectionById("specs"))} locale={locale}>
+        <SectionBlock section={sectionById("specs")} index={sectionIndex("specs")} isPremium={isPremiumSection(sectionById("specs"))} locale={locale}>
           <TechnicalSpecsScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("ai-analyse")} index={11} isPremium={isPremiumSection(sectionById("ai-analyse"))} locale={locale}>
+        <SectionBlock section={sectionById("ai-analyse")} index={sectionIndex("ai-analyse")} isPremium={isPremiumSection(sectionById("ai-analyse"))} locale={locale}>
           <AiAnalysisScreen plate={normalized} />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("acties")} index={12} isPremium={false} locale={locale}>
+        <SectionBlock section={sectionById("acties")} index={sectionIndex("acties")} isPremium={false} locale={locale}>
           <div className={styles.actionsGrid}>
             <Link href={withQuery(`/search/${normalized}/vehicle-comparison`)} className={styles.actionCard}>
               <span className={styles.actionIcon}>
