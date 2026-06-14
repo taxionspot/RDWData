@@ -3,6 +3,7 @@ import { PlatePaymentModel } from "@/models/PlatePayment";
 import { CheckoutLeadModel } from "@/models/CheckoutLead";
 import { sendEmail } from "@/lib/email/resend";
 import { buildThankYouEmail } from "@/lib/email/templates";
+import { buildReportPdfForEmail } from "@/lib/api/report-email";
 
 /** The shape we read from both a capture response and a get-order response. */
 export type PaypalCaptureLike = {
@@ -112,24 +113,84 @@ export async function fulfillFromCapture(args: {
     return { ok: true, status: "COMPLETED", amount, currency, alreadyFulfilled: true };
   }
 
-  if (email) {
-    // Post-payment extras must never fail fulfilment.
+  // Recover email from the PENDING row when not passed in from the caller.
+  // This is the primary recovery path for the card/wallet capture path.
+  if (!email) {
+    try {
+      const row = await PlatePaymentModel.findOne({ orderId: args.orderId }).lean();
+      if (row?.email) email = row.email.trim().toLowerCase();
+    } catch {
+      // best effort
+    }
+  }
+
+  // comp-/demo- orders: grant access, send nothing.
+  const isCompOrder = args.orderId.startsWith("comp-") || args.orderId.startsWith("demo-");
+
+  if (!isCompOrder && email) {
+    // Post-payment extras must never fail fulfilment. Each step is independent.
+
+    // Convert abandoned-checkout lead.
     try {
       await CheckoutLeadModel.updateMany({ email, plate: args.plate }, { $set: { status: "converted" } });
     } catch {
-      // no-op
+      // best effort
     }
-    try {
-      const { subject, html } = buildThankYouEmail({
-        plate: args.plate,
-        amount,
-        currency,
+
+    // Step A: guaranteed link-only thank-you email (fast, no AI/PDF).
+    const { subject, html } = buildThankYouEmail({
+      plate: args.plate,
+      amount,
+      currency,
+      orderId: args.orderId,
+      locale: args.locale
+    });
+    const linkMailResult = await sendEmail({ to: email, subject, html });
+    if (!linkMailResult.delivered) {
+      console.error("fulfill: thank-you link mail not delivered", {
         orderId: args.orderId,
-        locale: args.locale
+        plate: args.plate,
+        reason: linkMailResult.reason
       });
-      await sendEmail({ to: email, subject, html });
+    }
+
+    // Persist email delivery outcome on the PlatePayment record.
+    const emailDelivered = linkMailResult.delivered;
+    const emailReason = linkMailResult.reason;
+    try {
+      await PlatePaymentModel.updateOne(
+        { orderId: args.orderId },
+        { $set: { emailDelivered, ...(emailReason ? { emailReason } : {}) } }
+      );
     } catch {
-      // no-op
+      // best effort: persisting the delivery status must not block the response
+    }
+
+    // Step B: best-effort PDF attachment. Wrapped in its own timeout (8s) inside
+    // buildReportPdfForEmail, so this NEVER blocks the capture response.
+    // If it fails or times out, the link mail above already covered the customer.
+    try {
+      const pdfBase64 = await buildReportPdfForEmail(args.plate, args.locale);
+      if (pdfBase64) {
+        const pdfSubject = args.locale === "nl"
+          ? `Je kentekenrapport ${args.plate} (PDF)`
+          : `Your vehicle report ${args.plate} (PDF)`;
+        const pdfHtml = buildThankYouEmail({
+          plate: args.plate,
+          amount,
+          currency,
+          orderId: args.orderId,
+          locale: args.locale
+        }).html;
+        await sendEmail({
+          to: email,
+          subject: pdfSubject,
+          html: pdfHtml,
+          attachments: [{ filename: `kentekenrapport-${args.plate}.pdf`, content: pdfBase64 }]
+        });
+      }
+    } catch {
+      // PDF mail failure must never affect the capture response or the link mail.
     }
   }
 
