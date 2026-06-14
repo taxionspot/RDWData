@@ -13,6 +13,7 @@ import { alignValuationWithFormula, applyMileageValuationOverride } from "@/lib/
 import { sanitizeDeep } from "@/lib/api/sanitize-text";
 import { hasPaidPlateAccess } from "@/lib/payments/server-access";
 import { redactPremiumValue } from "@/lib/api/premium-value";
+import { computeVehicleSignals } from "@/lib/vehicle/signals";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
@@ -250,7 +251,12 @@ export async function GET(request: Request, { params }: Params) {
         hasPaidPlateAccess(plate),
         logMarketAggregate(plate, locale, localized)
       ]);
-      return NextResponse.json(redactPremiumValue(localized, hasAccess));
+      // Signals are computed on the RAW (pre-localization) profile so the
+      // napVerdict thresholds never see EN tokens, and shipped as a FREE field
+      // (fairPrice only appears when the plate is paid). nowMs is the single
+      // server timestamp so the client renders without hydration drift.
+      const signals = computeVehicleSignals({ profile, nowMs: Date.now(), hasAccess });
+      return NextResponse.json({ ...redactPremiumValue(localized, hasAccess), signals });
     }
 
     if (downloadReport) {
@@ -290,17 +296,24 @@ export async function GET(request: Request, { params }: Params) {
       const profile = await getVehicleProfile(plate);
       let localized = localizeVehicleProfile(profile, locale) as Record<string, unknown>;
       localized = applyMileageValuationOverride(localized, userMileage);
+      const signals = computeVehicleSignals({ profile, nowMs: Date.now(), hasAccess: false });
       // No access: also strip the premium market value from this (AI) branch.
       return NextResponse.json({
         ...redactPremiumValue(localized, false),
+        signals,
         aiInsights: null,
         aiValuation: null
       });
     }
 
     const { localized, aiInsights, aiValuation } = await buildLocalizedWithAi(plate, locale, userMileage);
+    // hasAiAccess is true on this branch -> fairPrice may appear. Signals run on
+    // the RAW (cache-served) profile, not the localized/AI-overridden object.
+    const rawProfile = await getVehicleProfile(plate);
+    const signals = computeVehicleSignals({ profile: rawProfile, nowMs: Date.now(), hasAccess: true });
     return NextResponse.json({
       ...localized,
+      signals,
       aiInsights,
       aiValuation
     });
