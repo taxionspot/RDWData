@@ -20,7 +20,7 @@ function formatCurrency(amount: number | null | undefined) {
  * Claude-analyse van het volledige voertuigprofiel: samenvatting in gewone
  * taal, sterke punten, aandachtspunten en een onderbouwde waardering.
  */
-export function AiAnalysisScreen({ plate }: Props) {
+export function AiAnalysisScreen({ plate, embedded = false }: Props) {
   const { locale } = useI18n();
   const nl = locale === "nl";
   const searchParams = useSearchParams();
@@ -35,6 +35,11 @@ export function AiAnalysisScreen({ plate }: Props) {
   const { insights, valuation, loading } = useAiReport(isValid ? normalized : "", mileageInput);
 
   if (!isValid) return null;
+
+  // This screen has no standalone chrome (no nav bar / back link), so the
+  // embedded flag does not change the markup. It is consumed here so the
+  // group body can pass it consistently with the other section screens.
+  void embedded;
 
   const levelClass =
     insights?.riskLevel === "LOW" ? styles.levelLow : insights?.riskLevel === "HIGH" ? styles.levelHigh : styles.levelMedium;
