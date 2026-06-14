@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { createPaypalOrder, getPaypalDiagnostics, probePaypalAuth } from "@/lib/payments/paypal";
 import { getSiteSettings } from "@/lib/site-settings/service";
+import { connectMongo } from "@/lib/db/mongodb";
+import { PlatePaymentModel } from "@/models/PlatePayment";
 
 export const runtime = "nodejs";
 
 type CreateOrderBody = {
   plate: string;
+  email?: string;
 };
 
 function normalizePlate(plate: string): string {
@@ -37,6 +40,8 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreateOrderBody;
     const plate = normalizePlate(body.plate ?? "");
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+
     if (!plate) {
       return NextResponse.json({ error: "Missing plate." }, { status: 400 });
     }
@@ -53,6 +58,34 @@ export async function POST(request: Request) {
       customId,
       description: `Kentekenrapport full unlock for ${plate}`
     });
+
+    // Stash a PENDING row so the capture handler / webhook can recover the
+    // buyer's email for the thank-you mail when the card/wallet path is used.
+    // PENDING never grants access (hasCompletedPlatePayment requires COMPLETED).
+    try {
+      await connectMongo();
+      await PlatePaymentModel.updateOne(
+        { orderId: order.id },
+        {
+          $set: {
+            plate,
+            orderId: order.id,
+            ...(email ? { email } : {}),
+            captureId: order.id,
+            amount,
+            currency,
+            status: "PENDING",
+            provider: "paypal"
+          },
+          $setOnInsert: { createdAt: new Date() }
+        },
+        { upsert: true }
+      );
+    } catch (pendingErr) {
+      // A failed PENDING write must not block payment; access is still granted
+      // on capture. Only the thank-you email address could be lost, so log it.
+      console.error("create-order: PENDING record write failed", { orderId: order.id, error: pendingErr });
+    }
 
     return NextResponse.json(order);
   } catch (error) {

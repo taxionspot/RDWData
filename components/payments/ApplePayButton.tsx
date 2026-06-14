@@ -67,7 +67,7 @@ export function ApplePayButton({ plate, email, amount, currency = "EUR", onSucce
     session.onpaymentauthorized = (event) => {
       void (async () => {
         try {
-          const orderId = await createOrderForPlate(plate);
+          const orderId = await createOrderForPlate({ plate, email });
           await applepay.confirmOrder({
             orderId,
             token: event.payment.token,

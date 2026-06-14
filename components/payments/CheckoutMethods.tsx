@@ -96,7 +96,7 @@ export function CheckoutMethods({
   latest.current = { plate, email, locale, onSuccess, onError };
 
   const sharedOrderConfig = () => ({
-    createOrder: () => createOrderForPlate(latest.current.plate),
+    createOrder: () => createOrderForPlate({ plate: latest.current.plate, email: latest.current.email }),
     onApprove: async ({ orderID }: { orderID: string }) => {
       const { plate: p, email: e, locale: l, onSuccess: ok } = latest.current;
       await captureOrderForPlate({ orderId: orderID, plate: p, email: e, locale: l });

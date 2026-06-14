@@ -84,7 +84,7 @@ export function GooglePayButton({ plate, email, amount, currency = "EUR", onSucc
           }
         });
 
-        const orderId = await createOrderForPlate(latest.current.plate);
+        const orderId = await createOrderForPlate({ plate: latest.current.plate, email: latest.current.email });
         const confirmation = await googlepay.confirmOrder({
           orderId,
           paymentMethodData: paymentData.paymentMethodData

@@ -1,10 +1,10 @@
 import { trackPurchase } from "@/lib/analytics/gtm";
 
-export async function createOrderForPlate(plate: string): Promise<string> {
+export async function createOrderForPlate(args: { plate: string; email?: string }): Promise<string> {
   const response = await fetch("/api/payments/paypal/create-order", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plate })
+    body: JSON.stringify({ plate: args.plate, email: args.email })
   });
 
   if (!response.ok) {
