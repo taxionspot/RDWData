@@ -1,0 +1,157 @@
+.teaser {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-end;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e2e8f2;
+  border-radius: 18px;
+  padding: 20px 22px;
+  margin: 8px 0 4px;
+}
+
+.copy {
+  flex: 1 1 320px;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5b6b84;
+}
+
+.title {
+  font-size: 17px;
+  line-height: 1.45;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.title strong {
+  font-weight: 800;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e2e8f2;
+  background: #fff;
+  color: #334155;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chipOk {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.chipWarn {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.chipDanger {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.priceAffecting {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.hint {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #5b6b84;
+  margin: 0;
+}
+
+.action {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.unlockBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  border-radius: 12px;
+  padding: 12px 18px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+.unlockBtn:hover {
+  background: #1d4ed8;
+}
+
+.unlockMicro {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #5b6b84;
+  text-align: center;
+}
+
+.unlockedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .teaser {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+  }
+
+  .action {
+    min-width: 0;
+  }
+}
