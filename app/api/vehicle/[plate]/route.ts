@@ -19,6 +19,11 @@ import { USER_SESSION_COOKIE, verifyUserSession } from "@/lib/user/auth";
 import { ReportDownloadModel } from "@/models/ReportDownload";
 import { sendEmail } from "@/lib/email/resend";
 import { isSamplePlate } from "@/lib/sample";
+import { fetchComparablePool } from "@/lib/listings/apify";
+import { selectComparables } from "@/lib/listings/comparable";
+import type { Subject } from "@/lib/listings/comparable";
+import { getModelStats } from "@/lib/stats/modelStats";
+import { buildScoreResult } from "@/lib/vehicle/score";
 
 type Params = { params: { plate: string } };
 
@@ -80,6 +85,78 @@ async function logMarketAggregate(plate: string, locale: Locale, localized: Reco
     );
   } catch {
     // best effort: aggregate logging must never affect the lookup response
+  }
+}
+
+/**
+ * Fetch the extra data that makes the PDF a 1:1 twin of the online report:
+ * comparable cars, model cohort statistics, and the Kentekenrapport Score.
+ * All three are wrapped in individual try/catch with a shared 8-second
+ * AbortController so a slow or absent Apify run NEVER blocks PDF generation.
+ * Returns nulls on failure; PDF degrades gracefully (no "-" placeholders).
+ */
+async function fetchPdfEnrichment(localized: Record<string, unknown>, locale: "nl" | "en") {
+  const vehicle = (localized.vehicle ?? {}) as Record<string, unknown>;
+  const enriched = (localized.enriched ?? {}) as Record<string, unknown>;
+  const brand = typeof vehicle.brand === "string" ? vehicle.brand : null;
+  const tradeName = typeof vehicle.tradeName === "string" ? vehicle.tradeName : null;
+  const year = typeof vehicle.year === "number" ? vehicle.year : null;
+  const defects = Array.isArray(localized.defects) ? (localized.defects as unknown[]) : [];
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 8000);
+
+  const comparablesPromise = (async () => {
+    if (!brand || !tradeName) return null;
+    try {
+      const pool = await fetchComparablePool(brand, tradeName, 12);
+      const subject: Subject = {
+        year,
+        valueNow: typeof enriched.estimatedValueNow === "number" ? enriched.estimatedValueNow : null,
+        mileage: typeof enriched.estimatedMileageNow === "number" ? enriched.estimatedMileageNow : null,
+        fuel: typeof vehicle.fuelType === "string" ? vehicle.fuelType : null,
+        bodyType: typeof vehicle.bodyType === "string" ? vehicle.bodyType : null
+      };
+      return selectComparables(pool, subject);
+    } catch {
+      return null;
+    }
+  })();
+
+  const modelStatsPromise = (async () => {
+    try {
+      return await getModelStats(brand, tradeName, year);
+    } catch {
+      return null;
+    }
+  })();
+
+  const scorePromise = (async () => {
+    try {
+      return buildScoreResult({
+        defects: defects.length,
+        riskScore: typeof enriched.maintenanceRiskScore === "number" ? enriched.maintenanceRiskScore : 6,
+        apkPassChance: typeof enriched.apkPassChance === "number" ? enriched.apkPassChance : null,
+        wok: vehicle.wok === true,
+        imported: enriched.isImported === true,
+        napOnlogisch: String(vehicle.napVerdict ?? "").toLowerCase().includes("onlogisch"),
+        openRecall: vehicle.hasOpenRecall === true,
+        locale
+      });
+    } catch {
+      return null;
+    }
+  })();
+
+  try {
+    const [comparables, modelStats, score] = await Promise.all([
+      comparablesPromise,
+      modelStatsPromise,
+      scorePromise
+    ]);
+    return { comparables, modelStats, score };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -275,6 +352,9 @@ export async function GET(request: Request, { params }: Params) {
       // cached so this is a cache hit, not a second RDW fetch.
       const profileForSignals = await getVehicleProfile(plate);
       const signals = computeVehicleSignals({ profile: profileForSignals, nowMs: Date.now(), hasAccess: true });
+      // Fetch comparables, model stats and score after the 402 gate; each is
+      // wrapped in try/catch + timeout so a slow Apify run never blocks delivery.
+      const { comparables, modelStats, score } = await fetchPdfEnrichment(localized, locale);
       const pdf = await generateVehicleReportPdf({
         plate,
         locale,
@@ -282,7 +362,10 @@ export async function GET(request: Request, { params }: Params) {
         data: localized,
         aiInsights,
         aiValuation,
-        signals
+        signals,
+        comparables,
+        modelStats,
+        score
       });
       await trackReportIfUserLoggedIn({ plate, locale, channel: "download" });
       // Sample report opens inline in the browser; paid reports download.
@@ -368,6 +451,8 @@ export async function POST(request: Request, { params }: Params) {
     // getVehicleProfile is 24h-cached so this is a cache hit, not a second RDW fetch.
     const profileForSignals = await getVehicleProfile(plate);
     const signals = computeVehicleSignals({ profile: profileForSignals, nowMs: Date.now(), hasAccess: true });
+    // Fetch comparables, model stats and score after the 402 gate; try/catch + timeout.
+    const { comparables, modelStats, score } = await fetchPdfEnrichment(localized, locale);
     const pdf = await generateVehicleReportPdf({
       plate,
       locale,
@@ -375,7 +460,10 @@ export async function POST(request: Request, { params }: Params) {
       data: localized,
       aiInsights,
       aiValuation,
-      signals
+      signals,
+      comparables,
+      modelStats,
+      score
     });
     const result = await sendReportEmail({
       to: email,
