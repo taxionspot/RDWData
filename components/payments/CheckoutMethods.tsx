@@ -39,14 +39,13 @@ type CardFieldsInstance = {
   ExpiryField: (o?: Record<string, unknown>) => CardField;
   CVVField: (o?: Record<string, unknown>) => CardField;
   submit: (o?: { billingAddress?: Record<string, string> }) => Promise<void>;
+  close?: () => void;
 };
 type PaypalSdk = {
   FUNDING?: Record<string, string>;
   Buttons: (config: Record<string, unknown>) => FundingButtons;
   CardFields?: (config: Record<string, unknown>) => CardFieldsInstance;
 };
-
-const CARD_FIELD_IDS = ["kr-card-number", "kr-card-expiry", "kr-card-cvv"];
 
 const LOGOS: Record<Method, string[]> = {
   applepay: ["apple-pay.svg"],
@@ -55,14 +54,6 @@ const LOGOS: Record<Method, string[]> = {
   card: ["visa.svg", "mastercard.svg"],
   paypal: ["paypal.svg"]
 };
-
-function clearCardEls() {
-  if (typeof document === "undefined") return;
-  for (const id of CARD_FIELD_IDS) {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = "";
-  }
-}
 
 export function CheckoutMethods({
   plate,
@@ -91,6 +82,17 @@ export function CheckoutMethods({
   const actionContainerRef = useRef<HTMLDivElement | null>(null);
   const fundingButtonsRef = useRef<FundingButtons | null>(null);
   const cardFieldsRef = useRef<CardFieldsInstance | null>(null);
+
+  // Per-field ref nodes: rendered into by PayPal CardFields .render(el) instead
+  // of document.getElementById selectors. React guarantees these nodes exist
+  // before the effect fires, eliminating the getElementById race.
+  const numberRef = useRef<HTMLDivElement | null>(null);
+  const expiryRef = useRef<HTMLDivElement | null>(null);
+  const cvvRef = useRef<HTMLDivElement | null>(null);
+
+  // Once-guard: prevents StrictMode's double-invoke from mounting two sets of
+  // card-field iframes. Reset in cleanup so a real unmount+remount works.
+  const cardMountedRef = useRef(false);
 
   const latest = useRef({ plate, email, locale, onSuccess, onError });
   latest.current = { plate, email, locale, onSuccess, onError };
@@ -172,20 +174,45 @@ export function CheckoutMethods({
 
   // Render the branded button (PayPal, or the card fallback) or the inline
   // CardFields into the action area on selection.
+  //
+  // FIX — three problems eliminated:
+  // 1. PLACEMENT: cardArea is now rendered inside the tiles.map loop (see JSX
+  //    below), directly under the Creditcard tile. This effect no longer needs
+  //    to touch placement; it only mounts/tears down.
+  // 2. DOUBLING (StrictMode race): cardMountedRef is checked at the top of the
+  //    card branch. StrictMode invokes the effect twice synchronously; the second
+  //    pass sees cardMountedRef.current === true and returns early, so only one
+  //    set of iframes is ever rendered.
+  // 3. CANCELLABLE ASYNC: `cancelled` is captured in the closure; the cleanup
+  //    sets it to true. If a slow async render resolves after the cleanup ran, the
+  //    handler immediately tears down (clears nodes + drops the instance) so no
+  //    stray iframe survives a dismount.
   useEffect(() => {
+    // `cancelled` tracks whether this effect instance has been cleaned up.
+    // The card mount reads locale via latest.current so locale is NOT in the
+    // dep array; locale changes therefore never churn the mount/teardown cycle.
+    let cancelled = false;
+
+    const teardownCard = () => {
+      if (numberRef.current) numberRef.current.innerHTML = "";
+      if (expiryRef.current) expiryRef.current.innerHTML = "";
+      if (cvvRef.current) cvvRef.current.innerHTML = "";
+      if (cardFieldsRef.current) {
+        try { cardFieldsRef.current.close?.(); } catch { /* no-op */ }
+        cardFieldsRef.current = null;
+      }
+      cardMountedRef.current = false;
+    };
+
     const cleanup = () => {
+      cancelled = true;
       if (fundingButtonsRef.current) {
-        try {
-          fundingButtonsRef.current.close();
-        } catch {
-          // no-op
-        }
+        try { fundingButtonsRef.current.close(); } catch { /* no-op */ }
         fundingButtonsRef.current = null;
       }
-      cardFieldsRef.current = null;
-      // Remove any rendered card-field iframes so a re-select never stacks them.
-      clearCardEls();
+      teardownCard();
     };
+
     cleanup();
     setLocalError("");
 
@@ -220,6 +247,13 @@ export function CheckoutMethods({
     } else if (selected === "card") {
       // Prefer inline CardFields; fall back to the hosted card button if the
       // account is not enabled for advanced cards.
+
+      // ONCE-GUARD: StrictMode calls this effect twice in development.
+      // The first pass sets cardMountedRef = true and starts the async renders.
+      // The second synchronous pass sees true and exits immediately, so only
+      // one set of iframes is ever injected.
+      if (cardMountedRef.current) return cleanup;
+
       let usedFields = false;
       try {
         if (sdk.CardFields) {
@@ -230,14 +264,36 @@ export function CheckoutMethods({
               ".invalid": { color: "#b91c1c" }
             }
           });
-          if (cf.isEligible()) {
-            clearCardEls(); // never stack iframes from a previous render
-            cf.NumberField({ placeholder: locale === "nl" ? "Kaartnummer" : "Card number" }).render("#kr-card-number");
-            cf.ExpiryField({ placeholder: "MM/JJ" }).render("#kr-card-expiry");
-            cf.CVVField({ placeholder: "CVC" }).render("#kr-card-cvv");
+          if (cf.isEligible() && numberRef.current && expiryRef.current && cvvRef.current) {
+            cardMountedRef.current = true;
             cardFieldsRef.current = cf;
             usedFields = true;
             setCardMode("fields");
+
+            // Capture ref values so the async callbacks close over stable nodes.
+            const numEl = numberRef.current;
+            const expEl = expiryRef.current;
+            const cvvEl = cvvRef.current;
+            // Read locale once from latest.current so locale is NOT a dep.
+            const loc = latest.current.locale;
+
+            // Fire all three renders concurrently. Each resolves when the PayPal
+            // SDK has injected its iframe into the target element.
+            Promise.all([
+              cf.NumberField({ placeholder: loc === "nl" ? "Kaartnummer" : "Card number" }).render(numEl),
+              cf.ExpiryField({ placeholder: "MM/JJ" }).render(expEl),
+              cf.CVVField({ placeholder: "CVC" }).render(cvvEl)
+            ]).then(() => {
+              // CANCELLABLE: if the effect was cleaned up while awaiting the SDK,
+              // immediately tear down whatever the SDK injected.
+              if (cancelled) teardownCard();
+            }).catch(() => {
+              if (!cancelled) setLocalError(
+                latest.current.locale === "nl"
+                  ? "Kaartinvoer kon niet worden geladen."
+                  : "Could not load card input."
+              );
+            });
           }
         }
       } catch {
@@ -250,8 +306,10 @@ export function CheckoutMethods({
     }
 
     return cleanup;
+    // locale intentionally omitted: read via latest.current to avoid
+    // churning mount/teardown on every locale change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, ready, locale]);
+  }, [selected, ready]);
 
   const payIdeal = async () => {
     setLocalError("");
@@ -318,39 +376,44 @@ export function CheckoutMethods({
 
       <div className={styles.methods} role="radiogroup">
         {tiles.map((tile) => (
-          <button
-            key={tile.key}
-            type="button"
-            role="radio"
-            aria-checked={selected === tile.key}
-            className={`${styles.tile} ${selected === tile.key ? styles.selected : ""}`}
-            onClick={() => {
-              setSelected(tile.key);
-              setLocalError("");
-            }}
-          >
-            <span className={styles.radio} />
-            <span className={styles.tileName}>{tile.name}</span>
-            <span className={styles.tileLogos}>
-              {LOGOS[tile.key].map((file) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={file} className={styles.logo} src={`/payment-logos/${file}`} alt={tile.name} />
-              ))}
-            </span>
-          </button>
+          <div key={tile.key} className={styles.tileGroup}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selected === tile.key}
+              className={`${styles.tile} ${selected === tile.key ? styles.selected : ""}`}
+              onClick={() => {
+                setSelected(tile.key);
+                setLocalError("");
+              }}
+            >
+              <span className={styles.radio} />
+              <span className={styles.tileName}>{tile.name}</span>
+              <span className={styles.tileLogos}>
+                {LOGOS[tile.key].map((file) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={file} className={styles.logo} src={`/payment-logos/${file}`} alt={tile.name} />
+                ))}
+              </span>
+            </button>
+
+            {/* Inline card fields rendered INSIDE the tile group, directly under
+                the Creditcard tile. This eliminates the misplacement: the
+                cardArea was previously a sibling after the entire tile list,
+                causing it to always appear below the PayPal tile. Column flex
+                on .methods makes this flow naturally between tiles. */}
+            {tile.key === "card" && selected === "card" ? (
+              <div className={`${styles.cardArea} ${cardMode === "button" ? styles.hidden : ""}`}>
+                <div className={styles.cardField} ref={numberRef} />
+                <div className={styles.cardRow}>
+                  <div className={styles.cardField} ref={expiryRef} />
+                  <div className={styles.cardField} ref={cvvRef} />
+                </div>
+              </div>
+            ) : null}
+          </div>
         ))}
       </div>
-
-      {/* Inline card fields (shown only in CardFields mode). */}
-      {selected === "card" ? (
-        <div className={`${styles.cardArea} ${cardMode === "button" ? styles.hidden : ""}`}>
-          <div className={styles.cardField} id="kr-card-number" />
-          <div className={styles.cardRow}>
-            <div className={styles.cardField} id="kr-card-expiry" />
-            <div className={styles.cardField} id="kr-card-cvv" />
-          </div>
-        </div>
-      ) : null}
 
       {/* Branded button slot: PayPal, or the card fallback button. */}
       <div

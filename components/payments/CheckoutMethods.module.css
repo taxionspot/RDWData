@@ -28,6 +28,13 @@
   gap: 9px;
 }
 
+/* Wraps the radio tile + the optional inline cardArea so the card fields
+   appear directly under the Creditcard tile, not after the whole tile list. */
+.tileGroup {
+  display: flex;
+  flex-direction: column;
+}
+
 .tile {
   width: 100%;
   min-height: 52px;
