@@ -165,6 +165,9 @@ export function OwnershipTimelineScreen({ plate, embedded = false }: Props) {
       plate={plate}
       sectionKey="ownershipHistory"
     >
+      {/* This screen shows a flat registration grid + timeline detail, not a
+          single section verdict. The g6 group status line (import -> warn, else
+          ok) is the section-level status; nothing here competes with it. */}
       <div className={styles.registrationPanel}>
         <div className={styles.registrationHeader}>
           <div>
