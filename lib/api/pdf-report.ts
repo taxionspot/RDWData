@@ -3,13 +3,11 @@ import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import { getVehicleImageUrl } from "@/lib/utils/imagin";
 import { computeNegotiationPricing } from "@/lib/api/negotiation-pricing";
 import type { VehicleSignalReport } from "@/lib/vehicle/signals";
-import { GROUPS, type ReportSectionId } from "@/lib/vehicle/groups";
 import {
   toneToPdfWord,
   accentForTone,
   inkForTone,
-  pdfSectionTitle,
-  pdfGroupOrder
+  pdfSectionTitle
 } from "@/lib/vehicle/pdf-presentation";
 
 type AiInsights = {
@@ -793,8 +791,6 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   const rawDefects = asRows(raw.defects);
   const rawRecalls = asRows(raw.recalls);
   const defectDescriptions = asRow(data.defectDescriptions);
-  const knownIssues = asRows(enriched.knownIssues);
-  const repairChances = asRows(enriched.repairChances);
 
   const derivedDefects =
     defects.length > 0
@@ -807,41 +803,13 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
           };
         });
 
-  layout.y -= 172;
+  // No hardcoded layout.y -= 172 here. The hero height is set by the caller
+  // (generateVehicleReportPdf) after drawHeroVisuals returns, so spacing is flow-based.
 
-  layout.section(locale === "nl" ? "Beslissingsdashboard" : "Decision Dashboard");
-  layout.drawCardRow([
-    {
-      title: locale === "nl" ? "Oordeel" : "Verdict",
-      value: args.aiInsights?.purchaseVerdict ?? "-",
-      accent: verdictColor(args.aiInsights?.purchaseVerdict ?? "AVOID")
-    },
-    {
-      title: locale === "nl" ? "Risiconiveau" : "Risk level",
-      value: args.aiInsights?.riskLevel ?? "-",
-      accent: riskColor(args.aiInsights?.riskLevel ?? "HIGH")
-    },
-    {
-      title: locale === "nl" ? "Waarde nu" : "Value now",
-      value: currency(enriched.estimatedValueNow),
-      accent: rgb(0.08, 0.2, 0.45)
-    }
-  ]);
+  // ---- G1: Overzicht & oordeel  (sectionIds: overzicht, ai-analyse) ----
+  layout.groupBanner(1, "Overzicht en oordeel", "Overview and verdict", locale);
 
-  if (args.aiInsights?.recommendations?.length) {
-    layout.keyValue(locale === "nl" ? "Actieplan" : "Action plan", args.aiInsights.recommendations.join(" | "));
-  }
-
-  if (aiInsights) {
-    layout.section(locale === "nl" ? "Analyse" : "Analysis");
-    layout.keyValue(locale === "nl" ? "Samenvatting" : "Summary", aiInsights.summary);
-    layout.keyValue(locale === "nl" ? "Sterke punten" : "Positives", aiInsights.positives.length > 0 ? aiInsights.positives.join(" | ") : "-");
-    layout.keyValue(locale === "nl" ? "Aandachtspunten" : "Points of attention", aiInsights.risks.length > 0 ? aiInsights.risks.join(" | ") : "-");
-    layout.keyValue(locale === "nl" ? "Aanbeveling" : "Recommendation", aiInsights.recommendation);
-    layout.keyValue(locale === "nl" ? "Aankoopverdict" : "Purchase verdict", `${aiInsights.purchaseVerdict} (${aiInsights.riskLevel})`);
-  }
-
-  layout.section(locale === "nl" ? "Voertuigoverzicht" : "Vehicle Overview");
+  layout.section(pdfSectionTitle("overzicht", locale));
   layout.keyValue(locale === "nl" ? "Merk / Model" : "Brand / Model", `${s(vehicle.brand)} ${s(vehicle.tradeName)}`.trim());
   const typeVariant = [vehicle.typeCode, vehicle.variant, vehicle.uitvoering].filter(Boolean).join(" ");
   if (typeVariant) {
@@ -850,53 +818,23 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
   layout.keyValue(locale === "nl" ? "Bouwjaar / Carrosserie" : "Year / Body type", `${s(vehicle.year)} / ${s(vehicle.bodyType)}`);
   layout.keyValue(locale === "nl" ? "Brandstof / Kleur" : "Fuel / Color", `${s(vehicle.fuelType)} / ${s(asRow(vehicle.color).primary)}`);
   layout.keyValue(locale === "nl" ? "Motor" : "Engine", `${s(asRow(vehicle.engine).displacement)} cc, ${s(asRow(vehicle.engine).cylinders)} cyl, ${s(asRow(vehicle.engine).powerKw)} kW`);
-  const dims = asRow(vehicle.dimensions);
-  const dimLength = toNumber(dims.length);
-  const dimWidth = toNumber(dims.width);
-  const dimHeight = toNumber(dims.height);
-  const dimWheelbase = toNumber(dims.wheelbase);
-  if (dimLength !== null && dimWidth !== null && dimHeight !== null && dimWheelbase !== null) {
-    layout.keyValue(
-      locale === "nl" ? "Afmetingen" : "Dimensions",
-      `${dimLength} x ${dimWidth} x ${dimHeight} mm, ${locale === "nl" ? "wielbasis" : "wheelbase"} ${dimWheelbase} mm`
-    );
-  }
-  layout.keyValue(locale === "nl" ? "Gewicht" : "Weight", `${s(asRow(vehicle.weight).empty)} kg empty, ${s(asRow(vehicle.weight).max)} kg max`);
-  const readyToDrive = toNumber(asRow(vehicle.weight).readyToDrive);
-  if (readyToDrive !== null) {
-    layout.keyValue(locale === "nl" ? "Massa rijklaar" : "Mass ready to drive", `${readyToDrive} kg`);
-  }
-  // Transmission from the RDW TGK (type-approval) datasets, when available.
-  const transmissionRaw = s(vehicle.transmission);
-  if (transmissionRaw !== "-") {
-    const code = String(vehicle.transmissionCode ?? "").toUpperCase();
-    let transmissionLabel: string;
-    if (code === "M") transmissionLabel = locale === "nl" ? "Handgeschakeld" : "Manual";
-    else if (code === "A") transmissionLabel = locale === "nl" ? "Automaat" : "Automatic";
-    else if (code === "C") transmissionLabel = locale === "nl" ? "CVT (automaat)" : "CVT (automatic)";
-    else if (code) transmissionLabel = locale === "nl" ? "Anders" : "Other";
-    else transmissionLabel = transmissionRaw;
-    const gears = toNumber(vehicle.gears);
-    if (gears !== null) {
-      transmissionLabel += locale === "nl" ? ` (${gears} versnellingen)` : ` (${gears} gears)`;
-    }
-    layout.keyValue(locale === "nl" ? "Transmissie" : "Transmission", transmissionLabel);
-  } else {
-    layout.keyValue(
-      locale === "nl" ? "Transmissie" : "Transmission",
-      locale === "nl"
-        ? "Niet geregistreerd in RDW open data"
-        : "Not registered in RDW open data"
-    );
-  }
-  const factoryModelName = s(vehicle.factoryModelName);
-  if (factoryModelName !== "-") {
-    layout.keyValue(locale === "nl" ? "Fabrieksbenaming" : "Factory model name", factoryModelName);
-  }
   layout.keyValue(locale === "nl" ? "APK vervaldatum" : "APK expiry", s(vehicle.apkExpiryDate));
-  layout.keyValue(locale === "nl" ? "Statusflags" : "Status flags", `WOK: ${boolLabel(vehicle.wok)}, Export: ${boolLabel(vehicle.exportIndicator)}, Transfer: ${boolLabel(vehicle.transferPossible)}, Insured: ${boolLabel(vehicle.insured)}, Taxi: ${boolLabel(vehicle.isTaxi)}, Recall open: ${boolLabel(vehicle.hasOpenRecall)}`);
 
-  layout.section(locale === "nl" ? "Marktwaarde en kosten" : "Market value and costs");
+  if (aiInsights) {
+    layout.section(pdfSectionTitle("ai-analyse", locale));
+    layout.keyValue(locale === "nl" ? "Samenvatting" : "Summary", aiInsights.summary);
+    layout.keyValue(locale === "nl" ? "Sterke punten" : "Positives", aiInsights.positives.length > 0 ? aiInsights.positives.join(" | ") : "-");
+    layout.keyValue(locale === "nl" ? "Aandachtspunten" : "Points of attention", aiInsights.risks.length > 0 ? aiInsights.risks.join(" | ") : "-");
+    layout.keyValue(locale === "nl" ? "Aanbeveling" : "Recommendation", aiInsights.recommendation);
+    if (aiInsights.recommendations?.length) {
+      layout.keyValue(locale === "nl" ? "Actieplan" : "Action plan", aiInsights.recommendations.join(" | "));
+    }
+  }
+
+  // ---- G2: Marktwaarde & eerlijke prijs  (sectionIds: markt, te-koop) ----
+  layout.groupBanner(2, "Marktwaarde en eerlijke prijs", "Market value and fair price", locale);
+
+  layout.section(pdfSectionTitle("markt", locale));
   layout.keyValue(locale === "nl" ? "Marktwaarde nu / volgend jaar" : "Market value now / next year", `${currency(enriched.estimatedValueNow)} / ${currency(enriched.estimatedValueNextYear)}`);
   layout.keyValue(locale === "nl" ? "Marktbandbreedte" : "Market range", `${currency(enriched.estimatedValueMin)} - ${currency(enriched.estimatedValueMax)} (${s(enriched.marketValueConfidence)} confidence)`);
   layout.keyValue(locale === "nl" ? "APK kans / onderhoudsrisico" : "APK chance / maintenance risk", `${s(enriched.apkPassChance)}% / ${s(enriched.maintenanceRiskScore)}`);
@@ -934,7 +872,8 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     mileagePlausible
   });
 
-  layout.section(locale === "nl" ? "Onderhandelcoach" : "Negotiation Coach");
+  // te-koop sectionId maps to the negotiation coach in the paper twin.
+  layout.section(pdfSectionTitle("te-koop", locale));
   if (marketNowRaw !== null && marketNowRaw > 0 && marketMinRaw !== null && marketMaxRaw !== null) {
     layout.drawCardRow([
       {
@@ -972,7 +911,39 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     );
   }
 
-  layout.section(locale === "nl" ? "Kilometerstand en NAP" : "Mileage and NAP");
+  // ---- G3: Risicos & schade  (sectionId: schade) ----
+  layout.groupBanner(3, "Risicos en schade", "Risks and damage", locale);
+
+  const yesNo = (value: unknown) =>
+    value === true ? (locale === "nl" ? "Ja" : "Yes") : value === false ? (locale === "nl" ? "Nee" : "No") : "-";
+
+  layout.section(pdfSectionTitle("schade", locale));
+  layout.keyValue(locale === "nl" ? "WOK-status (Wachten Op Keuren)" : "WOK status (awaiting inspection)", yesNo(vehicle.wok));
+  layout.keyValue(
+    locale === "nl" ? "Geconstateerde gebreken" : "Recorded defects",
+    `${derivedDefects.length} ${locale === "nl" ? "record(s) in APK-historie" : "record(s) in inspection history"}`
+  );
+  layout.keyValue(
+    locale === "nl" ? "Open terugroepactie" : "Open recall",
+    `${yesNo(vehicle.hasOpenRecall)} (${recalls.length} ${locale === "nl" ? "geregistreerd" : "recorded"})`
+  );
+  if (recalls.length > 0) {
+    layout.table(
+      [locale === "nl" ? "Campagne" : "Campaign", locale === "nl" ? "Defect" : "Defect", locale === "nl" ? "Status" : "Status"],
+      recalls.map((it) => [s(it.campagnenummer), s(it.omschrijving_defect), s(it.status)])
+    );
+  }
+  layout.keyValue(
+    locale === "nl" ? "Belangrijk" : "Important",
+    locale === "nl"
+      ? "Verzekeringsschade is in Nederland niet openbaar. Dit rapport toont daarom alleen schadesignalen uit officiele RDW-data, geen claimhistorie van verzekeraars."
+      : "Insurance damage records are not public in the Netherlands. This report therefore only shows damage signals from official RDW data, not insurer claim history."
+  );
+
+  // ---- G4: Kilometerstand & NAP  (sectionId: kilometerstand) ----
+  layout.groupBanner(4, "Kilometerstand en NAP", "Mileage and NAP", locale);
+
+  layout.section(pdfSectionTitle("kilometerstand", locale));
   layout.keyValue(locale === "nl" ? "NAP-tellerstandoordeel (RDW)" : "NAP odometer verdict (RDW)", s(vehicle.napVerdict));
   layout.keyValue(locale === "nl" ? "Geschatte kilometerstand nu" : "Estimated mileage now", kmLabel(enriched.estimatedMileageNow));
   if (toNumber(enriched.mileageSlopeKmPerYear) !== null) {
@@ -988,7 +959,10 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
       : "The RDW may not share full odometer readings. The official NAP verdict above is leading; the mileage figure is an estimate based on age and usage."
   );
 
-  layout.section(locale === "nl" ? "APK inspecties" : "APK Inspections");
+  // ---- G5: APK-historie & rijwaardigheid  (sectionIds: apk, apk-intelligence) ----
+  layout.groupBanner(5, "APK-historie en rijwaardigheid", "MOT history and roadworthiness", locale);
+
+  layout.section(pdfSectionTitle("apk", locale));
   layout.table(
     [locale === "nl" ? "Datum" : "Date", locale === "nl" ? "Code" : "Code", locale === "nl" ? "Type" : "Type", locale === "nl" ? "Aantal" : "Count"],
     inspections.map((it) => [
@@ -998,8 +972,6 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
       s(it.aantal_gebreken_geconstateerd)
     ])
   );
-
-  layout.section(locale === "nl" ? "Defecten" : "Defects");
   layout.table(
     [locale === "nl" ? "Code" : "Code", locale === "nl" ? "Omschrijving" : "Description", locale === "nl" ? "Bron" : "Source", locale === "nl" ? "Opmerking" : "Notes"],
     derivedDefects.map((it) => {
@@ -1009,19 +981,65 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     })
   );
 
-  layout.section(locale === "nl" ? "Terugroepacties" : "Recalls");
-  layout.table(
-    [locale === "nl" ? "Campagne" : "Campaign", locale === "nl" ? "Defect" : "Defect", locale === "nl" ? "Status" : "Status"],
-    recalls.map((it) => [s(it.campagnenummer), s(it.omschrijving_defect), s(it.status)])
-  );
+  if (enriched.apkPassChance !== null && enriched.apkPassChance !== undefined) {
+    layout.section(pdfSectionTitle("apk-intelligence", locale));
+    layout.keyValue(locale === "nl" ? "Geschatte APK-slaagkans" : "Estimated MOT pass chance", `${s(enriched.apkPassChance)}%`);
+    layout.keyValue(locale === "nl" ? "Onderhoudsrisico" : "Maintenance risk", s(enriched.maintenanceRiskScore));
+  }
 
-  layout.section(locale === "nl" ? "Brandstofgegevens (RDW)" : "Fuel Data (RDW)");
+  // ---- G6: Eigendom & voertuiggegevens  (sectionIds: eigendom, specs) ----
+  layout.groupBanner(6, "Eigendom en voertuiggegevens", "Ownership and vehicle data", locale);
+
+  layout.section(pdfSectionTitle("eigendom", locale));
+  layout.keyValue(locale === "nl" ? "Statusflags" : "Status flags", `WOK: ${boolLabel(vehicle.wok)}, Export: ${boolLabel(vehicle.exportIndicator)}, Transfer: ${boolLabel(vehicle.transferPossible)}, Insured: ${boolLabel(vehicle.insured)}, Taxi: ${boolLabel(vehicle.isTaxi)}, Recall open: ${boolLabel(vehicle.hasOpenRecall)}`);
+
+  layout.section(pdfSectionTitle("specs", locale));
+  const dims = asRow(vehicle.dimensions);
+  const dimLength = toNumber(dims.length);
+  const dimWidth = toNumber(dims.width);
+  const dimHeight = toNumber(dims.height);
+  const dimWheelbase = toNumber(dims.wheelbase);
+  if (dimLength !== null && dimWidth !== null && dimHeight !== null && dimWheelbase !== null) {
+    layout.keyValue(
+      locale === "nl" ? "Afmetingen" : "Dimensions",
+      `${dimLength} x ${dimWidth} x ${dimHeight} mm, ${locale === "nl" ? "wielbasis" : "wheelbase"} ${dimWheelbase} mm`
+    );
+  }
+  layout.keyValue(locale === "nl" ? "Gewicht" : "Weight", `${s(asRow(vehicle.weight).empty)} kg empty, ${s(asRow(vehicle.weight).max)} kg max`);
+  const readyToDrive = toNumber(asRow(vehicle.weight).readyToDrive);
+  if (readyToDrive !== null) {
+    layout.keyValue(locale === "nl" ? "Massa rijklaar" : "Mass ready to drive", `${readyToDrive} kg`);
+  }
+  // Transmission from the RDW TGK (type-approval) datasets, when available.
+  const transmissionRaw = s(vehicle.transmission);
+  if (transmissionRaw !== "-") {
+    const code = String(vehicle.transmissionCode ?? "").toUpperCase();
+    let transmissionLabel: string;
+    if (code === "M") transmissionLabel = locale === "nl" ? "Handgeschakeld" : "Manual";
+    else if (code === "A") transmissionLabel = locale === "nl" ? "Automaat" : "Automatic";
+    else if (code === "C") transmissionLabel = locale === "nl" ? "CVT (automaat)" : "CVT (automatic)";
+    else if (code) transmissionLabel = locale === "nl" ? "Anders" : "Other";
+    else transmissionLabel = transmissionRaw;
+    const gears = toNumber(vehicle.gears);
+    if (gears !== null) {
+      transmissionLabel += locale === "nl" ? ` (${gears} versnellingen)` : ` (${gears} gears)`;
+    }
+    layout.keyValue(locale === "nl" ? "Transmissie" : "Transmission", transmissionLabel);
+  } else {
+    layout.keyValue(
+      locale === "nl" ? "Transmissie" : "Transmission",
+      locale === "nl" ? "Niet geregistreerd in RDW open data" : "Not registered in RDW open data"
+    );
+  }
+  const factoryModelName = s(vehicle.factoryModelName);
+  if (factoryModelName !== "-") {
+    layout.keyValue(locale === "nl" ? "Fabrieksbenaming" : "Factory model name", factoryModelName);
+  }
+  layout.section(pdfSectionTitle("specs", locale) + (locale === "nl" ? " (brandstof)" : " (fuel)"));
   layout.table(
     [locale === "nl" ? "Brandstof" : "Fuel", "CO2", locale === "nl" ? "Verbruik combi" : "Combined usage", locale === "nl" ? "Emissie" : "Emission"],
     fuel.map((it) => [s(it.brandstof_omschrijving), s(it.co2_uitstoot_gecombineerd), s(it.brandstofverbruik_gecombineerd), s(it.uitlaatemissieniveau)])
   );
-
-  layout.section(locale === "nl" ? "Carrosserie en typegoedkeuring" : "Body and Type Approval");
   layout.table(
     [locale === "nl" ? "Carrosserie" : "Body", locale === "nl" ? "Europese omschrijving" : "EU description", locale === "nl" ? "Typegoedkeuring" : "Type approval"],
     [
@@ -1030,42 +1048,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     ]
   );
 
-  if (repairChances.length > 0) {
-    layout.section(locale === "nl" ? "Reparatiekansen" : "Repair Chances");
-    layout.table(
-      [locale === "nl" ? "Onderdeel" : "Part", locale === "nl" ? "Kans" : "Chance", locale === "nl" ? "Kosten min" : "Cost min", locale === "nl" ? "Kosten max" : "Cost max"],
-      repairChances.map((it) => [s(it.name), `${s(it.chance)}%`, currency(it.estMin), currency(it.estMax)])
-    );
-  }
-
-  if (knownIssues.length > 0) {
-    layout.section(locale === "nl" ? "Bekende aandachtspunten" : "Known Issues");
-    layout.table(
-      [locale === "nl" ? "Issue" : "Issue", locale === "nl" ? "Ernst" : "Severity", locale === "nl" ? "Doel" : "Target", locale === "nl" ? "Advies" : "Advice"],
-      knownIssues.map((it) => [s(it.title), s(it.severity), s(it.target), s(it.advice)])
-    );
-  }
-
-  const yesNo = (value: unknown) =>
-    value === true ? (locale === "nl" ? "Ja" : "Yes") : value === false ? (locale === "nl" ? "Nee" : "No") : "-";
-
-  layout.section(locale === "nl" ? "Schadesignalen" : "Damage Signals");
-  layout.keyValue(locale === "nl" ? "WOK-status (Wachten Op Keuren)" : "WOK status (awaiting inspection)", yesNo(vehicle.wok));
-  layout.keyValue(
-    locale === "nl" ? "Geconstateerde gebreken" : "Recorded defects",
-    `${derivedDefects.length} ${locale === "nl" ? "record(s) in APK-historie" : "record(s) in inspection history"}`
-  );
-  layout.keyValue(
-    locale === "nl" ? "Open terugroepactie" : "Open recall",
-    `${yesNo(vehicle.hasOpenRecall)} (${recalls.length} ${locale === "nl" ? "geregistreerd" : "recorded"})`
-  );
-  layout.keyValue(
-    locale === "nl" ? "Belangrijk" : "Important",
-    locale === "nl"
-      ? "Verzekeringsschade is in Nederland niet openbaar. Dit rapport toont daarom alleen schadesignalen uit officiële RDW-data, geen claimhistorie van verzekeraars."
-      : "Insurance damage records are not public in the Netherlands. This report therefore only shows damage signals from official RDW data, not insurer claim history."
-  );
-
+  // ---- RDW sources footer (runs after all groups, like the web "acties" footer) ----
   layout.section(locale === "nl" ? "Gebruikte RDW-bronnen" : "RDW sources used");
   const recordsLabel = locale === "nl" ? "records" : "records";
   layout.keyValue(locale === "nl" ? "Voertuigregister" : "Vehicle register", `${rawMain.length} ${recordsLabel}`);
@@ -1081,7 +1064,7 @@ function buildReportSections(layout: PdfLayout, args: ReportArgs) {
     locale === "nl"
       ? [
           "De getoonde marktwaarde is een indicatieve schatting en geen aankoopadvies.",
-          "Dit rapport is een automatische analyse op basis van officiële RDW-data en kan onvolledig of verouderd zijn.",
+          "Dit rapport is een automatische analyse op basis van officiele RDW-data en kan onvolledig of verouderd zijn.",
           "Dit rapport is digitale content. Na levering vervalt het herroepingsrecht.",
           "Bronvermelding: RDW open data."
         ]
@@ -1166,7 +1149,21 @@ export async function generateVehicleReportPdf(args: ReportArgs): Promise<Buffer
     aiValuation: args.aiValuation,
     locale: args.locale
   });
+  // The hero occupies a fixed band under the header; continue the flow just
+  // below it (replaces the old hardcoded layout.y -= 172).
+  const HERO_HEIGHT = 165;
+  layout.y = PAGE_HEIGHT - HEADER_HEIGHT - 8 - HERO_HEIGHT - 16;
+  // Page 1 judgment block (mirrors the web JudgmentBlock) when signals exist.
+  if (args.signals) {
+    layout.drawJudgmentBlock(args.signals, args.locale);
+  }
   buildReportSections(layout, args);
+  // Real two-pass: anchors were recorded during the render above; build the TOC
+  // page now and move it to the front so its page numbers line up.
+  const tocPage = layout.buildTocPage(args.locale);
+  const tocIndex = doc.getPageCount() - 1; // the TOC page is the last one added
+  doc.removePage(tocIndex);
+  doc.insertPage(0, tocPage);
   const bytes = await doc.save();
   return Buffer.from(bytes);
 }
