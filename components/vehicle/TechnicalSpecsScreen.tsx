@@ -322,19 +322,21 @@ export function TechnicalSpecsScreen({ plate, embedded = false }: Props) {
         <div className={embedded ? undefined : styles.contentContainer}>
           {!embedded && <VehicleNavBar plate={plate} subtitle={locale === "nl" ? "Technische specificaties" : "Technical specifications"} />}
 
-          <div className={styles.pageHeader}>
-            <Link href={backHref} className={styles.backLink}>
-              <ArrowLeft size={16} /> {locale === "nl" ? "Terug naar Risico-overzicht" : "Back to Risk Overview"}
-            </Link>
-            <div className={styles.headerTitleBlock}>
-              <div className={styles.headerTitle}>{locale === "nl" ? "Technische specificaties" : "Technical Specifications"}</div>
-              <div className={styles.headerSubtitle}>
-                {locale === "nl"
-                  ? "Bekijk de fabrieksgegevens voor prestaties, verbruik en milieuspecificaties van dit voertuig."
-                  : "Review the factory-recorded performance metrics and environmental impact data for this vehicle."}
+          {!embedded && (
+            <div className={styles.pageHeader}>
+              <Link href={backHref} className={styles.backLink}>
+                <ArrowLeft size={16} /> {locale === "nl" ? "Terug naar Risico-overzicht" : "Back to Risk Overview"}
+              </Link>
+              <div className={styles.headerTitleBlock}>
+                <div className={styles.headerTitle}>{locale === "nl" ? "Technische specificaties" : "Technical Specifications"}</div>
+                <div className={styles.headerSubtitle}>
+                  {locale === "nl"
+                    ? "Bekijk de fabrieksgegevens voor prestaties, verbruik en milieuspecificaties van dit voertuig."
+                    : "Review the factory-recorded performance metrics and environmental impact data for this vehicle."}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <PremiumLock
             featureName={locale === "nl" ? "Technische specificaties" : "Technical specifications"}
