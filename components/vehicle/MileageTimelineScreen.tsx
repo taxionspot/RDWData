@@ -264,6 +264,10 @@ export function MileageTimelineScreen({ plate, embedded = false }: Props) {
         <PremiumLock featureName={locale === "nl" ? "Kilometerhistorie" : "Mileage History"} isLocked={true} plate={normalized} sectionKey="mileageHistory">
           <div className={`${styles.heroPanel} ${styles.glassPanel}`}>
             <div className={styles.heroCopy}>
+              {/* This eyebrow restates the raw napVerdict as detail. The group
+                  status line (ReportGroup, g4-km) shows the tone+label derived
+                  from the SAME field, so the two agree by construction. Do not
+                  add a second status chip here that could diverge. */}
               <div className={styles.eyebrow}>
                 <CheckCircle2 size={14} />
                 {data.vehicle.napVerdict
