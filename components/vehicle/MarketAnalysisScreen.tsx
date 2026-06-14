@@ -123,7 +123,7 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
       bodyType: data.vehicle.bodyType,
       mileage: appliedMileage
     });
-  }, [data?.vehicle, appliedMileage]);
+  }, [data?.vehicle, appliedMileage, data?.enriched?.estimatedValueNow]);
 
   const marketValue = valuation?.value ?? data?.enriched?.estimatedValueNow ?? null;
   const marketValueMin = valuation?.min ?? data?.enriched?.estimatedValueMin ?? null;

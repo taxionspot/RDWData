@@ -159,7 +159,7 @@ test("recallsCount > 0 also triggers warn safety + openRecall alert", () => {
   assert.equal(report.alerts.some((a) => a.key === "openRecall"), true);
 });
 
-test("isTaxi triggers warn safety + taxi alert in g3", () => {
+test("isTaxi triggers warn safety + taxi alert in g6-risico", () => {
   const report = computeVehicleSignals(input(makeProfile({ isTaxi: true })));
   assert.equal(report.signals.find((s) => s.key === "safety")?.tone, "warn");
   assert.equal(report.alerts.some((a) => a.key === "taxi" && a.group === "g6-risico"), true);

@@ -32,6 +32,7 @@ export type EnrichedData = {
   mileageSlopeKmPerYear: number | null;
   mileageAnomalies: MileageAnomaly[];
 
+  userMileagePlausible?: boolean | null;
   apkPassChance: number; // Percentage 0-100
   repairChances: { name: string; chance: number; estMin: number; estMax: number }[];
   roadTaxEstQuarter: { min: number; max: number } | null;

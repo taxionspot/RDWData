@@ -89,7 +89,7 @@ export function EstimateRisksScreen({ plate, embedded = false }: Props) {
       value: enriched.estimatedMileageNow ? `${enriched.estimatedMileageNow.toLocaleString("nl-NL")} km` : null
     },
     { label: nl ? "Kilometersignaal" : "Mileage signal", value: mileageSignalLabel },
-    { label: nl ? "APK slagingskans" : "APK pass chance", value: `${enriched.apkPassChance}%` },
+    { label: nl ? "APK slagingskans" : "APK pass chance", value: enriched.apkPassChance != null ? `${enriched.apkPassChance}%` : null },
     {
       label: nl ? "Wegenbelasting (per kwartaal)" : "Road tax (per quarter)",
       value:
@@ -99,7 +99,7 @@ export function EstimateRisksScreen({ plate, embedded = false }: Props) {
     },
     { label: nl ? "Brandstofschatting / maand" : "Fuel est. / month", value: formatCurrency(enriched.fuelEstMonth) },
     { label: nl ? "Verzekering schatting / maand" : "Insurance est. / month", value: formatCurrency(enriched.insuranceEstMonth) },
-    { label: nl ? "Onderhoudsrisico" : "Maintenance risk", value: `${enriched.maintenanceRiskScore.toFixed(1)} / 10` }
+    { label: nl ? "Onderhoudsrisico" : "Maintenance risk", value: enriched.maintenanceRiskScore != null ? `${enriched.maintenanceRiskScore.toFixed(1)} / 10` : null }
   ].filter((row) => row.value && row.value !== "-");
 
   return (
@@ -129,7 +129,7 @@ export function EstimateRisksScreen({ plate, embedded = false }: Props) {
         defects={data.defects?.length ?? 0}
         recalls={data.recalls?.length ?? 0}
         riskScore={Number(enriched.maintenanceRiskScore ?? 6)}
-        mileagePlausible={((enriched as Record<string, unknown>).userMileagePlausible ?? null) as boolean | null}
+        mileagePlausible={enriched.userMileagePlausible ?? null}
       />
     </PremiumLock>
   );
