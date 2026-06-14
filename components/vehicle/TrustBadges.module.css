@@ -1,0 +1,74 @@
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+
+.badge {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--kr-line, #e2e8f2);
+  background: #fff;
+}
+
+.icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.sub {
+  font-size: 12px;
+  color: #5b6b84;
+  line-height: 1.4;
+}
+
+.ok {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.ok .icon {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.warn {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+.warn .icon {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.danger {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.danger .icon {
+  background: #fee2e2;
+  color: #dc2626;
+}

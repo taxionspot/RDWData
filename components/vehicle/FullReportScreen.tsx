@@ -41,6 +41,7 @@ import { ApkFailureIntelligenceScreen } from "./ApkFailureIntelligenceScreen";
 import { NegotiationCopilotScreen } from "./NegotiationCopilotScreen";
 import { TechnicalSpecsScreen } from "./TechnicalSpecsScreen";
 import { ReportSectionNav } from "./ReportSectionNav";
+import { TrustBadges } from "./TrustBadges";
 import styles from "./FullReportScreen.module.css";
 
 type Props = { plate: string };
@@ -64,28 +65,20 @@ const SECTIONS: SectionDef[] = [
     lockKey: null
   },
   {
-    id: "ai-analyse",
-    labelNl: "Analyse",
-    labelEn: "Analysis",
-    subNl: "Het volledige profiel vertaald naar gewone taal",
-    subEn: "The full profile translated into plain language",
-    lockKey: "riskOverview"
-  },
-  {
-    id: "risico",
-    labelNl: "Risico's",
-    labelEn: "Risks",
-    subNl: "De vier kerncontroles in één blik",
-    subEn: "The four core checks at a glance",
-    lockKey: "riskOverview"
-  },
-  {
     id: "markt",
     labelNl: "Marktwaarde",
     labelEn: "Market value",
     subNl: "Waarde, vraagprijs-check en vaste lasten",
     subEn: "Value, asking-price check and running costs",
     lockKey: "marketAnalysis"
+  },
+  {
+    id: "kilometerstand",
+    labelNl: "Kilometerstand",
+    labelEn: "Mileage",
+    subNl: "NAP-oordeel en tellertrend",
+    subEn: "NAP verdict and odometer trend",
+    lockKey: "mileageHistory"
   },
   {
     id: "apk",
@@ -96,12 +89,12 @@ const SECTIONS: SectionDef[] = [
     lockKey: "inspectionTimeline"
   },
   {
-    id: "kilometerstand",
-    labelNl: "Kilometerstand",
-    labelEn: "Mileage",
-    subNl: "NAP-oordeel en tellertrend",
-    subEn: "NAP verdict and odometer trend",
-    lockKey: "mileageHistory"
+    id: "risico",
+    labelNl: "Risico's",
+    labelEn: "Risks",
+    subNl: "De vier kerncontroles in één blik",
+    subEn: "The four core checks at a glance",
+    lockKey: "riskOverview"
   },
   {
     id: "schade",
@@ -142,6 +135,14 @@ const SECTIONS: SectionDef[] = [
     subNl: "Volledige fabrieksgegevens uit het RDW-register",
     subEn: "Full factory data from the RDW register",
     lockKey: "technicalSpecs"
+  },
+  {
+    id: "ai-analyse",
+    labelNl: "Samenvatting & advies",
+    labelEn: "Summary & advice",
+    subNl: "Alle bevindingen samengevat in gewone taal",
+    subEn: "All findings summarised in plain language",
+    lockKey: "riskOverview"
   },
   {
     id: "acties",
@@ -428,44 +429,48 @@ export function FullReportScreen({ plate }: Props) {
           />
         </SectionErrorBoundary>
 
-        <SectionBlock section={sectionById("ai-analyse")} index={2} isPremium={isPremiumSection(sectionById("ai-analyse"))} locale={locale}>
-          <AiAnalysisScreen plate={normalized} />
-        </SectionBlock>
+        <SectionErrorBoundary label="trust-badges">
+          <TrustBadges plate={normalized} />
+        </SectionErrorBoundary>
 
-        <SectionBlock section={sectionById("risico")} index={3} isPremium={isPremiumSection(sectionById("risico"))} locale={locale}>
-          <RiskOverviewScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("markt")} index={4} isPremium={isPremiumSection(sectionById("markt"))} locale={locale}>
+        <SectionBlock section={sectionById("markt")} index={2} isPremium={isPremiumSection(sectionById("markt"))} locale={locale}>
           <MarketAnalysisScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("apk")} index={5} isPremium={isPremiumSection(sectionById("apk"))} locale={locale}>
-          <InspectionTimelineScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("kilometerstand")} index={6} isPremium={isPremiumSection(sectionById("kilometerstand"))} locale={locale}>
+        <SectionBlock section={sectionById("kilometerstand")} index={3} isPremium={isPremiumSection(sectionById("kilometerstand"))} locale={locale}>
           <MileageTimelineScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("schade")} index={7} isPremium={isPremiumSection(sectionById("schade"))} locale={locale}>
+        <SectionBlock section={sectionById("apk")} index={4} isPremium={isPremiumSection(sectionById("apk"))} locale={locale}>
+          <InspectionTimelineScreen plate={normalized} embedded />
+        </SectionBlock>
+
+        <SectionBlock section={sectionById("risico")} index={5} isPremium={isPremiumSection(sectionById("risico"))} locale={locale}>
+          <RiskOverviewScreen plate={normalized} embedded />
+        </SectionBlock>
+
+        <SectionBlock section={sectionById("schade")} index={6} isPremium={isPremiumSection(sectionById("schade"))} locale={locale}>
           <DamageHistoryScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("eigendom")} index={8} isPremium={isPremiumSection(sectionById("eigendom"))} locale={locale}>
+        <SectionBlock section={sectionById("eigendom")} index={7} isPremium={isPremiumSection(sectionById("eigendom"))} locale={locale}>
           <OwnershipTimelineScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("apk-intelligence")} index={9} isPremium={isPremiumSection(sectionById("apk-intelligence"))} locale={locale}>
+        <SectionBlock section={sectionById("apk-intelligence")} index={8} isPremium={isPremiumSection(sectionById("apk-intelligence"))} locale={locale}>
           <ApkFailureIntelligenceScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("onderhandeling")} index={10} isPremium={isPremiumSection(sectionById("onderhandeling"))} locale={locale}>
+        <SectionBlock section={sectionById("onderhandeling")} index={9} isPremium={isPremiumSection(sectionById("onderhandeling"))} locale={locale}>
           <NegotiationCopilotScreen plate={normalized} embedded />
         </SectionBlock>
 
-        <SectionBlock section={sectionById("specs")} index={11} isPremium={isPremiumSection(sectionById("specs"))} locale={locale}>
+        <SectionBlock section={sectionById("specs")} index={10} isPremium={isPremiumSection(sectionById("specs"))} locale={locale}>
           <TechnicalSpecsScreen plate={normalized} embedded />
+        </SectionBlock>
+
+        <SectionBlock section={sectionById("ai-analyse")} index={11} isPremium={isPremiumSection(sectionById("ai-analyse"))} locale={locale}>
+          <AiAnalysisScreen plate={normalized} />
         </SectionBlock>
 
         <SectionBlock section={sectionById("acties")} index={12} isPremium={false} locale={locale}>
