@@ -90,6 +90,7 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
   }, [email, isOpen, plate, locale]);
 
   const emailLooksInvalid = email.trim().length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const handleUnlocked = () => {
     track("payment_success", { plate });
@@ -200,12 +201,14 @@ export function SubscriptionModal({ isOpen, onClose, featureName, plate, onUnloc
             </label>
             {emailLooksInvalid ? (
               <p className={styles.emailHint}>{locale === "nl" ? "Controleer het e-mailadres." : "Please check the email address."}</p>
-            ) : email.trim() ? (
+            ) : !email.trim() ? (
+              <p className={styles.emailHint}>{locale === "nl" ? "Vul je e-mailadres in om te betalen." : "Enter your email address to proceed."}</p>
+            ) : (
               <p className={styles.emailNote}>
                 {locale === "nl" ? `We sturen het rapport naar ${email.trim()}` : `We will send the report to ${email.trim()}`}
               </p>
-            ) : null}
-            <div className={styles.planBtn} key={`pay-${retryKey}`}>
+            )}
+            <div className={styles.planBtn} key={`pay-${retryKey}`} style={emailIsValid ? undefined : { opacity: 0.4, pointerEvents: "none", userSelect: "none" }}>
               <CheckoutMethods
                 plate={plate}
                 email={email}
