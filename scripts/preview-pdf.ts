@@ -3,7 +3,10 @@
 import { writeFileSync } from "node:fs";
 import { generateVehicleReportPdf } from "../lib/api/pdf-report";
 import { computeVehicleSignals } from "../lib/vehicle/signals";
+import { buildScoreResult } from "../lib/vehicle/score";
 import type { VehicleProfile } from "../lib/rdw/types";
+import type { ComparableCar } from "../lib/listings/comparable";
+import type { ModelStats } from "../lib/stats/modelStats";
 
 const mockData = {
   vehicle: {
@@ -151,6 +154,89 @@ const aiValuation = {
     "De waardering is gebaseerd op vergelijkbare Golf-modellen uit 2016-2018 met een kilometerstand tussen 110.000 en 145.000 km. De Highline-uitvoering en het logische tellerverloop ondersteunen de bovenkant van de bandbreedte."
 };
 
+// Mock comparable cars for the preview
+const mockComparables: ComparableCar[] = [
+  {
+    title: "Volkswagen Golf 1.4 TSI Comfortline",
+    brand: "Volkswagen",
+    model: "Golf",
+    year: 2016,
+    priceEur: 10500,
+    mileageKm: 112000,
+    fuelType: "Benzine",
+    bodyType: "Hatchback",
+    city: "Amsterdam",
+    region: "Noord-Holland",
+    imageUrl: null,
+    sourceUrl: "https://www.autoscout24.nl/lst",
+    source: "autoscout24.nl"
+  },
+  {
+    title: "Volkswagen Golf 1.4 TSI Trendline",
+    brand: "Volkswagen",
+    model: "Golf",
+    year: 2017,
+    priceEur: 11800,
+    mileageKm: 132000,
+    fuelType: "Benzine",
+    bodyType: "Hatchback",
+    city: "Rotterdam",
+    region: "Zuid-Holland",
+    imageUrl: null,
+    sourceUrl: "https://www.gaspedaal.nl",
+    source: "gaspedaal.nl"
+  },
+  {
+    title: "Volkswagen Golf 1.2 TSI Comfortline",
+    brand: "Volkswagen",
+    model: "Golf",
+    year: 2016,
+    priceEur: 9900,
+    mileageKm: 118000,
+    fuelType: "Benzine",
+    bodyType: "Hatchback",
+    city: "Utrecht",
+    region: "Utrecht",
+    imageUrl: null,
+    sourceUrl: "https://www.marktplaats.nl",
+    source: "marktplaats.nl"
+  },
+  {
+    title: "Volkswagen Golf 1.4 TSI Highline DSG",
+    brand: "Volkswagen",
+    model: "Golf",
+    year: 2017,
+    priceEur: 12500,
+    mileageKm: 98000,
+    fuelType: "Benzine",
+    bodyType: "Hatchback",
+    city: "Eindhoven",
+    region: "Noord-Brabant",
+    imageUrl: null,
+    sourceUrl: "https://www.autoscout24.nl/lst",
+    source: "autoscout24.nl"
+  }
+];
+
+// Mock model statistics for the preview
+const mockModelStats: ModelStats = {
+  key: "VOLKSWAGEN|GOLF|2017",
+  brand: "VOLKSWAGEN",
+  tradeName: "GOLF",
+  year: 2017,
+  sampleSize: 240,
+  vehiclesWithDefects: 132,
+  totalDefects: 387,
+  topDefects: [
+    { code: "AC1", description: "Band(en) beschadigd of profieldiepte onvoldoende", count: 48, pctOfVehicles: 20.0 },
+    { code: "BA2", description: "Remblokken of -schijven versleten", count: 36, pctOfVehicles: 15.0 },
+    { code: "GA3", description: "Uitlaat lekt of onvoldoende vastgezet", count: 24, pctOfVehicles: 10.0 },
+    { code: "DA1", description: "Lichten defect of verkeerd afgesteld", count: 21, pctOfVehicles: 8.8 },
+    { code: "CB1", description: "Stuurspeling te groot", count: 18, pctOfVehicles: 7.5 }
+  ],
+  computedAt: new Date().toISOString()
+};
+
 async function main() {
   // The preview mock is shaped like a localized payload; reuse its vehicle +
   // enriched as a minimal VehicleProfile so the page-1 judgment block renders.
@@ -168,6 +254,19 @@ async function main() {
     raw: mockData.raw
   } as unknown as VehicleProfile;
   const signals = computeVehicleSignals({ profile: previewProfile, nowMs: Date.now(), hasAccess: true });
+
+  // Build the Kentekenrapport Score from the same mock data
+  const score = buildScoreResult({
+    defects: mockData.defects.length,
+    riskScore: mockData.enriched.maintenanceRiskScore,
+    apkPassChance: mockData.enriched.apkPassChance,
+    wok: mockData.vehicle.wok,
+    imported: mockData.enriched.isImported,
+    napOnlogisch: mockData.vehicle.napVerdict.toLowerCase().includes("onlogisch"),
+    openRecall: mockData.vehicle.hasOpenRecall,
+    locale: "nl"
+  });
+
   const pdf = await generateVehicleReportPdf({
     plate: "HF001B",
     locale: "nl",
@@ -175,7 +274,10 @@ async function main() {
     data: mockData as unknown as Record<string, unknown>,
     aiInsights,
     aiValuation,
-    signals
+    signals,
+    comparables: mockComparables,
+    modelStats: mockModelStats,
+    score
   });
   const output = process.argv[2] ?? "preview-report.pdf";
   writeFileSync(output, pdf);
