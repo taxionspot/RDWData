@@ -62,10 +62,10 @@ function worst(a: SignalTone, b: SignalTone): SignalTone {
   return rank[a] >= rank[b] ? a : b;
 }
 
-/** Parse an ISO yyyy-mm-dd date to epoch ms at UTC midnight; null if unparseable. */
+/** Parse an ISO yyyy-mm-dd (or yyyy-mm-ddT...) date to epoch ms at UTC midnight; null if unparseable. */
 function parseApkMs(value: string | null): number | null {
   if (!value) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/.exec(value);
   if (!m) return null;
   const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   return Number.isFinite(ms) ? ms : null;
@@ -104,7 +104,7 @@ function computeSafetyTone(profile: VehicleProfile): SignalTone {
 
 function computeMileageTone(profile: VehicleProfile): SignalTone {
   const nap = profile.vehicle.napVerdict;
-  if (isImplausibleNap(nap)) return "danger";
+  if (isImplausibleNap(nap) || profile.enriched?.mileageVerdict === "ONLOGISCH") return "danger";
   if (isNoNapVerdict(nap) || profile.enriched?.mileageVerdict === "TWIJFELACHTIG") {
     return "warn";
   }
@@ -224,7 +224,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       group: "g3-risico"
     });
   }
-  if (isImplausibleNap(v.napVerdict)) {
+  if (isImplausibleNap(v.napVerdict) || enriched?.mileageVerdict === "ONLOGISCH") {
     alerts.push({
       key: "napImplausible",
       tone: "danger",
@@ -232,7 +232,7 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
       labelEn: "Implausible mileage",
       group: "g4-km"
     });
-  } else if (isNoNapVerdict(v.napVerdict)) {
+  } else if (isNoNapVerdict(v.napVerdict) || enriched?.mileageVerdict === "TWIJFELACHTIG") {
     alerts.push({
       key: "napNoVerdict",
       tone: "warn",
@@ -263,6 +263,8 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
   // Summary.
   const deterministic: SignalTone[] = [safetyTone, mileageTone, apkTone];
   const needAttention = deterministic.filter((t) => t !== "ok").length;
+  // Intentional resale-impact teaser count: includes wok/import/dubious mileage.
+  // This is DISTINCT from the per-signal affectsPrice flag (which drives signal-level UI).
   const priceAffecting = [
     !!enriched?.isImported,
     mileageTone !== "ok",
@@ -289,25 +291,31 @@ export function computeVehicleSignals(input: SignalInput): VehicleSignalReport {
   const verdict: Verdict = { tone: verdictTone, headingNl, headingEn };
 
   // Group status (every GroupId present).
+  // Use a Map keyed by signal.key so a future reorder cannot silently swap labels.
+  const signalByKey = new Map(signals.map((s) => [s.key, s]));
+  const safetySignal = signalByKey.get("safety")!;
+  const mileageSignal = signalByKey.get("mileage")!;
+  const apkSignal = signalByKey.get("apk")!;
+
   const safetyStatus: GroupStatus = {
     tone: safetyTone,
-    labelNl: signals[0].labelNl,
-    labelEn: signals[0].labelEn
+    labelNl: safetySignal.labelNl,
+    labelEn: safetySignal.labelEn
   };
   const mileageStatus: GroupStatus = {
     tone: mileageTone,
-    labelNl: signals[1].labelNl,
-    labelEn: signals[1].labelEn
+    labelNl: mileageSignal.labelNl,
+    labelEn: mileageSignal.labelEn
   };
   const apkStatus: GroupStatus = {
     tone: apkTone,
-    labelNl: signals[2].labelNl,
-    labelEn: signals[2].labelEn
+    labelNl: apkSignal.labelNl,
+    labelEn: apkSignal.labelEn
   };
 
   const groupStatus: Record<GroupId, GroupStatus> = {
     "g1-verdict": { tone: verdictTone, labelNl: headingNl, labelEn: headingEn },
-    "g2-markt": hasAccess
+    "g2-markt": hasAccess && enriched?.estimatedValueNow != null
       ? { tone: "ok", labelNl: "Marktwaarde berekend", labelEn: "Market value calculated" }
       : {
           tone: "ok",

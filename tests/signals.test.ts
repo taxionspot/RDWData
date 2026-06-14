@@ -335,9 +335,18 @@ test("groupStatus g1 mirrors verdict; g2 reflects access; g3/g4/g5 mirror signal
   assert.equal(report.groupStatus["g5-apk"].tone, report.signals.find((s) => s.key === "apk")?.tone);
 });
 
-test("groupStatus g2 reads 'Marktwaarde berekend' when hasAccess", () => {
-  const report = computeVehicleSignals(input(makeProfile(), { hasAccess: true }));
+test("groupStatus g2 reads 'Marktwaarde berekend' when hasAccess AND estimatedValueNow present", () => {
+  const report = computeVehicleSignals(
+    input(makeProfile({}, { enriched: { estimatedValueNow: 12000 } }), { hasAccess: true })
+  );
   assert.equal(report.groupStatus["g2-markt"].labelNl, "Marktwaarde berekend");
+});
+
+test("groupStatus g2 reads unlock label when hasAccess but estimatedValueNow is null", () => {
+  const report = computeVehicleSignals(
+    input(makeProfile({}, { enriched: { estimatedValueNow: null } }), { hasAccess: true })
+  );
+  assert.equal(report.groupStatus["g2-markt"].labelNl, "Ontgrendel de marktwaarde-analyse");
 });
 
 test("clean car: groupStatus g6 reads RDW data complete (not imported)", () => {
@@ -362,4 +371,49 @@ test("no alert label across the suite contains em-dash or en-dash", () => {
       assert.equal(a.labelEn.includes("–"), false);
     }
   }
+});
+
+// C1: ONLOGISCH mileage verdict (our own rollback detection) must be treated as danger.
+test("C1a: enriched.mileageVerdict ONLOGISCH with napVerdict Logisch -> mileage danger + danger alert + verdict danger", () => {
+  const report = computeVehicleSignals(
+    input(makeProfile({ napVerdict: "Logisch" }, { enriched: { mileageVerdict: "ONLOGISCH" } }))
+  );
+  assert.equal(report.signals.find((s) => s.key === "mileage")?.tone, "danger");
+  assert.equal(
+    report.alerts.some((a) => a.key === "napImplausible" && a.tone === "danger" && a.group === "g4-km"),
+    true
+  );
+  assert.equal(report.verdict.tone, "danger");
+});
+
+test("C1b: enriched.mileageVerdict TWIJFELACHTIG with napVerdict Logisch -> mileage warn + warn alert", () => {
+  const report = computeVehicleSignals(
+    input(makeProfile({ napVerdict: "Logisch" }, { enriched: { mileageVerdict: "TWIJFELACHTIG" } }))
+  );
+  assert.equal(report.signals.find((s) => s.key === "mileage")?.tone, "warn");
+  assert.equal(
+    report.alerts.some((a) => a.key === "napNoVerdict" && a.tone === "warn" && a.group === "g4-km"),
+    true
+  );
+});
+
+// m4: APK expiry equals exactly "today" (expiry === nowMs).
+// The condition is expiry < nowMs (strict less-than), so equal means NOT expired yet.
+// With no other triggers, expiry - nowMs = 0 which is <= 30 * DAY_MS -> warn.
+test("m4: apkExpiryDate equals today (expiry === nowMs) -> warn apk (within 30-day window)", () => {
+  const todayIso = new Date(BASE_NOW).toISOString().slice(0, 10);
+  const report = computeVehicleSignals(input(makeProfile({ apkExpiryDate: todayIso })));
+  assert.equal(report.signals.find((s) => s.key === "apk")?.tone, "warn");
+});
+
+// m2: enriched: null (absent enriched) must not throw and must yield sane defaults.
+test("m2: enriched absent (null) -> report produced without throwing, sane defaults", () => {
+  const report = computeVehicleSignals(input(makeProfile({}, { enriched: null })));
+  assert.ok(report, "report should be defined");
+  assert.equal(typeof report.verdict.tone, "string");
+  assert.equal(report.summary.checked, 3);
+  assert.equal(report.signals.find((s) => s.key === "safety")?.tone, "ok");
+  assert.equal(report.signals.find((s) => s.key === "mileage")?.tone, "ok");
+  assert.equal(report.signals.some((s) => s.key === "fairPrice"), false);
+  assert.equal(report.groupStatus["g6-voertuig"].labelNl, "RDW-voertuiggegevens compleet");
 });
