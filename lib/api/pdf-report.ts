@@ -176,6 +176,8 @@ class PdfLayout {
   private args: ReportArgs;
   public page: PDFPage;
   public y: number;
+  public pages: PDFPage[] = [];
+  public anchors: Array<{ title: string; pageIndex: number }> = [];
 
   constructor(doc: PDFDocument, regular: PDFFont, bold: PDFFont, args: ReportArgs) {
     this.doc = doc;
@@ -183,12 +185,14 @@ class PdfLayout {
     this.bold = bold;
     this.args = args;
     this.page = this.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    this.pages.push(this.page);
     drawHeader(this.page, this.bold, this.regular, args);
     this.y = PAGE_HEIGHT - HEADER_HEIGHT - 16;
   }
 
   private addPage() {
     this.page = this.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    this.pages.push(this.page);
     drawHeader(this.page, this.bold, this.regular, this.args);
     this.y = PAGE_HEIGHT - HEADER_HEIGHT - 16;
   }
@@ -386,6 +390,207 @@ class PdfLayout {
         });
     });
     this.y -= cardHeight + 8;
+  }
+
+  groupBanner(index: number, titleNl: string, titleEn: string, locale: "nl" | "en") {
+    this.anchors.push({
+      title: `${index}. ${locale === "nl" ? titleNl : titleEn}`,
+      pageIndex: this.pages.indexOf(this.page)
+    });
+    this.ensureHeight(26);
+    this.page.drawRectangle({
+      x: MARGIN,
+      y: this.y - 22,
+      width: CONTENT_WIDTH,
+      height: 22,
+      color: rgb(0.06, 0.2, 0.45)
+    });
+    this.page.drawText(`${index}. ${locale === "nl" ? titleNl : titleEn}`, {
+      x: MARGIN + 8,
+      y: this.y - 15,
+      font: this.bold,
+      size: 11,
+      color: rgb(1, 1, 1)
+    });
+    this.y -= 30;
+  }
+
+  drawJudgmentBlock(report: VehicleSignalReport, locale: "nl" | "en") {
+    const verdict = report.verdict;
+    const heading = locale === "nl" ? verdict.headingNl : verdict.headingEn;
+
+    // Verdict heading: a left accent bar (tone) + dark heading text. Colour is
+    // reinforced by the words below, so grayscale print stays readable.
+    this.ensureHeight(40);
+    const [ir, ig, ib] = inkForTone(verdict.tone);
+    this.page.drawRectangle({
+      x: MARGIN,
+      y: this.y - 30,
+      width: 6,
+      height: 30,
+      color: rgb(ir, ig, ib)
+    });
+    splitText(heading, this.bold, 15, CONTENT_WIDTH - 20)
+      .slice(0, 2)
+      .forEach((line, i) => {
+        this.page.drawText(line, {
+          x: MARGIN + 16,
+          y: this.y - 16 - i * 18,
+          font: this.bold,
+          size: 15,
+          color: rgb(0.06, 0.09, 0.16)
+        });
+      });
+    this.y -= 40;
+
+    // Signal lines: word in a light-tone filled rect (dark ink), then the
+    // Dutch/English label + sub. Reuses the drawCardRow accent idea as a row.
+    const rowH = 30;
+    const wordW = 78;
+    report.signals.forEach((sig) => {
+      this.ensureHeight(rowH + 4);
+      const top = this.y;
+      this.page.drawRectangle({
+        x: MARGIN,
+        y: top - rowH,
+        width: CONTENT_WIDTH,
+        height: rowH,
+        color: rgb(0.985, 0.99, 1),
+        borderColor: rgb(0.86, 0.9, 0.96),
+        borderWidth: 0.5
+      });
+      // status word chip (light fill, dark text, survives grayscale)
+      const [ar, ag, ab] = accentForTone(sig.tone);
+      this.page.drawRectangle({
+        x: MARGIN + 6,
+        y: top - rowH + 6,
+        width: wordW,
+        height: rowH - 12,
+        color: rgb(ar, ag, ab)
+      });
+      const [wr, wg, wb] = inkForTone(sig.tone);
+      this.page.drawText(toneToPdfWord(sig.tone), {
+        x: MARGIN + 12,
+        y: top - rowH / 2 - 3,
+        font: this.bold,
+        size: 9,
+        color: rgb(wr, wg, wb)
+      });
+      const label = locale === "nl" ? sig.labelNl : sig.labelEn;
+      const sub = locale === "nl" ? sig.subNl : sig.subEn;
+      this.page.drawText(label, {
+        x: MARGIN + wordW + 16,
+        y: top - 13,
+        font: this.bold,
+        size: 9.5,
+        color: rgb(0.12, 0.2, 0.3)
+      });
+      splitText(sub, this.regular, 8.5, CONTENT_WIDTH - wordW - 28)
+        .slice(0, 1)
+        .forEach((line) => {
+          this.page.drawText(line, {
+            x: MARGIN + wordW + 16,
+            y: top - 24,
+            font: this.regular,
+            size: 8.5,
+            color: rgb(0.36, 0.44, 0.55)
+          });
+        });
+      this.y -= rowH + 4;
+    });
+
+    // Summary teaser line (honest counts, no em-dash or en-dash).
+    const summary = report.summary;
+    const teaser =
+      locale === "nl"
+        ? `Wij controleerden ${summary.checked} signalen. ${summary.needAttention} ${summary.needAttention === 1 ? "vraagt" : "vragen"} aandacht.` +
+          (summary.priceAffecting > 0 ? ` ${summary.priceAffecting} raakt de eerlijke prijs.` : "")
+        : `We checked ${summary.checked} signals. ${summary.needAttention} need attention.` +
+          (summary.priceAffecting > 0 ? ` ${summary.priceAffecting} affects the fair price.` : "");
+    this.ensureHeight(18);
+    this.page.drawText(teaser, {
+      x: MARGIN,
+      y: this.y - 12,
+      font: this.regular,
+      size: 9,
+      color: rgb(0.3, 0.38, 0.5)
+    });
+    this.y -= 20;
+
+    // Alerts (only the real exceptions).
+    if (report.alerts.length > 0) {
+      this.section(locale === "nl" ? "Aandachtspunten" : "Exceptions");
+      report.alerts.forEach((alert) => {
+        const alertH = 22;
+        this.ensureHeight(alertH + 2);
+        const atop = this.y;
+        const [aar, aag, aab] = accentForTone(alert.tone);
+        this.page.drawRectangle({
+          x: MARGIN,
+          y: atop - alertH,
+          width: CONTENT_WIDTH,
+          height: alertH,
+          color: rgb(aar, aag, aab),
+          borderColor: rgb(0.86, 0.9, 0.96),
+          borderWidth: 0.5
+        });
+        const [alr, alg, alb] = inkForTone(alert.tone);
+        this.page.drawText(toneToPdfWord(alert.tone), {
+          x: MARGIN + 8,
+          y: atop - 15,
+          font: this.bold,
+          size: 8,
+          color: rgb(alr, alg, alb)
+        });
+        this.page.drawText(locale === "nl" ? alert.labelNl : alert.labelEn, {
+          x: MARGIN + 70,
+          y: atop - 15,
+          font: this.regular,
+          size: 9,
+          color: rgb(0.18, 0.26, 0.38)
+        });
+        this.y -= alertH + 3;
+      });
+      this.y -= 4;
+    }
+  }
+
+  buildTocPage(locale: "nl" | "en"): PDFPage {
+    const page = this.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    drawHeader(page, this.bold, this.regular, this.args);
+    let ty = PAGE_HEIGHT - HEADER_HEIGHT - 24;
+    page.drawText(locale === "nl" ? "Inhoud" : "Contents", {
+      x: MARGIN,
+      y: ty,
+      font: this.bold,
+      size: 16,
+      color: rgb(0.06, 0.2, 0.45)
+    });
+    ty -= 30;
+    this.anchors.forEach((a) => {
+      // pageIndex is into this.pages BEFORE the TOC is moved to the front, so
+      // the printed page number is pageIndex + 2 (1-based, +1 for the TOC page
+      // that becomes page 1).
+      const printedPage = a.pageIndex + 2;
+      page.drawText(a.title, {
+        x: MARGIN,
+        y: ty,
+        font: this.regular,
+        size: 11,
+        color: rgb(0.14, 0.22, 0.34)
+      });
+      const numLabel = String(printedPage);
+      const numW = this.regular.widthOfTextAtSize(numLabel, 11);
+      page.drawText(numLabel, {
+        x: PAGE_WIDTH - MARGIN - numW,
+        y: ty,
+        font: this.regular,
+        size: 11,
+        color: rgb(0.3, 0.4, 0.52)
+      });
+      ty -= 20;
+    });
+    return page;
   }
 }
 
