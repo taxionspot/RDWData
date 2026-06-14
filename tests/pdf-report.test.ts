@@ -21,21 +21,28 @@ test("pdfGroupOrder starts with the identity group and never contains the droppe
   assert.equal(order.includes("risico" as never), false);
 });
 
-test("pdfGroupOrder 9-group order: overzicht, ai-analyse, markt, te-koop, schatting, schade, kilometerstand, apk, apk-intelligence, eigendom, specs", () => {
+test("pdfGroupOrder 9-group order matches GROUPS definition exactly (G1-G9)", () => {
+  // The PDF order is driven from GROUPS, so this test validates that pdfGroupOrder()
+  // returns the same section ids as GROUPS.flatMap(g => g.sectionIds) in order.
+  // Current order: g1-overzicht=[overzicht], g2-oordeel=[ai-analyse],
+  // g3-markt=[markt], g4-tekoop=[te-koop], g5-schatting=[schatting],
+  // g6-risico=[schade], g7-km=[kilometerstand], g8-apk=[apk,apk-intelligence],
+  // g9-eigendom=[eigendom,specs]
   const order = pdfGroupOrder();
-  assert.deepEqual(order, [
-    "overzicht",
-    "ai-analyse",
-    "markt",
-    "te-koop",
-    "schatting",
-    "schade",
-    "kilometerstand",
-    "apk",
-    "apk-intelligence",
-    "eigendom",
-    "specs"
-  ]);
+  const expected = GROUPS.flatMap((g) => g.sectionIds);
+  assert.deepEqual(order, expected);
+  // Also verify key positions:
+  assert.equal(order[0], "overzicht");
+  assert.equal(order[1], "ai-analyse");
+  assert.equal(order[2], "markt");
+  assert.equal(order[3], "te-koop");
+  assert.equal(order[4], "schatting");
+  assert.equal(order[5], "schade");
+  assert.equal(order[6], "kilometerstand");
+  assert.equal(order[7], "apk");
+  assert.equal(order[8], "apk-intelligence");
+  assert.equal(order[9], "eigendom");
+  assert.equal(order[10], "specs");
 });
 
 test("pdfSectionTitle returns honest Dutch and English titles for each section id", () => {
