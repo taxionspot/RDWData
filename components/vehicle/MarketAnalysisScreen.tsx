@@ -14,6 +14,7 @@ import { formatDisplayPlate } from "@/lib/rdw/normalize";
 import styles from "./MarketAnalysisScreen.module.css";
 import { VehicleNavBar } from "./VehicleNavBar";
 import { PremiumLock } from "../ui/PremiumLock";
+import { NegotiationBlock } from "./NegotiationBlock";
 import { useI18n } from "@/lib/i18n/context";
 import { computeMarketValueV3 } from "@/lib/rdw/heuristics";
 
@@ -405,6 +406,17 @@ export function MarketAnalysisScreen({ plate, embedded = false }: Props) {
               ))}
             </div>
           </div>
+
+          <NegotiationBlock
+            locale={locale === "nl" ? "nl" : "en"}
+            marketNow={marketValue}
+            marketMin={marketValueMin}
+            marketMax={marketValueMax}
+            defects={data.defects?.length ?? 0}
+            recalls={data.recalls?.length ?? 0}
+            riskScore={Number(enriched.maintenanceRiskScore ?? 6)}
+            mileagePlausible={((enriched as Record<string, unknown>).userMileagePlausible ?? null) as boolean | null}
+          />
         </PremiumLock>
 
       </div>

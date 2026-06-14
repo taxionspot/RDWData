@@ -84,3 +84,41 @@ export async function fetchComparablePool(brand: string, model: string, maxResul
     clearTimeout(timer);
   }
 }
+
+/**
+ * Diagnostic probe (no secrets in output): reports whether APIFY_TOKEN is
+ * present, the raw Apify HTTP status, item count and a short body snippet, so we
+ * can tell "token not active" from "actor returned nothing / needs renting".
+ * Used by the comparable route's ?debug=1 branch; remove once verified live.
+ */
+export async function probeComparable(
+  brand: string,
+  model: string
+): Promise<{ hasToken: boolean; status: number | null; count: number; snippet: string }> {
+  const token = (process.env.APIFY_TOKEN || "").trim();
+  if (!token) return { hasToken: false, status: null, count: 0, snippet: "" };
+  const url = `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ brand: brand.toLowerCase(), model: model.toLowerCase(), maxResults: 10 }),
+      signal: controller.signal
+    });
+    const body = await res.text();
+    let count = 0;
+    try {
+      const j = JSON.parse(body);
+      if (Array.isArray(j)) count = j.length;
+    } catch {
+      // non-json body
+    }
+    return { hasToken: true, status: res.status, count, snippet: body.slice(0, 300) };
+  } catch (e) {
+    return { hasToken: true, status: null, count: 0, snippet: e instanceof Error ? e.message : "error" };
+  } finally {
+    clearTimeout(timer);
+  }
+}

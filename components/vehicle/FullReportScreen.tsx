@@ -38,7 +38,6 @@ import { MileageTimelineScreen } from "./MileageTimelineScreen";
 import { DamageHistoryScreen } from "./DamageHistoryScreen";
 import { OwnershipTimelineScreen } from "./OwnershipTimelineScreen";
 import { ApkFailureIntelligenceScreen } from "./ApkFailureIntelligenceScreen";
-import { NegotiationCopilotScreen } from "./NegotiationCopilotScreen";
 import { TechnicalSpecsScreen } from "./TechnicalSpecsScreen";
 import { ReportSectionNav } from "./ReportSectionNav";
 import { TrustBadges } from "./TrustBadges";
@@ -136,14 +135,6 @@ const SECTIONS: SectionDef[] = [
     subNl: "Terugkerende gebreken en slaagkans",
     subEn: "Recurring defects and pass probability",
     lockKey: "riskOverview"
-  },
-  {
-    id: "onderhandeling",
-    labelNl: "Onderhandelcoach",
-    labelEn: "Negotiation",
-    subNl: "Biedrange, walk-away en gesprekspunten",
-    subEn: "Offer range, walk-away and talking points",
-    lockKey: "marketAnalysis"
   },
   {
     id: "specs",
@@ -480,10 +471,6 @@ export function FullReportScreen({ plate }: Props) {
 
         <SectionBlock section={sectionById("apk-intelligence")} index={sectionIndex("apk-intelligence")} isPremium={isPremiumSection(sectionById("apk-intelligence"))} locale={locale}>
           <ApkFailureIntelligenceScreen plate={normalized} embedded />
-        </SectionBlock>
-
-        <SectionBlock section={sectionById("onderhandeling")} index={sectionIndex("onderhandeling")} isPremium={isPremiumSection(sectionById("onderhandeling"))} locale={locale}>
-          <NegotiationCopilotScreen plate={normalized} embedded />
         </SectionBlock>
 
         <SectionBlock section={sectionById("specs")} index={sectionIndex("specs")} isPremium={isPremiumSection(sectionById("specs"))} locale={locale}>
