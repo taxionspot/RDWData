@@ -159,8 +159,11 @@ export function FullReportScreen({ plate }: Props) {
   // Fire the GTM purchase event exactly once on the iDEAL return.
   // Gate strictly on the signed PAID cookie (unlocked) AND paid==="1" in the
   // URL so a spoofed bare ?paid=1 without a valid cookie never fires the event.
+  // Also exclude the sample plate: unlocked is always true for it, so a
+  // fabricated ?paid=1&oid=... on the sample URL would otherwise fire a bogus event.
   useEffect(() => {
     if (!unlocked) return;
+    if (isSamplePlate(normalized)) return;
     const paid = searchParams?.get("paid");
     if (paid !== "1") return;
     const oid = searchParams?.get("oid") ?? "";

@@ -6,16 +6,14 @@
  *
  * Trigger: when the pay modal opens (high-intent signal), fired fire-and-forget
  * from the client. The endpoint:
+ *   - Enforces a per-IP fixed-window rate limit (30 requests/IP/hour) stored in
+ *     MongoDB so an attacker cannot enumerate plates to trigger many Claude calls.
+ *     Over-cap requests return { ok: true, throttled: true } (HTTP 200) so the
+ *     fire-and-forget client never retries.
  *   - Always checks the cache first; returns immediately on a hit (idempotent).
  *   - Validates the plate against RDW before calling Claude, so random/invalid
  *     plates never trigger a generation (basic abuse guard).
  *   - Writes ONLY to the cache; NEVER returns AI content (premium must not leak).
- *
- * Cost note: a motivated attacker could enumerate NL plates and hit this endpoint
- * for each, triggering one Claude call per unique plate+locale pair per 7-day cache
- * window. The per-plate dedup on the client (sessionStorage kr_prewarm:<plate>) and
- * the cache-hit early return limit the blast radius for normal usage, but a
- * server-side rate-limit per IP is a recommended follow-up for production hardening.
  */
 
 import { NextResponse } from "next/server";
@@ -26,8 +24,50 @@ import { localizeVehicleProfile } from "@/lib/i18n/vehicle";
 import type { Locale } from "@/lib/i18n/messages";
 import { generateVehicleAiReport } from "@/lib/api/claude";
 import { aiCacheKey, readAiCache, writeAiCache } from "@/lib/api/ai-cache";
+import { connectMongo } from "@/lib/db/mongodb";
+import { PrewarmRateLimitModel } from "@/models/PrewarmRateLimit";
 
 type Params = { params: { plate: string } };
+
+/** Maximum prewarm calls allowed per IP per clock-hour. */
+const PREWARM_HOURLY_CAP = 30;
+
+/**
+ * Derive the client IP from the request headers.
+ * x-forwarded-for may be a comma-separated list; we take the first value
+ * (the original client), which is what Vercel/most proxies set.
+ * Falls back to a constant so the rate limit still works locally without a proxy.
+ */
+function getClientIp(request: Request): string {
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0].trim();
+    if (first) return first;
+  }
+  return "unknown";
+}
+
+/**
+ * Increment the per-IP hourly counter and return the updated count.
+ * Uses upsert + $inc so the operation is atomic. If Mongo is unavailable
+ * we allow the request through (fail open, prefer availability).
+ */
+async function incrementRateLimitCount(ip: string): Promise<number> {
+  try {
+    await connectMongo();
+    const hourSlot = new Date().toISOString().slice(0, 13).replace("T", "-"); // "YYYY-MM-DD-HH"
+    const bucketId = `${ip}|${hourSlot}`;
+    const doc = await PrewarmRateLimitModel.findOneAndUpdate(
+      { _id: bucketId },
+      { $inc: { count: 1 }, $setOnInsert: { createdAt: new Date() } },
+      { upsert: true, new: true }
+    );
+    return doc?.count ?? 1;
+  } catch {
+    // Mongo unavailable: fail open so a DB hiccup does not break prewarm.
+    return 0;
+  }
+}
 
 function parseLocale(input: string | null): Locale {
   return input === "en" ? "en" : "nl";
@@ -35,6 +75,15 @@ function parseLocale(input: string | null): Locale {
 
 export async function POST(request: Request, { params }: Params) {
   try {
+    // --- Rate limit (per-IP, per-hour) ---
+    // Check BEFORE any expensive work. Over-cap: return 200 with throttled:true
+    // so the fire-and-forget client never sees an error and does not retry.
+    const ip = getClientIp(request);
+    const count = await incrementRateLimitCount(ip);
+    if (count > PREWARM_HOURLY_CAP) {
+      return NextResponse.json({ ok: true, throttled: true });
+    }
+
     const plate = parsePlateOrThrow(params.plate);
     const url = new URL(request.url);
     const locale = parseLocale(url.searchParams.get("lang"));
