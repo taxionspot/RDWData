@@ -37,6 +37,7 @@ import { TechnicalSpecsScreen } from "./TechnicalSpecsScreen";
 import { ReportGroup } from "./ReportGroup";
 import { ReportSectionNav } from "./ReportSectionNav";
 import { ReportTeaser } from "./ReportTeaser";
+import { PageUnlockContext } from "./page-unlock-context";
 import { TrustBadges } from "./TrustBadges";
 import { ComparableListings } from "./ComparableListings";
 import styles from "./FullReportScreen.module.css";
@@ -190,6 +191,7 @@ export function FullReportScreen({ plate }: Props) {
   }));
 
   return (
+    <PageUnlockContext.Provider value={() => setShowPayment(true)}>
     <div className={styles.page}>
       <ScanIntro plate={normalized} />
 
@@ -295,5 +297,6 @@ export function FullReportScreen({ plate }: Props) {
         onUnlocked={() => setShowPayment(false)}
       />
     </div>
+    </PageUnlockContext.Provider>
   );
 }

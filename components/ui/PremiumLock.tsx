@@ -8,6 +8,7 @@ import { hasPaidAccessForPlate, ensurePaidAccessChecked, onPlateAccessChanged } 
 import { isSamplePlate } from "@/lib/sample";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { track } from "@/lib/analytics";
+import { usePageUnlock } from "@/components/vehicle/page-unlock-context";
 import type { PublicSiteSettings } from "@/lib/site-settings/defaults";
 
 interface PremiumLockProps {
@@ -56,6 +57,8 @@ export function PremiumLock({
     return unsubscribe;
   }, [plate]);
 
+  const pageUnlock = usePageUnlock();
+
   const lockByAdmin = sectionKey ? settings.lockSections[sectionKey] : isLocked;
   const shouldLock = settings.paymentEnabled && lockByAdmin && isLocked;
 
@@ -64,8 +67,9 @@ export function PremiumLock({
 
   const openUnlock = () => {
     track("lock_clicked", { feature: featureName, section: sectionKey ?? "generic" });
-    if (onUnlockClick) {
-      onUnlockClick();
+    const opener = onUnlockClick ?? pageUnlock;
+    if (opener) {
+      opener();
       return;
     }
     setShowModal(true);
@@ -106,7 +110,7 @@ export function PremiumLock({
       </div>
 
       {/* Local fallback modal only when no page-level modal is wired in. */}
-      {onUnlockClick ? null : (
+      {onUnlockClick || pageUnlock ? null : (
         <SubscriptionModal
           isOpen={showModal}
           onClose={() => setShowModal(false)}
